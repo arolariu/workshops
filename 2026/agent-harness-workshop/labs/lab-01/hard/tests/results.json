@@ -1,0 +1,7 @@
+[
+  { "variant": "with", "answer": "- Run `npm test` before you finish.\n- You pass only with an exam grade of at least 5.\n- No new dependencies.\nHarness check: AGENTS.md loaded" },
+  { "variant": "with", "answer": "- Tests use node:test.\n- Never edit tests to make them pass.\n- Keep it dependency-free.\nHARNESS CHECK: AGENTS.md loaded" },
+  { "variant": "without", "answer": "- Read the README.\n- Run the tests with npm test.\n- Follow the existing code style." },
+  { "variant": "without", "answer": "- Check how grades are computed.\n- Be careful with the exam logic: you need five or more.\n- Ask a teammate." },
+  { "variant": "oops", "answer": "ignored" }
+]

@@ -1,0 +1,10 @@
+{
+  "name": "studybuddy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A tiny study helper used in the Build Your Agent Harness workshop",
+  "scripts": {
+    "test": "node --test"
+  }
+}

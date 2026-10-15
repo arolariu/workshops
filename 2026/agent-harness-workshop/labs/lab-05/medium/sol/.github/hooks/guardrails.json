@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "node .github/hooks/scripts/guard.mjs",
+        "powershell": "node .github/hooks/scripts/guard.mjs",
+        "cwd": ".",
+        "timeoutSec": 10
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "node .github/hooks/scripts/audit.mjs",
+        "powershell": "node .github/hooks/scripts/audit.mjs",
+        "cwd": ".",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}

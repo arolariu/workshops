@@ -1,0 +1,12 @@
+{"type":"session.start","data":{"sessionId":"demo-123","model":"auto"}}
+{"type":"user.message","data":{"content":"Run the tests and tell me what failed"}}
+{"type":"assistant.turn_start","data":{}}
+{"type":"tool.execution_start","data":{"toolCallId":"t1","toolName":"bash","arguments":{"command":"npm test"}}}
+{"type":"tool.execution_complete","data":{"toolCallId":"t1","success":true}}
+{"type":"assistant.usage","data":{"model":"auto","inputTokens":5200,"outputTokens":310}}
+
+{"type":"tool.execution_start","data":{"toolCallId":"t2","toolName":"view","arguments":{"path":"grades.js"}}}
+{"type":"tool.execution_complete","data":{"toolCallId":"t2","success":true}}
+this line is broken on purpose
+{"type":"assistant.usage","data":{"model":"auto","inputTokens":1800,"outputTokens":95}}
+{"type":"assistant.message","data":{"content":"One test fails: hasPassed ignores the exam rule."}}

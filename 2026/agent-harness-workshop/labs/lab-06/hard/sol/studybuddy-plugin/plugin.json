@@ -1,0 +1,8 @@
+{
+  "name": "studybuddy-harness",
+  "description": "StudyBuddy's agent harness: a read-only reviewer agent and an explain-error skill.",
+  "version": "1.0.0",
+  "author": { "name": "StudyBuddy team" },
+  "license": "MIT",
+  "keywords": ["education", "code-review", "debugging"]
+}

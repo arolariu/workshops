@@ -1,0 +1,6 @@
+name: studybuddy
+version: 1.0.0
+description: StudyBuddy's agent harness, installed instead of copied
+dependencies:
+  apm:
+    - microsoft/apm-sample-package#v1.0.0

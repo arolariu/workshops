@@ -1,0 +1,12 @@
+# lab companion state
+labs/.progress.json
+labs/.runs/
+labs/.backups/
+
+# things the exercises create
+node_modules/
+.agent-logs/
+apm_modules/
+labs/**/src/runs/
+labs/**/src/ab-results.json
+labs/**/src/mcp/state.json
