@@ -1,9 +1,12 @@
 // Child process: runs one exercise's free checks (tests/checks.mjs) against a folder and streams
 // results as "@@harness {json}" lines. Running in a child keeps a broken solution from freezing the app.
+// Statuses: pass | fail | blocked (a required tool is missing) | skip (optional or machine-dependent).
 import { register } from 'node:module';
+import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { makeKit, CheckFail, commandExists, spawnCompat, copilotBin } from './kit.mjs';
+import { recoveryFor } from './doctor.mjs';
 
 register('./fake-sdk/loader.mjs', import.meta.url);
 
@@ -12,54 +15,89 @@ const exDir = path.resolve(exDirArg);
 const target = path.resolve(targetArg);
 const emit = (o) => process.stdout.write(`@@harness ${JSON.stringify(o)}\n`);
 
-const INSTALL = {
-  copilot: 'Install GitHub Copilot CLI: npm install -g @github/copilot',
-  apm: 'Install APM (Agent Package Manager): https://github.com/microsoft/apm#install',
-  'gh-aw': 'Install the GitHub CLI (https://cli.github.com) and run: gh extension install github/gh-aw',
-};
 const available = (tool) => {
   if (tool === 'copilot') return commandExists(copilotBin());
   if (tool === 'gh-aw') return commandExists('gh') && spawnCompat('gh', ['aw', 'version'], { timeout: 20000 }).status === 0;
   return commandExists(tool);
 };
 
+const jsonSafe = (v) => {
+  try { return JSON.parse(JSON.stringify(v)); } catch { return String(v); }
+};
+/** Only the evidence a check actually supplied: never invent expected/actual values. */
+function evidence(src) {
+  const detail = {};
+  if (src && typeof src === 'object') {
+    if (Object.hasOwn(src, 'expected')) detail.expected = jsonSafe(src.expected);
+    if (Object.hasOwn(src, 'actual')) detail.actual = jsonSafe(src.actual);
+  }
+  return detail;
+}
+/** Files a check names: declared ones, plus `backticked` paths in its message that exist in the folder. */
+function filesFor(c, message, supplied) {
+  const named = [...String(message).matchAll(/`([^`\s]+\.[A-Za-z0-9]+)`/g)].map((m) => m[1]);
+  const declared = [...(Array.isArray(supplied) ? supplied : []), ...(Array.isArray(c.files) ? c.files : [])];
+  const inside = (f) => {
+    const abs = path.resolve(target, f);
+    const rel = path.relative(target, abs);
+    return rel && !rel.startsWith('..') && !path.isAbsolute(rel) && fs.existsSync(abs);
+  };
+  return [...new Set([...declared.map(String), ...named.filter(inside)])];
+}
+
 const kit = makeKit({ dir: target, exDir });
 let checks;
 try {
   const mod = await import(pathToFileURL(path.join(exDir, 'tests', 'checks.mjs')).href);
   checks = typeof mod.default === 'function' ? await mod.default(kit) : mod.default;
+  if (!Array.isArray(checks)) throw new Error('tests/checks.mjs must export a list of checks.');
 } catch (e) {
   emit({ type: 'fatal', message: `Could not load the checks: ${e.message}` });
   process.exit(0);
 }
 
-emit({ type: 'plan', total: checks.length, names: checks.map((c) => c.name) });
+emit({ type: 'plan', total: checks.length, names: checks.map((c) => String(c.name)) });
 for (const [idx, c] of checks.entries()) {
-  emit({ type: 'start', idx, name: c.name });
+  const limit = c.timeout ?? 60000;
+  emit({ type: 'start', idx, name: String(c.name), timeout: limit });
   let status = 'pass';
   let message = '';
+  let detail = {};
+  let supplied = [];
+  let needs = null;
   const missing = (c.needs ?? []).find((n) => !available(n));
   if (missing) {
-    status = c.optional ? 'skip' : 'fail';
-    message = `${c.optional ? 'Skipped: this optional check needs' : 'This check needs'} \`${missing}\`. ${INSTALL[missing] ?? ''}`;
+    needs = missing;
+    status = c.optional ? 'skip' : 'blocked';
+    message = `${c.optional ? 'Skipped: this optional check needs' : 'Blocked: this check needs'} \`${missing}\`, which is not available. ${recoveryFor(missing)}`;
   } else if (process.env.HARNESS_VERIFY === '1' && c.env) {
     status = 'skip';
     message = 'Depends on your machine (skipped in verify mode).';
   } else {
-    const limit = c.timeout ?? 60000;
+    let timer;
     try {
       const res = await Promise.race([
         Promise.resolve().then(() => c.run()),
-        new Promise((_, reject) => setTimeout(() => reject(new CheckFail(`This check took longer than ${limit / 1000}s.`)), limit)),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new CheckFail(`This check took longer than ${limit / 1000}s.`)), limit); }),
       ]);
       if (typeof res === 'string') { status = 'fail'; message = res; }
       else if (res === false) { status = 'fail'; message = c.hint ?? 'Not there yet.'; }
+      else if (res && typeof res === 'object' && res.ok === false) {
+        status = 'fail';
+        message = String(res.message ?? c.hint ?? 'Not there yet.');
+        detail = evidence(res);
+        supplied = res.files;
+      }
     } catch (e) {
       status = 'fail';
-      message = e instanceof CheckFail || e?.constructor?.name === 'CheckFail' ? e.message : `The check crashed: ${e?.message ?? e}`;
+      const known = e instanceof CheckFail || e?.constructor?.name === 'CheckFail';
+      message = known ? e.message : `The check crashed: ${e?.message ?? e}`;
+      if (known) { detail = evidence(e.detail); supplied = e.detail?.files; }
+    } finally {
+      clearTimeout(timer);
     }
   }
-  emit({ type: 'result', idx, name: c.name, status, message, optional: Boolean(c.optional) });
+  emit({ type: 'result', idx, name: String(c.name), status, message, optional: Boolean(c.optional), ...(needs ? { needs } : {}), detail, files: status === 'pass' ? [] : filesFor(c, message, supplied) });
 }
 emit({ type: 'done' });
 process.exit(0);

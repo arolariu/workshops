@@ -245,12 +245,13 @@ if (!cmd) {
     for (const ex of lab.levels) {
       const s = await runChecks({ exDir: ex.dir, target: ex.src, env: { HARNESS_VERIFY: '1' } });
       const o = await runChecks({ exDir: ex.dir, target: ex.sol, env: { HARNESS_VERIFY: '1' } });
-      const srcOk = !s.fatal && s.failed > 0;
-      const solOk = !o.fatal && o.allPass;
+      // Facilitator semantics (not learner completion): machine-dependent checks may be skipped here.
+      const srcOk = s.complete && s.failed > 0;
+      const solOk = o.complete && o.failed === 0 && o.blocked === 0 && o.passed > 0;
       if (!srcOk || !solOk) problems++;
       const skipped = o.results.filter((r) => r.status === 'skip').length;
-      say(`   ${srcOk && solOk ? '✅' : '❌'} ${white(`${lab.id} ${ex.level.padEnd(6)}`)}  ${dim('src')} ${srcOk ? green(`fails ${s.failed}/${s.total}`) : red(s.fatal ? 'could not run' : 'passes - nothing to do!')}   ${dim('sol')} ${solOk ? green(`passes ${o.passed}/${o.total}`) : red(o.fatal ? `could not run: ${o.fatal}` : `fails ${o.failed}`)}${skipped ? dim(` (${skipped} skipped)`) : ''}`);
-      if (!solOk && !o.fatal) o.results.filter((r) => r.status === 'fail').forEach((r) => say(`        ${red('sol ✗')} ${r.name}: ${dim(r.message.slice(0, 220))}`));
+      say(`   ${srcOk && solOk ? '✅' : '❌'} ${white(`${lab.id} ${ex.level.padEnd(6)}`)}  ${dim('src')} ${srcOk ? green(`fails ${s.failed}/${s.total}`) : red(!s.complete ? `could not run: ${s.fatal}` : 'passes - nothing to do!')}   ${dim('sol')} ${solOk ? green(`passes ${o.passed}/${o.total}`) : red(!o.complete ? `could not run: ${o.fatal}` : o.blocked ? `blocked ${o.blocked}` : `fails ${o.failed}`)}${skipped ? dim(` (${skipped} skipped)`) : ''}`);
+      if (!solOk && o.complete) o.results.filter((r) => r.status === 'fail' || r.status === 'blocked').forEach((r) => say(`        ${red(r.status === 'blocked' ? 'sol blocked' : 'sol ✗')} ${r.name}: ${dim(r.message.slice(0, 220))}`));
       if (flags.has('--verbose') && s.results) s.results.filter((r) => r.status === 'fail').forEach((r) => say(`        ${dim('src ✗')} ${dim(r.name)}`));
     }
   }

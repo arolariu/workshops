@@ -1,47 +1,167 @@
-// Parent side: run the free checks of one exercise in a child process and report each result.
-import { spawn } from 'node:child_process';
+// Parent side: run the free checks of one exercise in a child process and turn its event stream into one
+// trustworthy result. Anything short of a complete, well-formed run is reported as interrupted, never as a pass.
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runProcess } from './process.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+const STATUSES = new Set(['pass', 'fail', 'blocked', 'skip']);
 
-export function runChecks({ exDir, target, onEvent = () => {}, env = {} }) {
-  return new Promise((resolve) => {
-    const results = [];
-    let fatal = null;
-    const child = spawn(process.execPath, [path.join(HERE, 'run-checks.mjs'), exDir, target], {
-      cwd: target,
-      env: { ...process.env, ...env },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let buf = '';
-    let stderr = '';
-    const timer = setTimeout(() => child.kill(), 10 * 60 * 1000);
-    child.stdout.on('data', (d) => {
-      buf += d;
-      let n;
-      while ((n = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, n);
-        buf = buf.slice(n + 1);
-        const m = line.match(/^@@harness (.*)$/);
-        if (!m) continue;
-        let ev;
-        try { ev = JSON.parse(m[1]); } catch { continue; }
-        if (ev.type === 'result') results[ev.idx] = ev;
-        if (ev.type === 'fatal') fatal = ev.message;
-        onEvent(ev);
+/** Result states. Only `pass` means the work is done. */
+export const STATES = ['pass', 'fail', 'blocked', 'skipped', 'cancelled', 'interrupted'];
+
+/**
+ * Run tests/checks.mjs of `exDir` against `target`. Resolves (never rejects):
+ * { state, allPass, complete, results, passed, failed, skipped, blocked, total, fatal, stdout, stderr, exitCode }
+ * state: pass | fail | blocked | skipped | cancelled | interrupted
+ */
+export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, signal, timeout = 10 * 60 * 1000, hangGrace = 15000 }) {
+  const results = [];
+  let plan = null;
+  let done = false;
+  let fatal = null;
+  let protocolError = null;
+  let current = null;
+  let currentOutput = '';
+  let hung = null;
+  let buf = '';
+  let stdout = '';
+  const violate = (msg) => { protocolError = protocolError ?? msg; };
+  const inner = new AbortController();
+  const cancel = () => inner.abort();
+  signal?.addEventListener('abort', cancel, { once: true });
+  let watchdog = null;
+  const armWatchdog = (ev) => {
+    clearTimeout(watchdog);
+    const limit = Number.isFinite(ev.timeout) && ev.timeout > 0 ? ev.timeout : 60000;
+    watchdog = setTimeout(() => { hung = ev.name; inner.abort(); }, limit + hangGrace);
+  };
+
+  const handle = (ev) => {
+    if (!ev || typeof ev !== 'object' || typeof ev.type !== 'string') return violate('an event without a type');
+    if (done) return violate(`a "${ev.type}" event after the run said it was done`);
+    const validIdx = (i) => Number.isInteger(i) && plan && i >= 0 && i < plan.total;
+    switch (ev.type) {
+      case 'plan':
+        if (plan) return violate('the plan was sent twice');
+        if (!Number.isInteger(ev.total) || ev.total < 0 || !Array.isArray(ev.names) || ev.names.length !== ev.total || !ev.names.every((n) => typeof n === 'string')) return violate('an invalid plan');
+        plan = { total: ev.total, names: ev.names };
+        break;
+      case 'start':
+        if (!validIdx(ev.idx) || results[ev.idx] || current !== null) return violate('an unexpected start event');
+        current = ev.idx;
+        currentOutput = '';
+        armWatchdog(ev);
+        break;
+      case 'result':
+        if (!plan) return violate('a result before the plan');
+        if (!validIdx(ev.idx)) return violate('a result for a check that is not in the plan');
+        if (results[ev.idx]) return violate(`the result of "${plan.names[ev.idx]}" was sent twice`);
+        if (ev.idx !== current) return violate(`a result for "${plan.names[ev.idx]}" while another check was running`);
+        if (ev.name !== plan.names[ev.idx]) return violate('a result whose name does not match the plan');
+        if (!STATUSES.has(ev.status)) return violate(`an unknown status "${ev.status}"`);
+        clearTimeout(watchdog);
+        results[ev.idx] = {
+          idx: ev.idx,
+          name: ev.name,
+          status: ev.status,
+          message: String(ev.message ?? ''),
+          optional: Boolean(ev.optional),
+          ...(ev.needs ? { needs: ev.needs } : {}),
+          detail: ev.detail && typeof ev.detail === 'object' ? ev.detail : {},
+          files: Array.isArray(ev.files) ? ev.files.map(String) : [],
+          output: currentOutput,
+        };
+        current = null;
+        break;
+      case 'fatal':
+        fatal = String(ev.message ?? 'The checks could not run.');
+        break;
+      case 'done':
+        if (!plan) return violate('done before the plan');
+        if (results.filter(Boolean).length !== plan.total) return violate('done before every check had a result');
+        done = true;
+        break;
+      default:
+        return violate(`an unknown event "${ev.type}"`);
+    }
+    onEvent(ev);
+    return undefined;
+  };
+
+  const onStdout = (chunk) => {
+    buf += chunk;
+    let n;
+    while ((n = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, n).replace(/\r$/, '');
+      buf = buf.slice(n + 1);
+      const m = line.match(/^@@harness (.*)$/);
+      if (!m) {
+        if (current !== null) currentOutput += `${line}\n`;
+        stdout += `${line}\n`;
+        continue;
       }
-    });
-    child.stderr.on('data', (d) => (stderr += d));
-    child.on('close', () => {
-      clearTimeout(timer);
-      if (!fatal && !results.length && stderr.trim()) fatal = stderr.trim().split('\n').slice(-3).join(' ');
-      const list = results.filter(Boolean);
-      const required = list.filter((r) => !r.optional);
-      const passed = list.filter((r) => r.status === 'pass').length;
-      const failed = list.filter((r) => r.status === 'fail').length;
-      const allPass = !fatal && required.length > 0 && required.every((r) => r.status === 'pass' || r.status === 'skip') && list.every((r) => r.status !== 'fail');
-      resolve({ results: list, passed, failed, total: list.length, allPass, fatal });
-    });
+      let ev;
+      try { ev = JSON.parse(m[1]); } catch { violate('a malformed protocol line'); continue; }
+      handle(ev);
+    }
+  };
+
+  const finish = (proc) => {
+    clearTimeout(watchdog);
+    signal?.removeEventListener('abort', cancel);
+    if (buf) stdout += buf;
+    const list = results.filter(Boolean);
+    const total = plan ? plan.total : list.length;
+    const count = (s) => list.filter((r) => r.status === s).length;
+    const cancelled = Boolean(signal?.aborted) && !hung;
+    let reason = null;
+    if (cancelled) reason = 'The checks were cancelled.';
+    else if (fatal) reason = fatal;
+    else if (proc?.error) reason = `Could not start the checks: ${proc.error}`;
+    else if (hung) reason = `The check "${hung}" did not finish in time and was stopped.`;
+    else if (proc?.timedOut) reason = `The checks took longer than ${Math.round(timeout / 1000)}s and were stopped.`;
+    else if (protocolError) reason = `The checks reported something unexpected (${protocolError}), so this run cannot be trusted.`;
+    else if (!plan || !done || list.length !== total) reason = `The checks stopped early${proc?.code ? ` (exit code ${proc.code})` : ''} after ${list.length} of ${plan ? total : '?'} checks.`;
+    else if (proc && proc.code !== 0) reason = `The checks stopped with exit code ${proc.code}.`;
+    const complete = !reason;
+    const required = list.filter((r) => !r.optional);
+    const allPass = complete && !fatal && required.length > 0 && required.every((r) => r.status === 'pass') && !list.some((r) => r.status === 'fail');
+    let state;
+    if (cancelled) state = 'cancelled';
+    else if (!complete) state = 'interrupted';
+    else if (list.some((r) => r.status === 'fail')) state = 'fail';
+    else if (required.some((r) => r.status === 'blocked')) state = 'blocked';
+    else if (!allPass) state = 'skipped';
+    else state = 'pass';
+    return {
+      state,
+      allPass,
+      complete,
+      results: list,
+      passed: count('pass'),
+      failed: count('fail'),
+      skipped: count('skip'),
+      blocked: count('blocked'),
+      total,
+      fatal: reason,
+      stdout,
+      stderr: proc?.stderr ?? '',
+      exitCode: proc?.code ?? null,
+    };
+  };
+
+  if (signal?.aborted) return finish(null);
+  for (const [dir, what] of [[target, 'folder to check'], [exDir, 'exercise folder']]) {
+    if (!fs.existsSync(dir)) return finish({ error: `the ${what} ${dir} does not exist.`, stderr: '' });
+  }
+  const proc = await runProcess(process.execPath, [path.join(HERE, 'run-checks.mjs'), exDir, target], {
+    cwd: target,
+    env: { ...process.env, ...env },
+    timeout,
+    signal: inner.signal,
+    onStdout,
   });
+  return finish(proc);
 }

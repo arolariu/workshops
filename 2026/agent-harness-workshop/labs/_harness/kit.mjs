@@ -1,12 +1,18 @@
 // The check kit: small helpers every exercise's tests/checks.mjs uses.
 // A check returns true/undefined (pass), a string (fail, shown to the student) or throws CheckFail.
+// To show evidence, fail with details: t.fail('Wrong total.', { expected: 42, actual: 41, files: ['grades.js'] }).
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export class CheckFail extends Error {}
+export class CheckFail extends Error {
+  constructor(message, detail) {
+    super(message);
+    if (detail && typeof detail === 'object') this.detail = detail;
+  }
+}
 
 // ---------- YAML (the subset used by frontmatter, apm.yml and agentic workflows) ----------
 function stripComment(line) {
@@ -297,7 +303,7 @@ export function makeKit({ dir, exDir }) {
     CheckFail,
     path: P,
     check: (name, run, opts = {}) => ({ name, run, ...opts }),
-    fail: (msg) => { throw new CheckFail(msg); },
+    fail: (msg, detail) => { throw new CheckFail(msg, detail); },
     ok: (cond, msg) => { if (!cond) throw new CheckFail(msg); return true; },
     exists: (rel) => fs.existsSync(P(rel)),
     read: (rel) => { try { return norm(fs.readFileSync(P(rel), 'utf8')); } catch { return null; } },
