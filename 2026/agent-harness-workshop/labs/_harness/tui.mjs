@@ -600,7 +600,7 @@ export async function startTui({ labsDir, open = null, intro = true, anim = true
     if (Rs.result) {
       if (Rs.result.ok) {
         L.push(`   ✅ ${bright('Done. This level is back to its starting point.')}`);
-        L.push(`   💾 ${dim('Your previous files are safe in')} ${cyan(rel(Rs.result.backup))}`);
+        L.push(`   💾 ${dim('Your previous files are safe in')} ${cyan(rel(Rs.result.backup.dir))}`);
       } else {
         wrap(`${Rs.result.clean ? '👍' : '⚠️ '} ${Rs.result.clean ? white('Nothing to do:') : yellow('Could not reset:')} ${dim(Rs.result.reason)}`, W() - 4).forEach((l) => L.push(`   ${l}`));
         if (!Rs.result.clean) wrap(dim('No git? Extract this level\'s src/ folder again from the workshop zip to get a fresh copy.'), W() - 4).forEach((l) => L.push(`   ${l}`));
@@ -900,9 +900,7 @@ Each lab has three levels: 🟢 **easy** (we do it together), 🟡 **medium** an
     const lab = labObj();
     const ex = exObj();
     stopWatch();
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const backup = path.join(labsDir, '.backups', `${lab.id}-${ex.level}-${stamp}`);
-    const result = resetToCommit(ex.src, backup);
+    const result = resetToCommit(labsDir, ex);
     if (result.ok) progress.set(keyOf(lab, ex), { checks: null, agent: null, passed: null, total: null, nextFix: null });
     S.reset = { result };
     S.changes = gitChanges(ex.src);

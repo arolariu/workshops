@@ -150,11 +150,10 @@ if (!cmd) {
     say();
     process.exit(0);
   }
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const result = resetToCommit(ex.src, path.join(labsDir, '.backups', `${lab.id}-${ex.level}-${stamp}`));
+  const result = resetToCommit(labsDir, ex);
   if (result.ok) {
     progress.set(`${lab.id}/${ex.level}`, { checks: null, agent: null, passed: null, total: null, nextFix: null });
-    say(`   ✅ ${bright('Done. This level is back to its starting point.')} ${dim('Backup:')} ${cyan(rel(result.backup))}`);
+    say(`   ✅ ${bright('Done. This level is back to your latest commit.')} ${dim('Backup:')} ${cyan(rel(result.backup.dir))}`);
   } else say(`   ${yellow('Could not reset:')} ${dim(result.reason)}`);
   say();
   process.exit(result.ok ? 0 : 1);
