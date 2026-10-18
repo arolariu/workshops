@@ -24,7 +24,7 @@ const labsDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.dirname(labsDir);
 const { green, bright, dim, white, yellow, red, cyan, bold, wrap, inline, bar, style, C } = await import('./_harness/ui.mjs');
 const { loadCatalog, findExercise, LEVEL_BADGE } = await import('./_harness/catalog.mjs');
-const { progressStore } = await import('./_harness/progress.mjs');
+const { progressStore, captureEvidence } = await import('./_harness/progress.mjs');
 const { runChecks } = await import('./_harness/checks.mjs');
 const { runAgentChecks } = await import('./_harness/agent.mjs');
 const { BRAND, creditLine } = await import('./_harness/brand.mjs');
@@ -193,13 +193,13 @@ if (!cmd) {
   const useSol = flags.has('--sol');
   const target = useSol ? ex.sol : ex.src;
   const label = useSol ? 'the reference solution' : 'your work';
-  const record = (r) => {
+  const record = (r, evidence) => {
     if (useSol) return;
-    const firstFail = r.results.find((x) => x.status === 'fail');
-    progress.set(`${lab.id}/${ex.level}`, { checks: r.allPass ? 'pass' : 'fail', passed: r.passed, total: r.total, nextFix: firstFail?.name ?? null });
+    progress.recordChecks(`${lab.id}/${ex.level}`, r, evidence);
   };
+  let evidence = captureEvidence(ex);
   const res = await printChecks(lab, ex, target, label);
-  record(res);
+  record(res, evidence);
   if (flags.has('--watch')) {
     const waiting = () => say(`  👀 ${dim('Watching')} ${cyan(rel(target))} ${dim('— save a file to run the checks again. Ctrl+C to stop.')}`);
     say();
@@ -211,7 +211,8 @@ if (!cmd) {
       if (running) { pending = true; return; }
       running = true;
       if (process.stdout.isTTY) process.stdout.write('\x1b[2J\x1b[H');
-      record(await printChecks(lab, ex, target, label));
+      evidence = captureEvidence(ex);
+      record(await printChecks(lab, ex, target, label), evidence);
       say();
       waiting();
       running = false;

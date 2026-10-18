@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { ESC, C, style, green, bright, dim, white, yellow, red, cyan, bold, width, pad, wrap, bar, box, renderMarkdown, inline, clip, stripAnsi, SPINNER, noColor } from './ui.mjs';
 import { loadCatalog, LEVELS, LEVEL_BADGE } from './catalog.mjs';
-import { progressStore } from './progress.mjs';
+import { progressStore, captureEvidence } from './progress.mjs';
 import { runChecks } from './checks.mjs';
 import { runAgentChecks, loadAgentChecks, copilotArgs, displayCommand } from './agent.mjs';
 import { listFiles, isTrusted, copilotBin } from './kit.mjs';
@@ -696,6 +696,7 @@ Each lab has three levels: 🟢 **easy** (we do it together), 🟡 **medium** an
     S.run = { running: true, results: [], plan: [], fatal: null, summary: null, firstPass: false };
     if (!silent || S.screen === 'checks') go('checks');
     else render();
+    const evidence = captureEvidence(ex);
     const summary = await runChecks({
       exDir: ex.dir,
       target: ex.src,
@@ -710,7 +711,7 @@ Each lab has three levels: 🟢 **easy** (we do it together), 🟡 **medium** an
     S.run.summary = summary;
     if (summary.fatal) S.run.fatal = summary.fatal;
     const firstFail = summary.results.find((r) => r.status === 'fail');
-    progress.set(key, { checks: summary.allPass ? 'pass' : 'fail', passed: summary.passed, total: summary.total, nextFix: firstFail?.name ?? null });
+    progress.recordChecks(key, summary, evidence);
     if (summary.allPass && before !== 'pass') {
       S.run.firstPass = true;
       S.celebrate = { at: now(), from: doneBefore };
