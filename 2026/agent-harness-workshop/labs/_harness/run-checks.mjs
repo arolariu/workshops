@@ -27,8 +27,9 @@ const token = await new Promise((resolve) => {
   process.stdin.on('error', () => resolve(''));
 });
 process.stdin.destroy();
+// Each event starts on its own line even when learner output did not end with a newline; the parent drops that separator.
 const emit = (o) => {
-  const bytes = Buffer.from(`@@harness ${token} ${stringify(o)}\n`);
+  const bytes = Buffer.from(`\n@@harness ${token} ${stringify(o)}\n`);
   for (let off = 0; off < bytes.length;) {
     try { off += writeSync(1, bytes, off); } catch (e) { if (e.code !== 'EAGAIN') throw e; }
   }

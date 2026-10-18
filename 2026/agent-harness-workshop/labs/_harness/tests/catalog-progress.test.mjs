@@ -116,6 +116,19 @@ test('generated output, dependencies and logs do not change the source fingerpri
   assert.notEqual(sourceFingerprint(ex.src), before);
 });
 
+test('files inside a linked folder are part of the source fingerprint, and link cycles end', () => {
+  const labsDir = fixtureLabs();
+  const ex = loadCatalog(labsDir)[0].levels[0];
+  const shared = path.join(tmpdir(), 'shared-agents');
+  writeTree(shared, { 'reviewer.agent.md': 'v1' });
+  fs.mkdirSync(path.join(ex.src, '.github'), { recursive: true });
+  fs.symlinkSync(shared, path.join(ex.src, '.github', 'agents'), 'junction');
+  fs.symlinkSync(ex.src, path.join(ex.src, 'loop'), 'junction');
+  const before = sourceFingerprint(ex.src);
+  fs.writeFileSync(path.join(shared, 'reviewer.agent.md'), 'v2 with different content');
+  assert.notEqual(sourceFingerprint(ex.src), before);
+});
+
 test('incomplete runs never replace evidence with a pass; cancelled runs keep the previous result', () => {
   const labsDir = fixtureLabs();
   const ex = loadCatalog(labsDir)[0].levels[0];

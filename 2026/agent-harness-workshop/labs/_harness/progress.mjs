@@ -23,17 +23,24 @@ function fileHash(abs, st) {
   return hash;
 }
 
-/** Files under `root` that count as work (no dependencies, VCS data, logs or generated output). */
+/** Files under `root` that count as work (no dependencies, VCS data, logs or generated output). Linked folders are followed once each. */
 export function workFiles(root) {
   const out = [];
+  const seen = new Set();
   const walk = (dir, rel) => {
+    let real;
+    try { real = fs.realpathSync(dir); } catch { return; }
+    if (seen.has(real)) return;
+    seen.add(real);
     let entries;
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
       const r = rel ? `${rel}/${e.name}` : e.name;
       if (SKIP_DIRS.has(e.name) || SKIP_ROOT.has(r) || SKIP_FILE.test(r)) continue;
       const abs = path.join(dir, e.name);
-      if (e.isDirectory()) walk(abs, r);
+      let linkedDir = false;
+      if (e.isSymbolicLink()) { try { linkedDir = fs.statSync(abs).isDirectory(); } catch { /* dangling */ } }
+      if (e.isDirectory() || linkedDir) walk(abs, r);
       else if (e.isFile() || e.isSymbolicLink()) out.push({ rel: r, abs });
     }
   };
@@ -46,7 +53,7 @@ function treeHash(parts) {
   for (const [label, root] of parts) {
     for (const f of workFiles(root)) {
       let st;
-      try { st = fs.statSync(f.abs); } catch { continue; }
+      try { st = fs.statSync(f.abs); } catch { h.update(`${label}/${f.rel}\0unreadable\n`); continue; }
       if (!st.isFile()) continue;
       h.update(`${label}/${f.rel}\0${fileHash(f.abs, st)}\n`);
     }

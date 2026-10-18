@@ -166,7 +166,7 @@ It never guesses what you actually spent: `/usage` and your GitHub billing page 
 
 ## 🧑‍🏫 For facilitators
 ```bash
-node labs/start.mjs verify          # every src/ must fail its checks, every sol/ must pass them
+node labs/start.mjs verify          # every src/ must fail its checks, every sol/ must pass them, starters.json must be current
 node labs/start.mjs test lab-03 easy --sol --agent   # try a reference solution with the real agent
 node labs/start.mjs open lab-03 easy --no-intro      # jump straight to a level during the live demo
 node labs/start.mjs --path=builder --no-intro        # start everyone on a learning path

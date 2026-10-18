@@ -184,9 +184,10 @@ export async function run(ctx) {
       }
     }
     const drift = starterDrift(ws, labsDir, catalog);
-    if (drift) say(`   ${drift.ok ? '✅' : '⚠️ '} ${white('starter manifest')}  ${drift.ok ? green(drift.message) : yellow(drift.message)}`);
+    if (drift) say(`   ${drift.ok ? '✅' : '❌'} ${white('starter manifest')}  ${drift.ok ? green(drift.message) : red(`${drift.message} Rebuild it with: node labs/start.mjs starters --write`)}`);
+    if (drift && !drift.ok) problems++;
     say();
-    say(problems ? `  ❌ ${red(`${problems} exercise(s) need attention.`)}` : `  ✅ ${bold(bright('All exercises verified.'))}`);
+    say(problems ? `  ❌ ${red(`${problems} verification problem(s) need attention.`)}` : `  ✅ ${bold(bright('All exercises verified.'))}`);
     say();
     process.exit(problems ? 1 : 0);
   }

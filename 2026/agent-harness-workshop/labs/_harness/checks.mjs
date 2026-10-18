@@ -111,9 +111,17 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
     if (current !== null) currentOutput = capped(currentOutput, text, MAX_CHECK_OUTPUT);
     stdout = capped(stdout, text, MAX_OUTPUT);
   };
+  // Every event is preceded by a newline, so a blank line right before an event is the grader's separator, not output.
+  let separator = false;
   const onLine = (raw) => {
     const line = raw.replace(/\r$/, '');
-    if (!line.startsWith('@@harness ')) { output(`${line}\n`); return; }
+    const pending = separator;
+    separator = false;
+    if (!line.startsWith('@@harness ')) {
+      if (pending) output('\n');
+      if (line) output(`${line}\n`); else separator = true;
+      return;
+    }
     const body = line.slice('@@harness '.length);
     if (!body.startsWith(tag)) { violate('a protocol line that did not come from the checks'); return; }
     let ev;
@@ -135,7 +143,8 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
     buf += chunk.slice(start);
     if (buf.length > MAX_LINE) {
       if (buf.startsWith('@@harness ')) violate('a protocol line that was too long');
-      else output(buf);
+      else { if (separator) output('\n'); output(buf); }
+      separator = false;
       truncated = true;
       buf = '';
       skipping = true;
@@ -145,6 +154,7 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
   const finish = (proc) => {
     clearTimeout(watchdog);
     signal?.removeEventListener('abort', cancel);
+    if (separator) stdout = capped(stdout, '\n', MAX_OUTPUT);
     if (buf && !skipping) stdout = capped(stdout, buf, MAX_OUTPUT);
     const list = results.filter(Boolean);
     const total = plan ? plan.total : list.length;

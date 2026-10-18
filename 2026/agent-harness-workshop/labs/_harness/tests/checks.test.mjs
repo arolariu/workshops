@@ -167,6 +167,18 @@ test('noisy learner output is bounded and marked, and protocol events are still 
   assert.match(result.stdout, /output truncated/);
 });
 
+test('learner output without a trailing newline does not swallow the next grader event', async () => {
+  const { exDir, target } = fixture(`export default (t) => [
+    t.check('partial line', () => { process.stdout.write('ordinary output'); return true; }),
+    t.check('blank lines kept', () => { process.stdout.write('a\\n\\nb\\n'); return true; }),
+  ];`);
+  const result = await runChecks({ exDir, target });
+  assert.equal(result.state, 'pass', result.fatal ?? '');
+  assert.equal(result.results[0].output, 'ordinary output\n');
+  assert.equal(result.results[1].output, 'a\n\nb\n');
+  assert.doesNotMatch(result.stdout, /@@harness/);
+});
+
 test('an early done event is rejected', async () => {
   const { exDir, target } = fixture(`export default (t) => [
     t.check('a', () => { process.stdout.write('@@harness {"type":"done"}\\n'); return true; }),
