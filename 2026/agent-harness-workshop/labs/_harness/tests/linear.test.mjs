@@ -80,3 +80,15 @@ test('unknown commands and invalid input are explained', async () => {
   assert.match(text, /Run "checks" first/);
   assert.match(text, /No exercise is open/);
 });
+
+test('--ascii keeps the linear mode to plain ASCII', async () => {
+  const { setAscii } = await import('../ui.mjs');
+  setAscii(true);
+  try {
+    const { text } = await session(['list path=security', 'open 1', 'show', 'hint', 'quit']);
+    assert.match(text, /^[\x00-\x7f]*$/);
+    assert.match(text, /Soft rules|Lab 05/);
+  } finally {
+    setAscii(false);
+  }
+});

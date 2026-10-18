@@ -17,43 +17,57 @@ StudyBuddy, and every step is checked by tests (and, if you like, by the real ag
 ```
 
 ## ⚡ Quick start
-1. **Install** [Node.js 22+](https://nodejs.org), git and GitHub Copilot CLI:
-   ```bash
-   npm install -g @github/copilot
+1. **Get the labs**: clone this repository (or unzip it) and open a terminal in its folder.
+2. **Start the launcher**: it checks your setup, prepares anything missing in a private folder (Node.js 22+,
+   GitHub Copilot CLI, and on Windows PowerShell 7), then starts the lab companion. No admin rights, no global
+   changes. Details and options: [SETUP.md](SETUP.md).
+   ```text
+   Windows:        start.cmd
+   macOS / Linux:  sh ./start.sh
    ```
-   You need a GitHub account with Copilot. The free plan for verified students works.
-2. **Get the labs**: clone this repository (or unzip it) and open a terminal in its folder.
-3. **Trust the folder, once**: run `copilot` in this folder, choose **Yes, and remember this folder**,
+   Prefer to install yourself? Install [Node.js 22+](https://nodejs.org), git and
+   [GitHub Copilot CLI](https://docs.github.com/copilot/how-tos/set-up/install-copilot-cli), then run
+   `node labs/start.mjs`. You need a GitHub account with Copilot. The free plan for verified students works.
+3. **Trust the folder and sign in, once**: run `copilot` in this folder, choose **Yes, and remember this folder**,
    type `/login` if asked, then `/exit`. Copilot only loads a project's MCP servers, hooks and agents from
-   folders you trust, and trusting this one covers every lab inside it.
-4. **Start the lab companion**:
-   ```bash
-   node labs/start.mjs
-   ```
-   Use the arrow keys to pick a lab and a level, read the mission, press **c** to start Copilot right in
-   that level's folder, and press **t** to run the checks.
+   folders you trust, and trusting this one covers every lab inside it. The launcher never does this for you.
+4. **Work through the labs**: use the arrow keys to pick a lab and a level, read the mission, press **c** to start
+   Copilot right in that level's folder, and press **t** to run the checks.
 
 ## ⌨️ The lab companion
 A green-on-dark terminal app that guides you through every level. On a level you can press:
 
 | Key | What it does |
 |---|---|
-| **t** | run the free checks: ✅ or ❌, each with a reason |
-| **w** | watch: the checks run again every time you save a file |
-| **h** | reveal the next hint (there are three per level) |
+| **t** | run the free checks: ✅ or ❌, each with a reason; select one and press **⏎** for the requirement, the files involved, expected and actual values when the check provides them, and its full output |
 | **c** | start Copilot in the level's folder; type `/exit` to come back, and your checks run automatically |
-| **o** / **y** | open the folder (VS Code or your file manager) / copy its `cd` command |
+| **h** | reveal the next hint (there are three per level) |
+| **a** | 🤖 agent check: the real Copilot on a copy of your folder (uses AI credits; shows the credit cap, or says when it cannot be known; **c** cancels) |
+| **m** | more: watch, guide, compare, bookmark, start over, run history, doctor, export |
+| **w** | watch: the checks run again every time you save a file |
 | **g** | read the lab guide: concepts, examples, links |
-| **a** | 🤖 agent check: the real Copilot on a copy of your folder (uses AI credits) |
-| **s** | peek at the reference solution |
-| **x** | start the level over (your files are backed up to `labs/.backups/` first; needs git) |
-| **1 2 3** | switch between easy, medium and hard · **n** next unfinished level · **?** all keys |
+| **s** | compare your work with the reference solution (a real diff; the reference is one possible answer) |
+| **x** | start over: restore the original starter, a checkpoint or a backup, or discard changes since your latest commit |
+| **f** / **H** | bookmark the level / agent run history |
+| **o** / **y** | open the folder (VS Code or your file manager) / copy its `cd` command |
+| **1 2 3** | switch between easy, medium and hard · **n** next unfinished level on your path · **?** all keys |
 
-It remembers where you were, shows what you changed and which check to fix next, and celebrates when a level
-goes green. Prefer a calmer screen? Start it with `--no-anim` (no animations) or `--no-intro` (no welcome screen).
+Everywhere: **/** searches every exercise (and filters by level, status, time and bookmarks), **p** picks a learning
+path, **d** opens the setup doctor and **e** exports a learning summary.
+
+Statuses are honest: ✅ means the checks passed **on your current files**. 🕓 means you (or the checks) changed
+something since, 🚧 means a tool is missing (not your fault), ⏩ means required checks were skipped, ⚠️ means a run
+stopped early and ⛔ that you cancelled it. None of those count as done.
+
+It remembers where you were, shows what you changed and which check to fix next, and celebrates when a level goes
+green. Prefer a calmer screen? `--no-anim` keeps it still, `--no-intro` skips the welcome screen, `--ascii` uses
+plain characters, and `--linear` works one line at a time without any screen control (for screen readers and
+simple terminals). `NO_COLOR=1` turns colors off.
 
 ## 🗺️ How the labs work
 ```text
+start.cmd / start.sh       ← 🚀 the launchers: prepare what is missing, then start the lab companion (SETUP.md)
+setup.mjs, setup-tools.mjs ← what the launchers run, and the reviewed tool versions
 labs/
 ├── start.mjs              ← 🧠 the lab companion: run this
 ├── lab-00 … lab-07/
@@ -65,11 +79,19 @@ labs/
 │       ├── src/           ← where you work: start `copilot` in here
 │       ├── tests/         ← the checks
 │       └── sol/           ← a reference solution, for when you're really stuck
-└── _harness/              ← the engine behind start.mjs (no need to touch it)
+└── _harness/              ← the engine behind start.mjs (no need to touch it; its tests: node --test "labs/_harness/tests/*.test.mjs")
 ```
 Every level is a **standalone mini-project**: it doesn't depend on any other lab, so you can start
-anywhere. Your work stays in `src/`. Commit early (`git add -A && git commit -m "lab 01 easy"`); to start a
-level over, press **x** in the app (or run `node labs/start.mjs reset lab-01 easy --yes`).
+anywhere. Your work stays in `src/`. Commit early (`git add -A && git commit -m "lab 01 easy"`).
+
+### ♻️ Starting over (with or without git)
+Press **x** in the app, or use the commands below. Your current files are always backed up first (to
+`labs/.recovery/`), and `node_modules` and git data are left alone.
+- **The original starter**: as the workshop published it, restored from git. If you downloaded the zip, the lab app
+  keeps a copy of each level the first time it checks or opens it, and restores that (it tells you which one it used).
+- **Your checkpoints**: save one before a risky change (`checkpoint lab-01 easy before-refactor`), go back to it later.
+- **Backups**: one is made automatically before every restore, so a restore can be undone too.
+- **Discard changes since your latest commit** (git only): a separate command, because your commit may not be the starter.
 
 ## 🧪 Two kinds of checks
 | | 🆓 Checks (press **t**) | 🤖 Agent checks (press **a**) |
@@ -79,18 +101,34 @@ level over, press **x** in the app (or run `node labs/start.mjs reset lab-01 eas
 | When | all the time | when the free checks are green and you want proof |
 
 Agent checks run on a throwaway copy in `labs/.runs/`, with explicit `--allow-tool` / `--deny-tool` flags
-and a credit cap, so they never touch your `src/`.
+and a credit cap, so they never touch your `src/`. Only one suite runs at a time, and cancelling stops it before the
+next check starts. Every run keeps its own folder (what the agent wrote and said) so you can look back with **H** or
+`history`; those folders stay on your computer and can contain generated or sensitive output, so they are never
+uploaded or attached to exports.
 
 Without the app:
 ```bash
-node labs/start.mjs list                          # your progress
+node labs/start.mjs list                          # your progress (--path= --status= --level= --query= --max-minutes= --bookmarked)
+node labs/start.mjs next --path=security          # the next unfinished exercise on a learning path
 node labs/start.mjs test lab-01 easy              # free checks
 node labs/start.mjs test lab-01 easy --watch      # free checks, again on every save
 node labs/start.mjs test lab-01 easy --agent      # + agent checks
 node labs/start.mjs hint lab-01 easy              # next hint
-node labs/start.mjs reset lab-01 easy --yes       # start a level over (backs up your files first)
+node labs/start.mjs diff lab-01 easy              # compare with the reference solution
+node labs/start.mjs checkpoint lab-01 easy NAME   # save a checkpoint
+node labs/start.mjs recovery lab-01 easy          # starter, checkpoints and backups
+node labs/start.mjs restore lab-01 easy --starter --yes        # back to the original starter (or --checkpoint=NAME)
+node labs/start.mjs reset lab-01 easy --yes       # discard changes since your latest commit (git)
+node labs/start.mjs history lab-01 easy           # agent check runs kept for this level
+node labs/start.mjs bookmark lab-01 easy          # bookmark a level
+node labs/start.mjs export --format=json          # a learning summary in labs/.reports/ (stays local)
+node labs/start.mjs doctor                        # what is installed, what is missing (read-only)
 node labs/start.mjs open lab-01 easy              # the app, straight into one level
+node labs/start.mjs --linear                      # the app one line at a time (screen readers)
+node labs/start.mjs help                          # every command
 ```
+Difficulty names: `easy`, `medium`, `hard` (or `e`, `m`, `h`), and `hard+` / `hard++` (`hard-plus`,
+`hard-plus-plus`) for extra levels, which appear automatically when a lab has them.
 
 ## 📚 The labs
 | Lab | Topic | 🟢 Easy (together) | 🟡 Medium | 🔴 Hard |
@@ -111,7 +149,8 @@ node labs/start.mjs open lab-01 easy              # the app, straight into one l
 | 10–50 | Eight labs, 5 minutes each: the idea in one slide, then the 🟢 easy level together |
 | 50–110 | Lab time: pick 🟡 medium and 🔴 hard levels; the facilitator walks around and helps |
 
-Suggested paths for lab time (about an hour each):
+Suggested paths for lab time (about an hour each; press **p** in the app or use `--path=` to follow one, and **n**
+always goes to its next unfinished exercise):
 - **Foundations**: 🟡 01 → 🟡 02 → 🟡 03 → 🟡 05
 - **Security**: 🟡 05 → 🔴 05 → 🟡 03 (free checks, few credits)
 - **Builder**: 🟡 04 → 🔴 04 → 🟡 06
@@ -121,15 +160,26 @@ Suggested paths for lab time (about an hour each):
 ## 💳 AI credits
 Every prompt costs AI credits, and student plans have a monthly budget. The free checks never spend any.
 In Copilot, use `!command` for things that don't need AI, keep prompts focused, check `/usage`, and cap
-scripted runs with `--max-ai-credits` (minimum 30).
+scripted runs with `--max-ai-credits` (minimum 30). Before an agent check runs, the app shows the cap passed to
+Copilot, or says plainly that the bound is unknown when a check runs a script that may call Copilot several times.
+It never guesses what you actually spent: `/usage` and your GitHub billing page know that.
 
 ## 🧑‍🏫 For facilitators
 ```bash
 node labs/start.mjs verify          # every src/ must fail its checks, every sol/ must pass them
 node labs/start.mjs test lab-03 easy --sol --agent   # try a reference solution with the real agent
 node labs/start.mjs open lab-03 easy --no-intro      # jump straight to a level during the live demo
+node labs/start.mjs --path=builder --no-intro        # start everyone on a learning path
+node labs/start.mjs starters        # is labs/_harness/starters.json (the published starters) up to date?
+start.cmd --full --setup-only       # prepare a classroom machine (see SETUP.md for shared offline caches)
 ```
-Each lab's `readme.md` is the script for its 5-minute slot: the concept, a demo, the easy level.
+Each lab's `readme.md` is the script for its 5-minute slot: the concept, a demo, the easy level. After changing a
+level's `src/`, run `node labs/start.mjs starters --write` and commit the updated manifest, so "restore the starter"
+keeps giving students the published version.
+
+Everything the companion stores stays in the workshop folder and is ignored by git: `labs/.progress.json`
+(progress, bound to fingerprints of the work and the checks), `labs/.recovery/` (starters, checkpoints, backups),
+`labs/.runs/` (agent runs), `labs/.reports/` (exports) and `.workshop/` (private tools). Nothing is sent anywhere.
 
 ## 🛟 Troubleshooting
 | Problem | Fix |
@@ -137,9 +187,12 @@ Each lab's `readme.md` is the script for its 5-minute slot: the concept, a demo,
 | "Copilot only loads … from folders you trust" | Run `copilot` once in the workshop root and choose *Yes, and remember this folder*. |
 | Copilot doesn't see my AGENTS.md / skill / agent | Start `copilot` **inside** the level's `src/` folder, and start a new session after editing. |
 | An agent check says "Are you logged in?" | Run `copilot`, type `/login`, then try again. |
-| `node labs/start.mjs` shows plain text | Use a real terminal (Windows Terminal, macOS Terminal, iTerm, a Linux terminal). |
-| Lab 06 needs `apm`, Lab 07 needs `gh aw` | Install them as the lab's guide explains. Lab 07's `gh aw` checks are optional. |
-| I broke a level and want to start over | Press **x** on the level. Without git, extract that level's `src/` again from the zip. |
+| `node labs/start.mjs` shows plain text | Use a real terminal (Windows Terminal, macOS Terminal, iTerm, a Linux terminal), or add `--linear`. |
+| Something is missing or too old | Press **d** (or run `node labs/start.mjs doctor`); `start.cmd` / `sh ./start.sh` prepare tools privately. See [SETUP.md](SETUP.md). |
+| A check says 🚧 blocked | A tool it needs is missing: it is your setup, not your solution. Lab 06 needs `apm` (`--install=apm`); Lab 07's `gh aw` checks are optional. |
+| A level I passed shows 🕓 | Its files (or its checks) changed since the last run. Press **t** to check it again. |
+| I broke a level and want to start over | Press **x**: restore the starter (works without git), a checkpoint or a backup. |
+| "Your progress file could not be read" | It was kept as `labs/.progress.corrupt-….json` and the app started fresh; nothing was deleted. |
 | Copying the `cd` command (**y**) does nothing | Your terminal may block clipboard access; the command is also shown at the bottom of the screen. |
 
 ## ✨ About

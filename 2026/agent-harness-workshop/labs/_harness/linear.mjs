@@ -9,7 +9,7 @@ import { runAgentChecks as realRunAgentChecks, loadAgentChecks as realLoadAgentC
 import { inspectEnvironment as realInspect, reportLines } from './doctor.mjs';
 import { ensureStarter, listRecovery, restoreStarter, restoreSnapshot, createCheckpoint, resetToCommit, compareTrees } from './workspace.mjs';
 import { PATHS, pathById, progressView, describeSelection, nextExercise, choosePath, learningReport, writeReport } from './learning.mjs';
-import { statusWord, stripAnsi, inline } from './ui.mjs';
+import { statusWord, stripAnsi, inline, isAscii, asciiFold } from './ui.mjs';
 import { runInteractive as realRunInteractive } from './system.mjs';
 import { copilotBin } from './kit.mjs';
 
@@ -45,7 +45,7 @@ export function runLinear({
   const store = progressStore(labsDir);
   const view = progressView(store, catalog);
   const rel = (p) => path.relative(rootDir, p).split(path.sep).join('/');
-  const say = (s = '') => output.write(`${stripAnsi(s)}\n`);
+  const say = (s = '') => output.write(`${isAscii() ? asciiFold(stripAnsi(s)) : stripAnsi(s)}\n`);
   const plain = (md) => stripAnsi(inline(String(md ?? ''))).split('\n').map((l) => `  ${l}`).join('\n');
   let current = open ?? null;
   let lastList = [];
