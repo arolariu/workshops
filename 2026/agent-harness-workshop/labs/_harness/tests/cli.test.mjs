@@ -94,6 +94,10 @@ test('the starter kept on first use restores without git', () => {
   assert.equal(r.code, 0, r.out);
   assert.match(r.out, /first time you used the lab app/);
   assert.equal(fs.readFileSync(file, 'utf8'), original);
+  fs.rmSync(path.dirname(file), { recursive: true, force: true });
+  const gone = cli(labsDir, ['restore', 'lab-02', 'easy', '--starter', '--yes'], { PATH: path.dirname(process.execPath) });
+  assert.equal(gone.code, 0, gone.out);
+  assert.equal(fs.readFileSync(file, 'utf8'), original, 'restores even after src/ was deleted');
 });
 
 test('diff, history, hint, export and doctor', () => {

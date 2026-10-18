@@ -71,8 +71,8 @@ export function parseTodo(md) {
   };
 }
 
-/** An exercise is authored when its folder has a todo.md and a src/ folder. */
-const authored = (dir) => fs.existsSync(path.join(dir, 'todo.md')) && fs.existsSync(path.join(dir, 'src'));
+/** An exercise is authored when its folder has a todo.md (its src/ may be missing if a learner deleted it: recovery still works). */
+const authored = (dir) => fs.existsSync(path.join(dir, 'todo.md'));
 
 export function loadCatalog(labsDir) {
   return fs.readdirSync(labsDir)

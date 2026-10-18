@@ -50,6 +50,18 @@ test('ZIP users without git can restore the starter and keep their attempt in a 
   assert.equal(ensureStarter(labsDir, ex).created, false, 'the first-use starter is never replaced');
 });
 
+test('the starter can be restored even after the whole src/ folder was deleted', () => {
+  const { labsDir, ex } = fixture();
+  ensureStarter(labsDir, ex);
+  fs.rmSync(ex.src, { recursive: true, force: true });
+  const again = loadCatalog(labsDir)[0].levels[0];
+  assert.equal(again.key, 'lab-01/easy', 'the level is still listed');
+  const result = restoreStarter(labsDir, again, { gitBin: 'definitely-missing-git' });
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(read(path.join(ex.src, 'main.js')), 'starter\n');
+  assert.equal(read(path.join(ex.src, 'lib', 'util.js')), 'export const u = 1;\n');
+});
+
 test('the published starter wins over committed learner mistakes', { skip: !hasGit }, () => {
   const { root, labsDir, ex } = fixture();
   git(root, 'init', '-q');

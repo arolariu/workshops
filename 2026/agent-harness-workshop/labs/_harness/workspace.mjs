@@ -287,6 +287,7 @@ function replaceWork(labsDir, ex, files, reason) {
   }
   try {
     for (const f of current) fs.rmSync(f.abs, { force: true });
+    fs.mkdirSync(ex.src, { recursive: true });
     const prune = (dir) => {
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         if (!e.isDirectory() || KEEP.has(e.name)) continue;

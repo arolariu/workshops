@@ -180,6 +180,18 @@ test('a broken or unsafe archive is rejected, and a private copy that does not r
   assert.deepEqual(repaired.installs, ['apm']);
 });
 
+test('a private copy whose program disappeared is repaired, not reported as ready', async () => {
+  const m = machine();
+  assert.deepEqual((await run(m, { install: ['apm'], pins: { apm: pin('apm') } })).installs, ['apm']);
+  const program = path.join(m.toolsDir, 'apm', `9.9.9-${KEY}`, 'pkg', exe('apm'));
+  fs.rmSync(program);
+  const again = await run(m, { install: ['apm'], pins: { apm: pin('apm') } });
+  assert.deepEqual(again.failures, []);
+  assert.deepEqual(again.installs, ['apm']);
+  assert.ok(fs.existsSync(program));
+  assert.equal(again.report.items.find((x) => x.id === 'apm').status, 'ready');
+});
+
 test('an incompatible existing tool gets a private, compatible copy; the user\'s install is untouched', async () => {
   const m = machine({ copilotHelp: 'Usage\n  --agent\n' });
   const userCopilot = path.join(m.userBin, WIN ? 'copilot.js' : 'copilot.js');

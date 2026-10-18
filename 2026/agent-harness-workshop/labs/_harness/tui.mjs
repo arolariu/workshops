@@ -1118,6 +1118,7 @@ Each lab has these levels: ${levels}. Every level is a small standalone project:
       signal: controller.signal,
       onEvent: (e) => {
         if (e.type === 'plan') S.run.plan = e.names;
+        if (e.type === 'result') S.run.results[e.idx] = { detail: {}, files: [], output: '', ...e };
         if (e.type === 'fatal') S.run.fatal = e.message;
         if (['plan', 'result', 'fatal'].includes(e.type)) render();
       },

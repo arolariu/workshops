@@ -186,6 +186,9 @@ export async function prepare({
         if (await probe(exeAt(finalDir(tool)))) { reused.push(tool); continue; }
         log(`  ${label}: the private copy does not run; preparing it again.`);
         fs.rmSync(finalDir(tool), { recursive: true, force: true });
+      } else if (fs.existsSync(finalDir(tool))) {
+        log(`  ${label}: the private copy is incomplete; preparing it again.`);
+        fs.rmSync(finalDir(tool), { recursive: true, force: true });
       }
       const archive = path.join(cacheDir, path.basename(new URL(asset.url).pathname));
       let cached = false;
@@ -214,9 +217,12 @@ export async function prepare({
       if (!fs.existsSync(exe)) throw new Error(`${asset.exe} is not where the reviewed layout says (${asset.bin}/${asset.exe})`);
       if (platform !== 'win32') fs.chmodSync(exe, 0o755);
       if (!(await probe(exe))) throw new Error(`the unpacked ${asset.exe} does not report version ${pin.version}`);
+      // A parallel run may have finished first; anything else already in the way is not a working copy.
+      if (fs.existsSync(finalDir(tool)) && !(fs.existsSync(exeAt(finalDir(tool))) && await probe(exeAt(finalDir(tool))))) fs.rmSync(finalDir(tool), { recursive: true, force: true });
       if (!fs.existsSync(finalDir(tool))) {
         try { fs.renameSync(stage, finalDir(tool)); stage = null; } catch (e) { if (!fs.existsSync(finalDir(tool))) throw e; }
       }
+      if (!fs.existsSync(exeAt(finalDir(tool)))) throw new Error(`could not finish preparing ${finalDir(tool)}`);
       installs.push(tool);
       log(`  ✅ ${label} is ready in ${finalDir(tool)}`);
     } catch (e) {

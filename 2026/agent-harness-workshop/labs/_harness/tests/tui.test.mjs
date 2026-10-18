@@ -124,6 +124,32 @@ test('the checks screen shows the runner\'s authoritative outcome', async () => 
   }
 });
 
+test('the checks screen fills in live, and c cancels a running check', async () => {
+  let release;
+  const t = await app({
+    open: 'lab-00/easy',
+    deps: {
+      runChecks: ({ onEvent, signal }) => new Promise((resolve) => {
+        onEvent({ type: 'plan', total: 2, names: ['first', 'second'] });
+        onEvent({ type: 'start', idx: 0, name: 'first' });
+        onEvent({ type: 'result', idx: 0, name: 'first', status: 'pass', message: '', optional: false });
+        onEvent({ type: 'start', idx: 1, name: 'second' });
+        release = resolve;
+        signal.addEventListener('abort', () => resolve({ state: 'cancelled', allPass: false, complete: false, results: [{ idx: 0, name: 'first', status: 'pass', message: '', optional: false, detail: {}, files: [], output: '' }], passed: 1, failed: 0, skipped: 0, blocked: 0, total: 2, fatal: 'The checks were cancelled.', stdout: '', stderr: '' }));
+      }),
+    },
+  });
+  press(t.input, 't');
+  await waitFor(() => release);
+  assert.match(text(t.output), /✅ first/);
+  assert.match(text(t.output), /second/);
+  press(t.input, 'c');
+  await waitFor(() => !t.state.run.running);
+  assert.match(text(t.output), /Cancelled/);
+  assert.equal(progressStore(t.labsDir).get('lab-00/easy').checks, undefined, 'a cancelled run records no result');
+  t.quit();
+});
+
 test('a selected check shows its requirement, observation, evidence, files and output', async () => {
   const t = await app({
     open: 'lab-00/easy',
