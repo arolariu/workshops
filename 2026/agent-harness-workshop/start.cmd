@@ -58,6 +58,9 @@ echo.
 exit /b 3
 
 :run
+rem The lab app and what it starts (MCP servers use command "node") find this same runtime first. setlocal keeps
+rem the change inside this script: the terminal that ran it keeps its PATH.
+for %%D in ("%NODE%") do set "PATH=%%~dpD;%PATH%"
 "%NODE%" "%HERE%\setup.mjs" %*
 exit /b %ERRORLEVEL%
 
@@ -99,9 +102,11 @@ del /q "%LIST%" >nul 2>&1
 mkdir "%STAGE%" || goto :no_write
 tar -xf "%ARCHIVE%" -C "%STAGE%" || goto :unpack_failed
 call :node_ok "%STAGE%\%NAME%\node.exe" || goto :does_not_run
-if not exist "%FINAL%\node.exe" move "%STAGE%\%NAME%" "%FINAL%" >nul 2>&1
+rem An earlier copy that no longer runs (damaged, or node.exe deleted) is replaced by the verified one.
+if exist "%FINAL%\" call :node_ok "%FINAL%\node.exe" || rmdir /s /q "%FINAL%" >nul 2>&1
+if not exist "%FINAL%\" move "%STAGE%\%NAME%" "%FINAL%" >nul 2>&1
 rmdir /s /q "%STAGE%" >nul 2>&1
-if not exist "%FINAL%\node.exe" goto :no_write
+call :node_ok "%FINAL%\node.exe" || goto :no_write
 set "NODE=%FINAL%\node.exe"
 echo   Node.js %NODE_VERSION% is ready in %FINAL%
 goto :run

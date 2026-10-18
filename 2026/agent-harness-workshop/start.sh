@@ -166,11 +166,19 @@ acquire() {
   mkdir "$stage" || die "Cannot write to $tools/node."
   if ! tar -xzf "$archive" -C "$stage"; then rm -rf "$stage"; die "Could not unpack $file."; fi
   if ! node_ok "$stage/$name/bin/node"; then rm -rf "$stage"; die "The unpacked Node.js does not run on this system. Install Node.js 22+ yourself."; fi
+  # An earlier copy that no longer runs (damaged, or bin/node deleted) is moved aside and replaced by the verified one.
+  if { [ -e "$final" ] || [ -L "$final" ]; } && ! node_ok "$final/bin/node"; then
+    broken="$tools/node/.broken-$$"
+    rm -rf "$broken"
+    mv "$final" "$broken" 2>/dev/null || { rm -rf "$stage"; die "The Node.js in $final does not run and could not be replaced. Delete that folder and run this again."; }
+    rm -rf "$broken"
+  fi
   if [ ! -d "$final" ]; then
     mv "$stage/$name" "$final" 2>/dev/null || [ -d "$final" ] || { rm -rf "$stage"; die "Could not finish preparing Node.js in $final."; }
   fi
   rm -rf "$stage"
   node="$final/bin/node"
+  node_ok "$node" || die "The Node.js in $final does not run on this system. Delete that folder and run this again, or install Node.js 22+ yourself."
   say "Node.js $NODE_VERSION is ready in $final"
 }
 
@@ -196,4 +204,7 @@ if [ -z "$node" ]; then
   acquire
 fi
 
+# The lab app and what it starts (MCP servers use command "node") find this same runtime first. Only the lab app's
+# environment changes: the terminal that ran this script keeps its PATH.
+case "$node" in */*) PATH="${node%/*}:$PATH"; export PATH ;; esac
 exec "$node" "$here/setup.mjs" "$@"

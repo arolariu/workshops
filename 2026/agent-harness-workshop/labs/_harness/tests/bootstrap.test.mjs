@@ -130,7 +130,7 @@ describe('start.cmd (native Windows cmd)', { skip: !WIN }, () => {
     const privateNode = path.join(dir, '.workshop', 'node', name, 'node.exe');
     assert.equal(first.recorded.execPath.toLowerCase(), privateNode.toLowerCase());
     assert.deepEqual(first.recorded.argv, ['open', 'lab-04', 'medium', '--no-anim']);
-    assert.equal(first.recorded.path, sys32, 'PATH is unchanged');
+    assert.equal(first.recorded.path, `${path.dirname(privateNode)}\\;${sys32}`, 'only the lab app gets the private runtime on its PATH');
     assert.equal(hits - before, 1);
     assert.deepEqual(listAll(first.home), [], 'nothing written to the user profile');
     const second = await run(dir, 'list', { PATH: sys32 });
@@ -241,10 +241,28 @@ describe('start.sh (POSIX sh)', { skip: !shPath }, () => {
     assert.equal(first.status, 7, first.out);
     assert.deepEqual(first.recorded.argv, ['open', 'lab-04', 'medium', '--no-anim']);
     assert.ok(fs.existsSync(path.join(dir, '.workshop', 'node', name, 'bin', 'node')));
+    if (!WIN) assert.equal(first.recorded.path, `${path.join(fs.realpathSync(dir), '.workshop', 'node', name, 'bin')}:${basePath}`, 'the lab app (and the MCP servers it starts) find the private runtime as node');
     assert.equal(hits - before, 1);
     assert.deepEqual(listAll(first.home), [], 'nothing written to the home folder');
     assert.equal((await run(dir, ['list'], { PATH: basePath })).status, 7);
     assert.equal(hits - before, 1, 'reused');
+  });
+
+  test('an unusable private Node.js is replaced by a verified copy instead of being started again', { skip: nodeOnBase && 'node is on the base PATH' }, async () => {
+    files.set(`/${NODE_VERSION}/${name}.tar.gz`, fs.readFileSync(goodTar));
+    const dir = workshopCopy('start.sh', withSha(sha256(goodTar)));
+    const bin = path.join(dir, '.workshop', 'node', name, 'bin', 'node');
+    assert.equal((await run(dir, ['list'], { PATH: basePath })).status, 7);
+    const before = hits;
+    for (const damage of [() => fs.writeFileSync(bin, '#!/bin/sh\nexit 1\n', { mode: 0o755 }), () => fs.rmSync(bin)]) {
+      damage();
+      const r = await run(dir, ['list'], { PATH: basePath });
+      assert.equal(r.status, 7, r.out);
+      assert.notEqual(r.recorded, null);
+      assert.match(fs.readFileSync(bin, 'utf8'), /exec /, 'the verified runtime is back in place');
+    }
+    assert.equal(hits, before, 'the verified cached archive is reused');
+    assert.ok(!listAll(path.join(dir, '.workshop')).some((f) => /\.staging-|\.broken-/.test(f)), 'nothing left behind');
   });
 
   test('a checksum mismatch, an offline miss and an unsafe archive all stop before running anything', { skip: nodeOnBase && 'node is on the base PATH' }, async () => {
