@@ -1,6 +1,7 @@
 # lab companion state (stays on this computer)
 labs/.progress.json
 labs/.progress.json.*.tmp
+labs/.progress.json.lock
 labs/.progress.corrupt-*.json
 labs/.runs/
 labs/.backups/

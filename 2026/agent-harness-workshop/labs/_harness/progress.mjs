@@ -109,7 +109,7 @@ export function deriveStatus(entry, current, kind = 'checks') {
 
 // ---------- the store ----------
 function migrate(raw) {
-  if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.version === PROGRESS_VERSION && raw.entries && typeof raw.entries === 'object') return { data: raw, migrated: false };
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.version === PROGRESS_VERSION && raw.entries && typeof raw.entries === 'object' && !Array.isArray(raw.entries)) return { data: raw, migrated: false };
   if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.version === undefined) {
     const entries = {};
     for (const [k, v] of Object.entries(raw)) {
@@ -122,6 +122,13 @@ function migrate(raw) {
 }
 
 const stamp = () => new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+const LOCK_STALE_MS = 5000;
+const LOCK_WAIT_MS = 6000;
+const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+const gone = (pid) => {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try { process.kill(pid, 0); return false; } catch (e) { return e.code === 'ESRCH'; }
+};
 
 export function progressStore(labsDir, { fileName = '.progress.json' } = {}) {
   const file = path.join(labsDir, fileName);
@@ -130,7 +137,30 @@ export function progressStore(labsDir, { fileName = '.progress.json' } = {}) {
   let writable = true;
   let error = null;
   let warning = null;
-  const sigOf = () => { try { const st = fs.statSync(file); return st.isFile() ? `${st.size}:${st.mtimeMs}` : 'not-a-file'; } catch { return null; } };
+  // Every save renames a fresh file into place, so the inode tells writes apart even when size and mtime match.
+  const sigOf = () => { try { const st = fs.statSync(file); return st.isFile() ? `${st.size}:${st.mtimeMs}:${st.ino}` : 'not-a-file'; } catch { return null; } };
+  const lockFile = `${file}.lock`;
+
+  /** Run `fn` while holding a cross-process lock, so reload-merge-save never interleaves with another app or command. */
+  function locked(fn) {
+    let held = false;
+    const until = Date.now() + LOCK_WAIT_MS;
+    for (;;) {
+      try { fs.writeFileSync(lockFile, `${process.pid}\n`, { flag: 'wx' }); held = true; break; } catch (e) {
+        if (e.code !== 'EEXIST') break; // no lock possible here (read-only folder…): save() reports the real problem
+        try {
+          const st = fs.statSync(lockFile);
+          const owner = Number.parseInt(fs.readFileSync(lockFile, 'utf8'), 10);
+          if (Date.now() - st.mtimeMs > LOCK_STALE_MS || gone(owner)) { fs.rmSync(lockFile, { force: true }); continue; }
+        } catch { continue; }
+        if (Date.now() > until) break;
+        pause(5 + Math.floor(Math.random() * 20));
+      }
+    }
+    try { return fn(); } finally {
+      if (held) { try { fs.rmSync(lockFile, { force: true }); } catch { /* best effort */ } }
+    }
+  }
 
   function load({ initial = false } = {}) {
     const sig = sigOf();
@@ -209,9 +239,12 @@ export function progressStore(labsDir, { fileName = '.progress.json' } = {}) {
     reload,
     status: () => ({ file, writable, error, warning }),
     set(key, patch) {
-      reload();
-      data.entries[key] = { ...(data.entries[key] ?? {}), ...patch, updated: new Date().toISOString() };
-      save();
+      const apply = () => {
+        reload();
+        data.entries[key] = { ...(data.entries[key] ?? {}), ...patch, updated: new Date().toISOString() };
+        save();
+      };
+      if (writable) locked(apply); else apply();
     },
     /** Record a check run. Complete results replace the evidence; a cancelled run keeps the previous result. */
     recordChecks(key, result, evidence) {

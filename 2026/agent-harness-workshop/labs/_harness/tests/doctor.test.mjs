@@ -99,6 +99,12 @@ test('on macOS the doctor never runs the git shim that would open the developer-
   assert.equal(item(report, 'git').status, 'manual');
   assert.match(item(report, 'git').message, /xcode-select --install/);
   assert.ok(!calls.includes('git --version'));
+  assert.equal(report.ready, true, 'git is not required outside lab-02 and --full');
+  for (const opts of [{ lab: 'lab-02' }, { full: true }]) {
+    const needsGit = await inspectEnvironment({ ...base, ...opts, platform: 'darwin', arch: 'arm64', which: (c) => (c === 'git' ? '/usr/bin/git' : `/opt/${c}`), probe: probeFrom({ ...all, 'xcode-select -p': { code: 2, stdout: '', stderr: 'unable to get active developer directory' } }) });
+    assert.equal(item(needsGit, 'git').status, 'manual');
+    assert.equal(needsGit.ready, false, `a required git that needs a manual install blocks readiness (${JSON.stringify(opts)})`);
+  }
 });
 
 test('folder trust is reported only when Copilot\'s own settings establish it', async () => {
@@ -118,7 +124,7 @@ test('real probes: shims in folders with spaces work, a hung tool is stopped, an
   const say = (text) => `process.stdout.write(${JSON.stringify(text)})`;
   const tool = (name, js) => (process.platform === 'win32'
     ? { [`${name}.cmd`]: `@"${process.execPath}" "%~dp0${name}.js" %*\r\n`, [`${name}.js`]: js }
-    : { [name]: `#!/bin/sh\nexec "${process.execPath}" "$(dirname "$0")/${name}.js" "$@"\n`, [`${name}.js`]: js });
+    : { [name]: `#!/bin/sh\nexec "${process.execPath}" "\${0%/*}/${name}.js" "$@"\n`, [`${name}.js`]: js });
   writeTree(bin, {
     ...tool('copilot', `if (process.argv[2] === '--help') ${say(HELP)}; else ${say('GitHub Copilot CLI 1.0.98.\n')};`),
     ...tool('git', say('git version 2.53.0\n')),

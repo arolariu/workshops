@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DIFFICULTIES, normalizeLevel, loadCatalog, findExercise, parseDuration } from '../catalog.mjs';
 import { progressStore, captureEvidence, evidenceTracker, deriveStatus, sourceFingerprint, PROGRESS_VERSION } from '../progress.mjs';
 import { tmpdir, writeTree } from './helpers.mjs';
@@ -143,6 +145,20 @@ test('a malformed progress file is preserved, reported, and never silently disca
   assert.equal(fs.readFileSync(path.join(labsDir, copies[0]), 'utf8'), '{ "lab-01/easy": { "checks": "pass" ');
 });
 
+test('a current-format progress file whose entries are a list is preserved and reported, not silently emptied', () => {
+  const labsDir = fixtureLabs();
+  const file = path.join(labsDir, '.progress.json');
+  const bad = JSON.stringify({ version: PROGRESS_VERSION, entries: [] });
+  fs.writeFileSync(file, bad);
+  const store = progressStore(labsDir);
+  assert.match(store.status().warning, /could not be read/i);
+  const copies = fs.readdirSync(labsDir).filter((f) => f.startsWith('.progress.corrupt-'));
+  assert.deepEqual(copies.map((f) => fs.readFileSync(path.join(labsDir, f), 'utf8')), [bad]);
+  store.set('lab-01/easy', { hints: 1 });
+  const restarted = progressStore(labsDir);
+  assert.equal(restarted.get('lab-01/easy').hints, 1, 'new progress survives a restart');
+});
+
 test('a write failure is reported and the progress stays in memory', () => {
   const labsDir = fixtureLabs();
   fs.mkdirSync(path.join(labsDir, '.progress.json'));
@@ -180,6 +196,23 @@ test('updates written by another process are not lost', () => {
   const saved = JSON.parse(fs.readFileSync(path.join(labsDir, '.progress.json'), 'utf8')).entries;
   assert.deepEqual([saved['lab-01/easy'].hints, saved['lab-01/easy'].bookmarked, saved['lab-01/medium'].hints, saved['lab-01/hard'].hints], [1, true, 3, 2]);
   assert.equal(a.reload(), false, 'nothing new since our own write');
+});
+
+test('concurrent writers in separate processes never drop each other\'s updates', async () => {
+  const labsDir = fixtureLabs();
+  const progress = pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'progress.mjs')).href;
+  const writers = 4;
+  const each = 25;
+  const script = (w) => `import { progressStore } from ${JSON.stringify(progress)};
+    const store = progressStore(${JSON.stringify(labsDir)});
+    for (let i = 0; i < ${each}; i++) store.set('w${w}/' + i, { hints: i });`;
+  const codes = await Promise.all(Array.from({ length: writers }, (_, w) => new Promise((resolve) => {
+    spawn(process.execPath, ['--input-type=module', '-e', script(w)], { stdio: 'inherit' }).on('exit', resolve);
+  })));
+  assert.deepEqual(codes, Array(writers).fill(0));
+  const saved = JSON.parse(fs.readFileSync(path.join(labsDir, '.progress.json'), 'utf8')).entries;
+  assert.equal(Object.keys(saved).length, writers * each, 'every update from every process is kept');
+  assert.ok(!fs.existsSync(path.join(labsDir, '.progress.json.lock')), 'the lock is released');
 });
 
 test('a progress file from a newer version is left untouched', () => {

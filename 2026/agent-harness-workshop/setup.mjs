@@ -283,7 +283,7 @@ export async function main(argv = process.argv.slice(2), {
     out(`  ❌ Not ready: ${unmet.map((it) => it.label).join(', ')} ${unmet.length === 1 ? 'was' : 'were'} requested but ${unmet.length === 1 ? 'is' : 'are'} not available. Fix that (see above), or run without ${opts.full ? '--full' : '--install'} to start anyway.`);
     return 1;
   }
-  const missing = result.report.items.filter((it) => it.required && !['ready', 'manual'].includes(it.status));
+  const missing = result.report.items.filter((it) => it.required && it.status !== 'ready');
   if (missing.length) out(`  ⚠️  Still missing: ${missing.map((it) => it.label).join(', ')}. The lab app starts anyway; checks that need ${missing.length === 1 ? 'it' : 'them'} will say "blocked".`);
   if (result.installs.length) out(`  🔒 Prepared privately (only for the lab app started from here; your PATH is unchanged): ${result.installs.join(', ')}.`);
   if (opts.setupOnly) return result.report.ready ? 0 : 1;

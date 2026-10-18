@@ -169,7 +169,8 @@ export async function inspectEnvironment({
   const trust = (() => { try { return readTrust(rootDir); } catch { return null; } })();
   add('folder-trust', trust === true ? 'ready' : 'manual', trust === true ? 'Copilot trusts the workshop folder (MCP servers, hooks and agents will load).' : trust === false ? 'Copilot does not trust the workshop folder yet, so it will ignore MCP servers, hooks and agents.' : 'Not verified: Copilot\'s trusted folders could not be read.', { label: 'Folder trust', category: 'manual', why: 'Copilot only loads project MCP servers, hooks and agents from folders you trust.', recovery: 'Run `copilot` once in the workshop folder and choose "Yes, and remember this folder".' });
 
-  const blocking = (it) => it.required && it.status !== 'ready' && it.status !== 'manual';
+  // Sign-in, policy and trust are manual but never required; a required tool that needs a manual step still blocks.
+  const blocking = (it) => it.required && it.status !== 'ready';
   const coreReady = !items.some((it) => it.category === 'core' && blocking(it));
   return { ready: !items.some(blocking), coreReady, platform, arch, items };
 }
