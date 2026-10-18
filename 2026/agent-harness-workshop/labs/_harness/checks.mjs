@@ -1,5 +1,6 @@
 // Parent side: run the free checks of one exercise in a child process and turn its event stream into one
 // trustworthy result. Anything short of a complete, well-formed run is reported as interrupted, never as a pass.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,13 +8,17 @@ import { runProcess } from './process.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const STATUSES = new Set(['pass', 'fail', 'blocked', 'skip']);
+const MAX_OUTPUT = 1024 * 1024; // learner output kept for the whole run
+const MAX_CHECK_OUTPUT = 256 * 1024; // learner output kept per check
+const MAX_LINE = 8 * 1024 * 1024; // longest protocol line accepted
+const TRUNCATED = '\n… (output truncated)\n';
 
 /** Result states. Only `pass` means the work is done. */
 export const STATES = ['pass', 'fail', 'blocked', 'skipped', 'cancelled', 'interrupted'];
 
 /**
  * Run tests/checks.mjs of `exDir` against `target`. Resolves (never rejects):
- * { state, allPass, complete, results, passed, failed, skipped, blocked, total, fatal, stdout, stderr, exitCode }
+ * { state, allPass, complete, results, passed, failed, skipped, blocked, total, fatal, stdout, stderr, exitCode, truncated }
  * state: pass | fail | blocked | skipped | cancelled | interrupted
  */
 export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, signal, timeout = 10 * 60 * 1000, hangGrace = 15000 }) {
@@ -26,7 +31,12 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
   let currentOutput = '';
   let hung = null;
   let buf = '';
+  let skipping = false;
   let stdout = '';
+  let truncated = false;
+  // Only the grader knows this per-run token; lines without it did not come from the checks.
+  const token = crypto.randomBytes(24).toString('hex');
+  const tag = `${token} `;
   const violate = (msg) => { protocolError = protocolError ?? msg; };
   const inner = new AbortController();
   const cancel = () => inner.abort();
@@ -90,28 +100,52 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
     return undefined;
   };
 
+  const capped = (have, text, max) => {
+    if (have.length >= max) { if (text) truncated = true; return have; }
+    const next = have + text;
+    if (next.length <= max) return next;
+    truncated = true;
+    return next.slice(0, max) + TRUNCATED;
+  };
+  const output = (text) => {
+    if (current !== null) currentOutput = capped(currentOutput, text, MAX_CHECK_OUTPUT);
+    stdout = capped(stdout, text, MAX_OUTPUT);
+  };
+  const onLine = (raw) => {
+    const line = raw.replace(/\r$/, '');
+    if (!line.startsWith('@@harness ')) { output(`${line}\n`); return; }
+    const body = line.slice('@@harness '.length);
+    if (!body.startsWith(tag)) { violate('a protocol line that did not come from the checks'); return; }
+    let ev;
+    try { ev = JSON.parse(body.slice(tag.length)); } catch { violate('a malformed protocol line'); return; }
+    handle(ev);
+  };
+  // Output is captured up to its limits, but every line is still scanned so protocol events keep flowing.
   const onStdout = (chunk) => {
-    buf += chunk;
+    let start = 0;
     let n;
-    while ((n = buf.indexOf('\n')) >= 0) {
-      const line = buf.slice(0, n).replace(/\r$/, '');
-      buf = buf.slice(n + 1);
-      const m = line.match(/^@@harness (.*)$/);
-      if (!m) {
-        if (current !== null) currentOutput += `${line}\n`;
-        stdout += `${line}\n`;
-        continue;
-      }
-      let ev;
-      try { ev = JSON.parse(m[1]); } catch { violate('a malformed protocol line'); continue; }
-      handle(ev);
+    while ((n = chunk.indexOf('\n', start)) >= 0) {
+      const piece = chunk.slice(start, n);
+      start = n + 1;
+      if (skipping) { skipping = false; continue; }
+      onLine(buf + piece);
+      buf = '';
+    }
+    if (skipping) return;
+    buf += chunk.slice(start);
+    if (buf.length > MAX_LINE) {
+      if (buf.startsWith('@@harness ')) violate('a protocol line that was too long');
+      else output(buf);
+      truncated = true;
+      buf = '';
+      skipping = true;
     }
   };
 
   const finish = (proc) => {
     clearTimeout(watchdog);
     signal?.removeEventListener('abort', cancel);
-    if (buf) stdout += buf;
+    if (buf && !skipping) stdout = capped(stdout, buf, MAX_OUTPUT);
     const list = results.filter(Boolean);
     const total = plan ? plan.total : list.length;
     const count = (s) => list.filter((r) => r.status === s).length;
@@ -149,6 +183,7 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
       stdout,
       stderr: proc?.stderr ?? '',
       exitCode: proc?.code ?? null,
+      truncated: truncated || (proc?.stderr?.length ?? 0) >= MAX_OUTPUT,
     };
   };
 
@@ -161,6 +196,8 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
     env: { ...process.env, ...env },
     timeout,
     signal: inner.signal,
+    input: `${token}\n`,
+    maxOutput: MAX_OUTPUT,
     onStdout,
   });
   return finish(proc);

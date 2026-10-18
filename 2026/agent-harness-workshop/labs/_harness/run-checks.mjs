@@ -1,5 +1,6 @@
 // Child process: runs one exercise's free checks (tests/checks.mjs) against a folder and streams
-// results as "@@harness {json}" lines. Running in a child keeps a broken solution from freezing the app.
+// results as "@@harness <token> {json}" lines. Running in a child keeps a broken solution from freezing the app.
+// The token arrives on stdin before any learner code loads, so learner output cannot pass for a grader event.
 // Statuses: pass | fail | blocked (a required tool is missing) | skip (optional or machine-dependent).
 import { register } from 'node:module';
 import fs from 'node:fs';
@@ -13,7 +14,25 @@ register('./fake-sdk/loader.mjs', import.meta.url);
 const [exDirArg, targetArg] = process.argv.slice(2);
 const exDir = path.resolve(exDirArg);
 const target = path.resolve(targetArg);
-const emit = (o) => process.stdout.write(`@@harness ${JSON.stringify(o)}\n`);
+// Captured before learner code runs: patching process.stdout, fs or JSON later cannot read or rewrite events.
+const { writeSync } = fs;
+const stringify = JSON.stringify;
+// Blocking stdout keeps learner output and grader events in order, and nothing queued is lost at exit.
+process.stdout._handle?.setBlocking?.(true);
+const token = await new Promise((resolve) => {
+  let text = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (d) => { text += d; });
+  process.stdin.on('end', () => resolve(text.trim()));
+  process.stdin.on('error', () => resolve(''));
+});
+process.stdin.destroy();
+const emit = (o) => {
+  const bytes = Buffer.from(`@@harness ${token} ${stringify(o)}\n`);
+  for (let off = 0; off < bytes.length;) {
+    try { off += writeSync(1, bytes, off); } catch (e) { if (e.code !== 'EAGAIN') throw e; }
+  }
+};
 
 const available = (tool) => {
   if (tool === 'copilot') return commandExists(copilotBin());

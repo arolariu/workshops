@@ -114,6 +114,59 @@ test('forged or duplicate protocol events make the run interrupted', async () =>
   assert.match(result.fatal, /protocol|unexpected|twice/i);
 });
 
+test('a learner module cannot forge a verdict, a done event and a clean exit', async () => {
+  const forged = (idx, name) => `process.stdout.write('@@harness ' + JSON.stringify({ type: 'result', idx: ${idx}, name: ${JSON.stringify(name)}, status: 'pass', message: '', optional: false, detail: {}, files: [] }) + '\\n@@harness {"type":"done"}\\n'); process.exit(0);`;
+  const { exDir, target } = fixture(`export default (t) => [
+    t.check('solution works', async () => { await t.import('solution.js'); return 'really failing'; }),
+  ];`, { src: { 'solution.js': forged(0, 'solution works') } });
+  const result = await runChecks({ exDir, target });
+  assert.equal(result.state, 'interrupted');
+  assert.equal(result.complete, false);
+  assert.equal(result.allPass, false);
+  assert.match(result.fatal, /did not come from the checks/);
+});
+
+test('a learner who watches stdout never sees the grader\'s events, so cannot replay them', async () => {
+  const { exDir, target } = fixture(`export default (t) => [
+    t.check('loads', async () => { await t.import('spy.js'); return true; }),
+    t.check('forged', async () => { (await t.import('spy.js')).forge(); return 'really failing'; }),
+  ];`, { src: { 'spy.js': `const seen = globalThis.__seen ??= [];
+    if (!globalThis.__spying) {
+      globalThis.__spying = true;
+      const write = process.stdout.write.bind(process.stdout);
+      process.stdout.write = (s, ...a) => { seen.push(String(s)); return write(s, ...a); };
+    }
+    export function forge() {
+      const prefix = seen.map((s) => s.match(/^(@@harness \\S+ )\\{/)?.[1]).find(Boolean) ?? '@@harness ';
+      process.stdout.write(prefix + JSON.stringify({ type: 'result', idx: 1, name: 'forged', status: 'pass', message: '', optional: false, detail: {}, files: [] }) + '\\n' + prefix + '{"type":"done"}\\n');
+      process.exit(0);
+    }` } });
+  const result = await runChecks({ exDir, target });
+  assert.equal(result.state, 'interrupted');
+  assert.equal(result.allPass, false);
+});
+
+test('noisy learner output is bounded and marked, and protocol events are still parsed after the limit', async () => {
+  const { exDir, target } = fixture(`export default (t) => [
+    t.check('noisy', () => {
+      const line = 'x'.repeat(99) + '\\n';
+      for (let i = 0; i < 40000; i++) process.stdout.write(line);
+      process.stdout.write('y'.repeat(9 * 1024 * 1024));
+      process.stdout.write('\\nafter the long line\\n');
+      return true;
+    }),
+    t.check('still counted', () => true),
+  ];`);
+  const result = await runChecks({ exDir, target });
+  assert.equal(result.state, 'pass', result.fatal ?? '');
+  assert.equal(result.total, 2);
+  assert.equal(result.truncated, true);
+  assert.ok(result.stdout.length < 1.1 * 1024 * 1024, `stdout is bounded (${result.stdout.length})`);
+  assert.ok(result.results[0].output.length < 300 * 1024, `per-check output is bounded (${result.results[0].output.length})`);
+  assert.match(result.results[0].output, /output truncated/);
+  assert.match(result.stdout, /output truncated/);
+});
+
 test('an early done event is rejected', async () => {
   const { exDir, target } = fixture(`export default (t) => [
     t.check('a', () => { process.stdout.write('@@harness {"type":"done"}\\n'); return true; }),
