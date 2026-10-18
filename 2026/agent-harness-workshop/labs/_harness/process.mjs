@@ -15,7 +15,11 @@ function isRunnable(file, platform) {
     if (!fs.statSync(file).isFile()) return false;
     if (platform !== 'win32') fs.accessSync(file, fs.constants.X_OK);
     return true;
-  } catch {
+  } catch (e) {
+    // Windows app execution aliases (…\WindowsApps\pwsh.exe) refuse stat() but start fine.
+    if (platform === 'win32' && e.code === 'EACCES') {
+      try { return fs.lstatSync(file).isSymbolicLink(); } catch { return false; }
+    }
     return false;
   }
 }
