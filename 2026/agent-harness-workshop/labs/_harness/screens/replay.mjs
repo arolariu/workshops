@@ -53,7 +53,7 @@ export function replayLines(rec, idx, { W = 96, fmt }) {
     put(t.context.map((s) => colour(s, `${letterOf(s.name)} ${s.name} ≈${k(s.tokens)}`)).join(fmt.dim(' · ')));
     const harness = t.context.filter((s) => SEGMENTS[s.name]?.harness);
     put(fmt.dim(harness.length
-      ? `Your harness is the green part: ≈${k(harness.reduce((s, x) => s + x.tokens, 0))} tokens, sent again on every turn.`
+      ? `Your harness is ${harness.map((s) => letterOf(s.name)).join(' and ')}: ≈${k(harness.reduce((s, x) => s + x.tokens, 0))} tokens, sent again on every turn.`
       : 'No harness here: everything the model knows about your project is in the history.'));
   } else {
     head('🧠', 'CONTEXT WINDOW');

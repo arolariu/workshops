@@ -30,6 +30,12 @@ test('CRLF, wrapped options and "**2**." also parse', () => {
   assert.equal(q.why, 'Because.');
 });
 
+test('a question or an explanation wrapped over source lines reads as one paragraph (as Markdown renders it)', () => {
+  const q = parseQuiz('The model insists it has a good reason\nto delete the folder.\n\nWhat holds?\n1. a\n2. b\n<details><summary>A</summary>\n\n**2.** The hook runs\noutside the model.\n\nAlways.\n</details>');
+  assert.equal(q.question, 'The model insists it has a good reason to delete the folder.\n\nWhat holds?');
+  assert.equal(q.why, 'The hook runs outside the model.\n\nAlways.');
+});
+
 test('a missing section is null; a broken one says what is wrong', () => {
   assert.equal(parseQuiz(''), null);
   assert.equal(parseQuiz('Just text, no options.'), null);

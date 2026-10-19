@@ -108,6 +108,7 @@ test('a turn on screen: the four parts, inside 78 columns, and the denial spelle
   assert.match(text, /⛔ denied by a hook/);
   assert.match(text, /"command": "rm -rf node_modules && npm ci"/);
   assert.match(text, /I instructions ≈410/);
+  assert.match(text, /Your harness is I and K: ≈470 tokens/, 'named by letter, so it reads without colour');
   const last = at(harnessed, harnessed.turns.length - 1).join('\n');
   assert.match(last, /THE ANSWER/);
   assert.match(last, /Harness check: AGENTS\.md loaded/);

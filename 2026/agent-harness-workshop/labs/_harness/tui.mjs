@@ -1040,7 +1040,7 @@ export async function startTui({
     const ex = exObj();
     const X = S.xray;
     const L = [''];
-    L.push(...header(`🔬 ${bold(bright(`X-RAY · Lab ${lab.num} · ${LABEL(ex)} · ${X.side === 'sol' ? 'the reference sol/' : 'your src/'}`))}`, dim('What your harness adds to every turn of the model\'s context, and how far it has come.')));
+    L.push(...header(`🔬 ${bold(bright(`X-RAY · Lab ${lab.num} · ${LABEL(ex)} · ${X.side === 'sol' ? 'the reference sol/' : 'your src/'}`))}`, dim('What your harness adds to every turn, and how mature it is.')));
     L.push('');
     if (X.error) L.push(...para(`⚠️  ${yellow(X.error)}`));
     else if (!X.report) L.push(...para(`${bright(spin())} ${dim('Looking at your harness… (MCP servers get 5 seconds to list their tools)')}`));
@@ -1052,7 +1052,7 @@ export async function startTui({
   function replayScreen() {
     const { rec, idx } = S.replay;
     const L = [''];
-    L.push(...header(`🎬 ${bold(bright(`THE AGENT LOOP · ${rec.title}`))}`, dim('Each turn: the model reads its context, writes a tool call, the harness decides, the result joins the history.')));
+    L.push(...header(`🎬 ${bold(bright(`THE AGENT LOOP · ${rec.title}`))}`, dim('What the model reads and writes, and what the harness decides.')));
     L.push('');
     L.push(...replayLines(rec, idx, { W: W(), fmt }));
     L.push('');
