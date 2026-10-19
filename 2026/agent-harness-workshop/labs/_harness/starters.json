@@ -1,6 +1,6 @@
 {
   "format": 2,
-  "revision": "e5c20303105e1317203558121dff65198141812b",
+  "revision": "8c123a67dfdc60ca6a5c96ac1a5e8da2c86f86e9",
   "note": "Every seed file of every exercise's src/ as a git blob ID (line endings normalised), and the chain: where each level starts from and which files are its own starter files. Regenerate with: node labs/start.mjs sync-seeds",
   "exercises": {
     "lab-00/easy": {
@@ -276,13 +276,16 @@
       "index.js": "c921c72563c35a7f4ab3f2a5fffd2625a11f4036",
       "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
       "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
-      "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
+      "scripts/audit-report.mjs": "7804c58cd6897e72f95f501ff9b1f6e7838ebc2e"
     },
     "lab-05/hard": {
       ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
-      ".github/hooks/guardrails.json": "89f0c204dc54b1a01f2ce7cd98ca387a41f40605",
-      ".github/hooks/scripts/audit.mjs": "70bf6f30a87e030df0fc51a1ab363c6555d6704d",
-      ".github/hooks/scripts/guard.mjs": "183ab4e7efb287c76461b276edae84df6ce453cc",
+      ".github/hooks/guardrails.json": "8c0c66edf28c70edd6bc50a68787369a97540e82",
+      ".github/hooks/scripts/audit.mjs": "5950efeb7d999f73b760d40eaaaadfa0a1e52d83",
+      ".github/hooks/scripts/guard-cases.json": "1182a126ab9a4f4c8e3b37c918cbc51431283e86",
+      ".github/hooks/scripts/guard.mjs": "a6e9a5789065882ed4384454ccae3a28dfb72dc0",
+      ".github/hooks/scripts/guard.test.mjs": "73e298e124d0c3ccf548a024862c9d0688c6dee1",
       ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
       ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
       ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
@@ -301,6 +304,7 @@
       "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
       "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
       "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
+      "scripts/audit-report.mjs": "c520a134248cc62a04c49b124ddcba0e2dca2bc7",
       "scripts/leash.mjs": "1a843a25d6918e180110321003bdb5434e377d62"
     },
     "lab-06/easy": {
@@ -787,7 +791,9 @@
     },
     "lab-05/medium": {
       "from": "lab-05/easy",
-      "starter": {},
+      "starter": {
+        "scripts/audit-report.mjs": "7804c58cd6897e72f95f501ff9b1f6e7838ebc2e"
+      },
       "inherited": {
         ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
         ".github/hooks/guardrails.json": "7957f56d18cc57c81d8fb4b174aa942e047b3739",
@@ -815,13 +821,15 @@
     "lab-05/hard": {
       "from": "lab-05/medium",
       "starter": {
+        ".github/hooks/scripts/guard-cases.json": "1182a126ab9a4f4c8e3b37c918cbc51431283e86",
+        ".github/hooks/scripts/guard.test.mjs": "73e298e124d0c3ccf548a024862c9d0688c6dee1",
         "scripts/leash.mjs": "1a843a25d6918e180110321003bdb5434e377d62"
       },
       "inherited": {
         ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
-        ".github/hooks/guardrails.json": "89f0c204dc54b1a01f2ce7cd98ca387a41f40605",
-        ".github/hooks/scripts/audit.mjs": "70bf6f30a87e030df0fc51a1ab363c6555d6704d",
-        ".github/hooks/scripts/guard.mjs": "183ab4e7efb287c76461b276edae84df6ce453cc",
+        ".github/hooks/guardrails.json": "8c0c66edf28c70edd6bc50a68787369a97540e82",
+        ".github/hooks/scripts/audit.mjs": "5950efeb7d999f73b760d40eaaaadfa0a1e52d83",
+        ".github/hooks/scripts/guard.mjs": "a6e9a5789065882ed4384454ccae3a28dfb72dc0",
         ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
         ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
         ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
@@ -839,7 +847,8 @@
         "index.js": "c921c72563c35a7f4ab3f2a5fffd2625a11f4036",
         "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
         "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
-        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
+        "scripts/audit-report.mjs": "c520a134248cc62a04c49b124ddcba0e2dca2bc7"
       }
     },
     "lab-06/easy": {

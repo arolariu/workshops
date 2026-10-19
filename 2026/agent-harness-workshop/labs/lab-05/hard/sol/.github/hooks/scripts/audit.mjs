@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// 📒 postToolUse audit: one JSON line per tool call in .agent-logs/audit.jsonl. It never blocks anything.
+// 📒 Audit: one JSON line per tool call in .agent-logs/audit.jsonl. Registered for postToolUse (the call succeeded:
+// toolResult.resultType is "success") and postToolUseFailure (it failed: `error` says why). It never blocks anything.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -13,11 +14,13 @@ try {
     if (typeof args === 'string') {
       try { args = JSON.parse(args); } catch { args = { raw: args }; }
     }
+    const failed = typeof input.error === 'string' || input.toolResult?.resultType === 'failure';
     const entry = {
       at: new Date().toISOString(),
       tool: input.toolName ?? 'unknown',
       args: redact(JSON.stringify(args)).slice(0, 200),
-      result: input.toolResult?.resultType ?? 'unknown',
+      result: failed ? 'failure' : (input.toolResult?.resultType ?? 'unknown'),
+      ...(typeof input.error === 'string' ? { error: redact(input.error).slice(0, 200) } : {}),
     };
     fs.mkdirSync('.agent-logs', { recursive: true });
     fs.appendFileSync(path.join('.agent-logs', 'audit.jsonl'), `${JSON.stringify(entry)}\n`);

@@ -1,0 +1,4 @@
+[
+  { "tool": "bash", "args": { "command": "rm -rf build" }, "expect": "deny", "why": "recursive force delete" },
+  { "tool": "bash", "args": { "command": "npm test" }, "expect": "allow", "why": "running the tests" }
+]

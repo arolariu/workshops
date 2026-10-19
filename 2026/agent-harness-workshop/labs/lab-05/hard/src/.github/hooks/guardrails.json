@@ -18,6 +18,15 @@
         "cwd": ".",
         "timeoutSec": 10
       }
+    ],
+    "postToolUseFailure": [
+      {
+        "type": "command",
+        "bash": "node .github/hooks/scripts/audit.mjs",
+        "powershell": "node .github/hooks/scripts/audit.mjs",
+        "cwd": ".",
+        "timeoutSec": 10
+      }
     ]
   }
 }

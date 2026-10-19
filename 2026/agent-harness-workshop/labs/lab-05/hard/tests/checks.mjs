@@ -20,6 +20,25 @@ const flag = (args, name) => {
   return hit === undefined ? undefined : hit.slice(name.length + 1);
 };
 
+// M3: the guard's own test suite, and the mutants it must catch.
+const SUITE = '.github/hooks/scripts/guard.test.mjs';
+const CASES = '.github/hooks/scripts/guard-cases.json';
+const GUARD_FILE = path.join('.github', 'hooks', 'scripts', 'guard.mjs');
+const MUTANTS = ['no-rm', 'no-deps', 'no-env', 'no-hooks', 'no-secrets', 'over-blocking'];
+const FAMILIES = [
+  ['rm -rf', /\b(rm|remove-item)\b/i],
+  ['dependencies', /package\.json|\b(npm|yarn|pnpm)\b/i],
+  ['.env', /\.env\b/i],
+  ['.github/hooks', /\.github[\\/]+hooks/i],
+  ['secrets', /\{\{secret:\w+\}\}|ghp_\w{20}|AKIA[0-9A-Z]{16}|PRIVATE KEY/],
+];
+/** Run the learner's suite in a copy of their folder, with `guardFile` in place of their guard. */
+function suiteWith(t, guardFile) {
+  const copy = t.copy(t.tmp());
+  fs.copyFileSync(guardFile, path.join(copy, GUARD_FILE));
+  return t.unitTests({ cwd: copy, files: [SUITE] });
+}
+
 export default (t) => [
   t.check('The guard blocks secrets in writes and commands', () => expectDecisions(t,
     [tool('create', { path: 'config.js', file_text: `export const token = '${ghp}';` }), tool('edit', { path: 'grades.js', old_str: 'x', new_str: `const aws = "${aws}";` }), tool('create', { path: 'id_rsa', file_text: key }), shell(`echo ${pat} > token.txt`), tool('create', { path: 'ai.js', file_text: `const k = '${sk}';` })],
@@ -63,6 +82,28 @@ export default (t) => [
     const entry = JSON.parse(fs.readFileSync(file, 'utf8').trim().split('\n').pop());
     return (entry.result === 'fail' && entry.fail >= 1) || `A failing test should give result "fail", got ${JSON.stringify(entry)}`;
   }, { timeout: 150000, milestone: 'M2' }),
+  t.check('The table: 30+ rows, both decisions, a why on each, every rule family', () => {
+    const rows = t.json(CASES);
+    if (!Array.isArray(rows)) return `${CASES} must be a JSON array of rows.`;
+    const bad = rows.filter((r) => !r || typeof r.tool !== 'string' || !r.args || typeof r.args !== 'object' || !['allow', 'deny'].includes(r.expect) || !String(r.why ?? '').trim());
+    if (bad.length) return `Every row needs tool, args (an object), expect ("allow" or "deny") and why. Fix: ${JSON.stringify(bad[0]).slice(0, 120)}`;
+    if (rows.length < 30) return `guard-cases.json has ${rows.length} rows; write at least 30 (the denied spellings and the work that must still pass).`;
+    const allowed = rows.filter((r) => r.expect === 'allow').length;
+    if (allowed < 8) return `Only ${allowed} rows expect "allow". A guard that blocks everything passes a deny-only table: add at least 8 allowed calls.`;
+    const thin = FAMILIES.filter(([, re]) => rows.filter((r) => r.expect === 'deny' && re.test(JSON.stringify(r.args))).length < 2).map(([name]) => name);
+    return !thin.length || `Add at least two denied rows for: ${thin.join(', ')}.`;
+  }, { milestone: 'M3' }),
+  t.check('The suite runs every row and passes on your guard', () => {
+    const r = t.unitTests({ files: [SUITE] });
+    if (r.total < 30) return `node --test ${SUITE} ran ${r.total} tests; one per row (30+) is the idea.`;
+    return r.fail === 0 || `Your suite fails on your own guard: ${r.failing.slice(0, 2).join(' | ')}`;
+  }, { timeout: 120000, milestone: 'M3' }),
+  t.check('It agrees with the reference guard, and catches all six mutants', () => {
+    const control = suiteWith(t, path.join(t.solDir, GUARD_FILE));
+    if (control.fail > 0) return `Your suite fails on the reference guard, so some rows expect something the rules don't say: ${control.failing.slice(0, 2).join(' | ')}`;
+    const survived = MUTANTS.filter((m) => suiteWith(t, path.join(t.exDir, 'tests', 'mutants', `${m}.mjs`)).fail === 0);
+    return !survived.length || `These broken guards pass your suite (the suite would not notice the regression): ${survived.join(', ')}. Add rows that only a working guard gets right.`;
+  }, { timeout: 240000, milestone: 'M3' }),
   t.check('leashArgs(): least privilege and a budget', async () => {
     const { leashArgs } = await t.import('scripts/leash.mjs');
     const a = leashArgs('TASK');
@@ -77,5 +118,5 @@ export default (t) => [
     if (!n.some((x) => /^--allow-tool=shell\(npm/.test(x))) return 'It needs to run the tests: --allow-tool=shell(npm:*).';
     if (!n.includes('--deny-tool=shell(git push)')) return 'Deny git push: --deny-tool=shell(git push).';
     return n.some((x) => /^--deny-tool=shell\(rm(:\*)?\)$/.test(x)) || 'Deny rm: --deny-tool=shell(rm).';
-  }, { milestone: 'M3' }),
+  }, { milestone: 'M4' }),
 ];
