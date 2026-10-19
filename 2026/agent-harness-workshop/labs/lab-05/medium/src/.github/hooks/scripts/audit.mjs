@@ -11,7 +11,7 @@ try {
     if (typeof args === 'string') {
       try { args = JSON.parse(args); } catch { args = { raw: args }; }
     }
-    // TODO (M3): build { at, tool, args, result } (result: "success", or "failure" with the error when input.error
+    // TODO(M3): build { at, tool, args, result } (result: "success", or "failure" with the error when input.error
     // is there), then append it as one JSON line to .agent-logs/audit.jsonl (create the folder first).
   }
 } catch {

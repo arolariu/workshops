@@ -1,0 +1,4 @@
+# Who must review changes to these paths. GitHub asks a code owner to review every pull request that touches them.
+# TODO(M1): give /.github/hooks/ (the guardrails, and the organisation policy in policies/org.json) an owner: a
+# line with the path and at least one @team or @user. Then layer the org policy over the repository's:
+# effectivePolicy() in .github/hooks/scripts/engine.mjs, loaded by guard.mjs.

@@ -1,6 +1,6 @@
 {
   "format": 2,
-  "revision": "59fc57066e8a57e6fc6e1b49574ad2ecbf6c3b8d",
+  "revision": "51a4861250d8c535dc879ca500fa1cc3d5e5d53c",
   "note": "Every seed file of every exercise's src/ as a git blob ID (line endings normalised), and the chain: where each level starts from and which files are its own starter files. Regenerate with: node labs/start.mjs sync-seeds",
   "exercises": {
     "lab-00/easy": {
@@ -258,7 +258,7 @@
     "lab-05/medium": {
       ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
       ".github/hooks/guardrails.json": "7957f56d18cc57c81d8fb4b174aa942e047b3739",
-      ".github/hooks/scripts/audit.mjs": "35756b4d5688191e335c2435d0872d3fc3402dcf",
+      ".github/hooks/scripts/audit.mjs": "5fedee2ded541e58f7fd87fd04e7ba12844709f1",
       ".github/hooks/scripts/guard.mjs": "ec6ef80ec80295e689bf1054a69dcc616528b06b",
       ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
       ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
@@ -313,7 +313,7 @@
       ".github/hooks/guardrails.json": "b0d728dd04595edbbc12ee5a8a623f72dd678ceb",
       ".github/hooks/policies/repo.json": "3eb80c094884bd10231a4ab8f991622ea76d317a",
       ".github/hooks/scripts/audit.mjs": "293de06df888902ff875665311103236a2258aa4",
-      ".github/hooks/scripts/engine.mjs": "d245659a323856fbb11482a54b65ce4fc20f1d4d",
+      ".github/hooks/scripts/engine.mjs": "2668c28dab633948ae5cda825e5d241be3e12781",
       ".github/hooks/scripts/guard-cases.json": "d366a44bd0c18e43317d07d2a6879bc4bfad53e3",
       ".github/hooks/scripts/guard.mjs": "390c1a57ab2426fc8099c845360a16b5971d4a7d",
       ".github/hooks/scripts/guard.test.mjs": "520e32f647f7d332897610cebdb58b71b7cf27bd",
@@ -340,19 +340,20 @@
       "scripts/leash.mjs": "9876091a4f2503c0913877b93b201cb134779d18"
     },
     "lab-05/hard-plus-plus": {
+      ".github/CODEOWNERS": "ceb6497292084725c1dad01ad81550a3edd0bbf0",
       ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
       ".github/hooks/guardrails.json": "b0d728dd04595edbbc12ee5a8a623f72dd678ceb",
       ".github/hooks/policies/org.json": "5da71b1ec151031df4fe2c2e82841db864310df7",
       ".github/hooks/policies/repo.json": "a39ebbb932a375cd244d4f024d6c7fa7e251dd4e",
-      ".github/hooks/scripts/audit-chain.mjs": "cb04899fadec43b050dc6e6b0bd53ee655f188c9",
+      ".github/hooks/scripts/audit-chain.mjs": "652126f3ad73c0144229db3352827debc81802cc",
       ".github/hooks/scripts/audit.mjs": "293de06df888902ff875665311103236a2258aa4",
       ".github/hooks/scripts/engine.mjs": "140923d8ff42d9a92c7c78ee533006da16a5a864",
       ".github/hooks/scripts/guard-cases.json": "d366a44bd0c18e43317d07d2a6879bc4bfad53e3",
       ".github/hooks/scripts/guard.mjs": "21c3b91c993cc0ce983937e1556526eef821e311",
       ".github/hooks/scripts/guard.test.mjs": "520e32f647f7d332897610cebdb58b71b7cf27bd",
-      ".github/hooks/scripts/prompt-scan.mjs": "6b27a2880d697e3463dcf2ea07fed18aa3e3e03b",
+      ".github/hooks/scripts/prompt-scan.mjs": "229edfb917f2be048235de14dea587ee4ff4d50f",
       ".github/hooks/scripts/run-tests-after-edit.mjs": "a5ad252ce39effcfcf5db526860658e33483f48f",
-      ".github/hooks/scripts/session-start.mjs": "648fa393b6b12aa8c223d0010949471e0872aed2",
+      ".github/hooks/scripts/session-start.mjs": "cac3c417e3765818d977e50666e5097e9ac6385c",
       ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
       ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
       ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
@@ -372,7 +373,7 @@
       "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
       "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
       "scripts/audit-report.mjs": "c520a134248cc62a04c49b124ddcba0e2dca2bc7",
-      "scripts/governance-report.mjs": "c1d813d826e11813f8b99a0d63bd241cefe9762b",
+      "scripts/governance-report.mjs": "f60e836a881c01ffcd33aecc247c6c1165e3c601",
       "scripts/leash.mjs": "9876091a4f2503c0913877b93b201cb134779d18",
       "scripts/verify-audit.mjs": "2d782fef7cbd3f51313f34430d81b25cc79a6c70"
     },
@@ -861,7 +862,7 @@
     "lab-05/medium": {
       "from": "lab-05/easy",
       "starter": {
-        ".github/hooks/scripts/audit.mjs": "35756b4d5688191e335c2435d0872d3fc3402dcf",
+        ".github/hooks/scripts/audit.mjs": "5fedee2ded541e58f7fd87fd04e7ba12844709f1",
         "scripts/audit-report.mjs": "7804c58cd6897e72f95f501ff9b1f6e7838ebc2e"
       },
       "inherited": {
@@ -925,7 +926,7 @@
       "from": "lab-05/hard",
       "starter": {
         ".github/hooks/policies/repo.json": "3eb80c094884bd10231a4ab8f991622ea76d317a",
-        ".github/hooks/scripts/engine.mjs": "d245659a323856fbb11482a54b65ce4fc20f1d4d"
+        ".github/hooks/scripts/engine.mjs": "2668c28dab633948ae5cda825e5d241be3e12781"
       },
       "inherited": {
         ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
@@ -960,11 +961,12 @@
     "lab-05/hard-plus-plus": {
       "from": "lab-05/hard-plus",
       "starter": {
+        ".github/CODEOWNERS": "ceb6497292084725c1dad01ad81550a3edd0bbf0",
         ".github/hooks/policies/org.json": "5da71b1ec151031df4fe2c2e82841db864310df7",
-        ".github/hooks/scripts/audit-chain.mjs": "cb04899fadec43b050dc6e6b0bd53ee655f188c9",
-        ".github/hooks/scripts/prompt-scan.mjs": "6b27a2880d697e3463dcf2ea07fed18aa3e3e03b",
-        ".github/hooks/scripts/session-start.mjs": "648fa393b6b12aa8c223d0010949471e0872aed2",
-        "scripts/governance-report.mjs": "c1d813d826e11813f8b99a0d63bd241cefe9762b",
+        ".github/hooks/scripts/audit-chain.mjs": "652126f3ad73c0144229db3352827debc81802cc",
+        ".github/hooks/scripts/prompt-scan.mjs": "229edfb917f2be048235de14dea587ee4ff4d50f",
+        ".github/hooks/scripts/session-start.mjs": "cac3c417e3765818d977e50666e5097e9ac6385c",
+        "scripts/governance-report.mjs": "f60e836a881c01ffcd33aecc247c6c1165e3c601",
         "scripts/verify-audit.mjs": "2d782fef7cbd3f51313f34430d81b25cc79a6c70"
       },
       "inherited": {

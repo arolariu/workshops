@@ -1,6 +1,7 @@
 // The real labs: every level's todo.md can be read, and its milestones and hints line up.
 // (verify checks the other direction: every milestone a check names exists, and every milestone has a check.)
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { loadCatalog } from '../catalog.mjs';
@@ -102,7 +103,8 @@ test('every reference solution passes the scorecard rules of the layers earlier 
 });
 
 // Labs whose homework ladder is complete (Phase 4). Their levels above easy follow the ticket format of spec §5.3.
-const GROWN = new Set(['lab-05']);
+// CONTENT_TEST_LABS=lab-01,lab-02 checks other labs while their ladders are being written.
+const GROWN = new Set(process.env.CONTENT_TEST_LABS ? process.env.CONTENT_TEST_LABS.split(',').map((s) => s.trim()) : ['lab-05']);
 const tierRange = (d) => {
   const [lo, hi = lo] = d.time.match(/[\d.]+/g).map(Number);
   const unit = /\bh\b/.test(d.time) ? 60 : 1;
@@ -133,6 +135,25 @@ test('every homework level of a grown lab follows the ticket format, fits its ti
         const prompts = specs.reduce((n, s) => n + (s.command ? (s.prompts ?? 1) : 1), 0);
         assert.ok(prompts <= 2, `${ex.key}: agent checks use at most 2 prompts (${prompts})`);
       }
+    }
+  }
+});
+
+// Hard+ and hard++ starters are skeletons: a TODO(Mn) marker shows where each milestone's work goes.
+const textOf = (dir) => {
+  if (!fs.existsSync(dir)) return '';
+  return fs.readdirSync(dir, { withFileTypes: true }).map((e) => {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) return /^(node_modules|\.git)$/.test(e.name) ? '' : textOf(p);
+    return fs.statSync(p).size < 512 * 1024 ? fs.readFileSync(p, 'utf8') : '';
+  }).join('\n');
+};
+test('every milestone of a grown lab\'s hard+ and hard++ level has a TODO(Mn) marker in its starter', () => {
+  for (const lab of catalog.filter((l) => GROWN.has(l.id))) {
+    for (const ex of lab.levels.filter((e) => e.level === 'hard-plus' || e.level === 'hard-plus-plus')) {
+      const text = textOf(ex.src);
+      const missing = ex.milestones.filter((m) => !text.includes(`TODO(${m.id})`)).map((m) => m.id);
+      assert.deepEqual(missing, [], `${ex.key}: src/ has no TODO(Mn) marker for ${missing.join(', ')}`);
     }
   }
 });

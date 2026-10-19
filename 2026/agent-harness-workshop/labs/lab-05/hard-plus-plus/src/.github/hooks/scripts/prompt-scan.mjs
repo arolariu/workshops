@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { append } from './audit-chain.mjs';
 
-// TODO (M3): one regex per signal. The names to use: 'override', 'role', 'system-prompt', 'hidden-characters', 'encoded',
+// TODO(M3): one regex per signal. The names to use: 'override', 'role', 'system-prompt', 'hidden-characters', 'encoded',
 // 'exfiltration' (tests/fixtures/prompts.json has twelve prompts that should be flagged, and twelve that shouldn't).
 const SIGNALS = [];
 
@@ -27,7 +27,7 @@ const safe = (id) => String(id ?? 'unknown').replace(/[^\w-]/g, '_');
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   try {
-    // TODO (M3): read { sessionId, prompt } from stdin; when scanPrompt() finds signals, write
+    // TODO(M3): read { sessionId, prompt } from stdin; when scanPrompt() finds signals, write
     // .agent-logs/flags/<sessionId>.json and append a { type: 'prompt-flag', at, session, signals, excerpt } entry.
   } catch {
     // A prompt hook must never break the session.

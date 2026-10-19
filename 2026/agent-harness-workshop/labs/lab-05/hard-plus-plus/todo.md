@@ -145,6 +145,8 @@ attack.
 
 The prompt hook can't block anything (Copilot ignores its output), but it can leave a file. The guard gets the same
 `sessionId` on every call: if `.agent-logs/flags/<sessionId>.json` exists, call `evaluate(…, { lockdown: true })`.
+Lockdown is an allow-list, so it also denies the `skill` calls of your personal Copilot plugins (you'll see them in
+the timeline): that's intended; add a `"lockdown": true` allow rule if you want one to stay available.
 
 </details>
 

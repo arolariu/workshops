@@ -47,7 +47,7 @@ export function readLines(file) {
 // ---------- M4 · append and verify ----------
 /** Append one entry (an object without seq, prev or hash): link it to the last one, and update the head file. */
 export function append(file, entry) {
-  // TODO (M4): inside withLock(file, …): find the last entry that parses (readLines; a damaged last line must not stop
+  // TODO(M4): inside withLock(file, …): find the last entry that parses (readLines; a damaged last line must not stop
   // the log) for its seq and hash (or 0 and GENESIS), build body = { ...entry, seq: seq + 1, prev }, hash it, append
   // { ...body, hash } as one JSON line, and write the head file.
   throw new Error('append() is not written yet (M4)');
@@ -55,7 +55,7 @@ export function append(file, entry) {
 
 /** { ok, entries, problems: [{ line, kind: 'unreadable' | 'hash' | 'link' | 'seq' | 'head' }] } */
 export function verify(file) {
-  // TODO (M4): walk the lines and report every problem, not just the first: for each line check that it parses
+  // TODO(M4): walk the lines and report every problem, not just the first: for each line check that it parses
   // ('unreadable'), that its hash is right ('hash'), that prev is the hash of the line before ('link'), that seq goes
   // 1, 2, 3 … ('seq'); then that the head file names the last seq and hash ('head'), even when the chain is empty. A
   // chain with neither a file nor a head is empty and intact.

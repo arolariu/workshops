@@ -9,6 +9,10 @@
 //   text         tested against JSON.stringify(args)
 // A deny rule fires when one command of the call matches. An allow rule speaks for the whole call: its `command`
 // pattern must match every command, or `npm test && rm -rf src` would ride along on an allow rule for `npm test`.
+//
+// Where the work goes: TODO(M1) validatePolicy and policies/repo.json · TODO(M2) evaluate, and guard.mjs asks it
+// · TODO(M3) canonical and unwrap · TODO(M4) guard.mjs fails closed: no usable policy, an unreadable call, or no
+// decision within DEADLINE_MS denies · TODO(M5) rules for the calls an injection would make, in policies/repo.json.
 
 export const SEVERITY = ['low', 'medium', 'high', 'critical'];
 export const MATCH_KEYS = ['tool', 'command', 'commandLine', 'path', 'text'];
@@ -52,7 +56,7 @@ export function compile(source) {
 // ---------- M1 · the policy file ----------
 /** Everything wrong with a policy, in words a human can fix; [] when it is valid. */
 export function validatePolicy(policy) {
-  // TODO (M1): check version, default, the rules list, and each rule: id (unique, lowercase-dashes), decision,
+  // TODO(M1): check version, default, the rules list, and each rule: id (unique, lowercase-dashes), decision,
   // a reason and a severity for deny rules, and a match with known keys whose regexes compile (use compile()).
   return [];
 }
@@ -70,7 +74,7 @@ const SHELLS = { bash: 'bash', sh: 'bash', zsh: 'bash', dash: 'bash', cmd: 'cmd'
  * "delete --force --recursive x". Every other command keeps its words: "npm install lodash".
  */
 export function canonical(words, dialect = 'bash') {
-  // TODO (M3): the delete family with bash (-r -f -rf --recursive --force), PowerShell (-Recurse -rec -Force -fo) and
+  // TODO(M3): the delete family with bash (-r -f -rf --recursive --force), PowerShell (-Recurse -rec -Force -fo) and
   // cmd (/s /q) flags. Until then, every command keeps its words, so "rm -rf x" stays "rm -rf x".
   const name = base(words[0]);
   const rest = words.slice(1);
@@ -82,7 +86,7 @@ export function canonical(words, dialect = 'bash') {
  * inside shells are opened up: `bash -c "…"`, `cmd /c "…"`, `powershell -NoProfile -Command "…"`, `Invoke-Expression "…"`.
  */
 export function unwrap(words, dialect = 'bash') {
-  // TODO (M3): drop prefixes (sudo, env, VAR=value, xargs, …) and open shells inside shells (bash -c, cmd /c,
+  // TODO(M3): drop prefixes (sudo, env, VAR=value, xargs, …) and open shells inside shells (bash -c, cmd /c,
   // powershell -Command, Invoke-Expression). Return { command, dialect }, or null when there is nothing to unwrap.
   return null;
 }
@@ -113,7 +117,7 @@ export function normalize(toolName, args = {}) {
  * otherwise the first matching allow rule; otherwise the policy's default.
  */
 export function evaluate(policy, call) {
-  // TODO (M2): find the rules whose match fits the call (every key given must match: tool, command, commandLine,
+  // TODO(M2): find the rules whose match fits the call (every key given must match: tool, command, commandLine,
   // path, text), then decide: deny wins (highest severity), else the first allow, else policy.default.
   return { decision: 'allow', rule: null, severity: null, reason: null, matched: [] };
 }

@@ -16,14 +16,14 @@ const sha = (file) => { try { return crypto.createHash('sha256').update(fs.readF
 
 /** What the model should know before it starts: who governs it, and what can never be allowed. */
 export function sessionContext(org) {
-  // TODO (M2): a few sentences, under 1,500 characters, naming every organisation deny rule by its id.
+  // TODO(M2): a few sentences, under 1,500 characters, naming every organisation deny rule by its id.
   return '';
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   try {
-    // TODO (M2): read the input, append a { type: 'session-start', at, session, source, policies: { org, repo } } entry
+    // TODO(M2): read the input, append a { type: 'session-start', at, session, source, policies: { org, repo } } entry
     // (sha(ORG_POLICY), sha(REPO_POLICY)), and print { additionalContext: sessionContext(org) }.
   } catch {
     // A session hook must never break the session.

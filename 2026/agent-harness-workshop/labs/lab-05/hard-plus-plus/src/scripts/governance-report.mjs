@@ -13,7 +13,7 @@ import { verify } from '../.github/hooks/scripts/audit-chain.mjs';
  * Entries: { type: 'session-start' | 'prompt-flag' | 'decision', session, … }.
  */
 export function governanceReport(entries) {
-  // TODO (M5): count decisions and denials per session, denials per rule, and collect the flagged prompts; then build
+  // TODO(M5): count decisions and denials per session, denials per rule, and collect the flagged prompts; then build
   // the Markdown exactly as todo.md shows it (tests/fixtures/governance-report.golden.md is the expected output).
   return '';
 }
