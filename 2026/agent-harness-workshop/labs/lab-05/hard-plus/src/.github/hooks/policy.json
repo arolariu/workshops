@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "default": "allow",
+  "rules": [
+    {
+      "id": "no-recursive-force-delete",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "Recursive force-deletes (rm -rf, Remove-Item -Recurse, rd /s /q) are blocked in this project. Delete specific files instead, or ask the human.",
+      "match": {
+        "tool": "shell",
+        "command": "^delete --force --recursive\\b"
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "valid": { "version": 1, "default": "allow", "rules": [{ "id": "no-echo", "decision": "deny", "severity": "low", "reason": "No echo here: print with console.log instead.", "match": { "tool": "shell", "command": "^echo\\b" } }] },
+  "broken": [
+    ["wrong version", { "version": 2, "default": "allow", "rules": [] }],
+    ["unknown decision", { "version": 1, "default": "allow", "rules": [{ "id": "a", "decision": "maybe", "severity": "low", "reason": "x", "match": { "tool": "shell" } }] }],
+    ["duplicate id", { "version": 1, "default": "allow", "rules": [{ "id": "a", "decision": "deny", "severity": "low", "reason": "x", "match": { "tool": "shell" } }, { "id": "a", "decision": "deny", "severity": "low", "reason": "y", "match": { "tool": "write" } }] }],
+    ["deny without a reason", { "version": 1, "default": "allow", "rules": [{ "id": "a", "decision": "deny", "severity": "high", "match": { "tool": "shell" } }] }],
+    ["a regex that does not compile", { "version": 1, "default": "allow", "rules": [{ "id": "a", "decision": "deny", "severity": "high", "reason": "x", "match": { "command": "^rm (-rf" } }] }],
+    ["an unknown match key", { "version": 1, "default": "allow", "rules": [{ "id": "a", "decision": "deny", "severity": "high", "reason": "x", "match": { "commnad": "^rm" } }] }],
+    ["an empty match (it would match every call)", { "version": 1, "default": "allow", "rules": [{ "id": "a", "decision": "deny", "severity": "high", "reason": "x", "match": {} }] }]
+  ]
+}

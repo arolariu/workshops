@@ -1,6 +1,6 @@
 {
   "format": 2,
-  "revision": "8c123a67dfdc60ca6a5c96ac1a5e8da2c86f86e9",
+  "revision": "1f9be86f7161cfdb99488dc869f46abbc608f96e",
   "note": "Every seed file of every exercise's src/ as a git blob ID (line endings normalised), and the chain: where each level starts from and which files are its own starter files. Regenerate with: node labs/start.mjs sync-seeds",
   "exercises": {
     "lab-00/easy": {
@@ -306,6 +306,37 @@
       "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
       "scripts/audit-report.mjs": "c520a134248cc62a04c49b124ddcba0e2dca2bc7",
       "scripts/leash.mjs": "1a843a25d6918e180110321003bdb5434e377d62"
+    },
+    "lab-05/hard-plus": {
+      ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+      ".github/hooks/guardrails.json": "b0d728dd04595edbbc12ee5a8a623f72dd678ceb",
+      ".github/hooks/policy.json": "7ab4825e4831493b3f8cf6c892af7e049d4bc93c",
+      ".github/hooks/scripts/audit.mjs": "d84f373989a8a3d232382d6a84786814ecec2aa6",
+      ".github/hooks/scripts/engine.mjs": "be083815546c239bd4bd7506aa1d862e90515199",
+      ".github/hooks/scripts/guard-cases.json": "d366a44bd0c18e43317d07d2a6879bc4bfad53e3",
+      ".github/hooks/scripts/guard.mjs": "e22ca35020cbf6c1b5d626bc011b8d76500fb1fc",
+      ".github/hooks/scripts/guard.test.mjs": "520e32f647f7d332897610cebdb58b71b7cf27bd",
+      ".github/hooks/scripts/run-tests-after-edit.mjs": "a5ad252ce39effcfcf5db526860658e33483f48f",
+      ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+      ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+      ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+      ".gitignore": "eb00b035e2823b43c2b507e23fccc74b592daff5",
+      ".mcp.json": "7db343765085918ddabf82f7391f7aa750eb581e",
+      "AGENTS.md": "e37b145e87eb8428419d1019d8701619e7055f30",
+      "README.md": "aea3fbc476a919079799955a1cdf3ab2603bb5db",
+      "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+      "attendance.js": "e32660715066786b6700beb55b22952500870617",
+      "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+      "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+      "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+      "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+      "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+      "index.js": "c921c72563c35a7f4ab3f2a5fffd2625a11f4036",
+      "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+      "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
+      "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
+      "scripts/audit-report.mjs": "c520a134248cc62a04c49b124ddcba0e2dca2bc7",
+      "scripts/leash.mjs": "9876091a4f2503c0913877b93b201cb134779d18"
     },
     "lab-06/easy": {
       ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
@@ -849,6 +880,42 @@
         "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
         "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
         "scripts/audit-report.mjs": "c520a134248cc62a04c49b124ddcba0e2dca2bc7"
+      }
+    },
+    "lab-05/hard-plus": {
+      "from": "lab-05/hard",
+      "starter": {
+        ".github/hooks/policy.json": "7ab4825e4831493b3f8cf6c892af7e049d4bc93c",
+        ".github/hooks/scripts/engine.mjs": "be083815546c239bd4bd7506aa1d862e90515199"
+      },
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/hooks/guardrails.json": "b0d728dd04595edbbc12ee5a8a623f72dd678ceb",
+        ".github/hooks/scripts/audit.mjs": "d84f373989a8a3d232382d6a84786814ecec2aa6",
+        ".github/hooks/scripts/guard-cases.json": "d366a44bd0c18e43317d07d2a6879bc4bfad53e3",
+        ".github/hooks/scripts/guard.mjs": "e22ca35020cbf6c1b5d626bc011b8d76500fb1fc",
+        ".github/hooks/scripts/guard.test.mjs": "520e32f647f7d332897610cebdb58b71b7cf27bd",
+        ".github/hooks/scripts/run-tests-after-edit.mjs": "a5ad252ce39effcfcf5db526860658e33483f48f",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        ".gitignore": "eb00b035e2823b43c2b507e23fccc74b592daff5",
+        ".mcp.json": "7db343765085918ddabf82f7391f7aa750eb581e",
+        "AGENTS.md": "e37b145e87eb8428419d1019d8701619e7055f30",
+        "README.md": "aea3fbc476a919079799955a1cdf3ab2603bb5db",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "c921c72563c35a7f4ab3f2a5fffd2625a11f4036",
+        "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
+        "scripts/audit-report.mjs": "c520a134248cc62a04c49b124ddcba0e2dca2bc7",
+        "scripts/leash.mjs": "9876091a4f2503c0913877b93b201cb134779d18"
       }
     },
     "lab-06/easy": {
