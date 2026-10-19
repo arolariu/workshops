@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// 📊 run-stats: summarise Copilot runs recorded as JSON events (one event per line).
-//   node scripts/run-stats.mjs fixtures/sample-run.jsonl                summarise a recorded run
+// 📊 run-stats: what happened in a Copilot run, from its JSON events (`copilot -p … --output-format json`, one event
+// per line): event types, tools and their success rate, tokens, the outcome, and a timeline per turn.
+//   node scripts/run-stats.mjs fixtures/denied.jsonl [more.jsonl …]      summarise recorded runs
 //   node scripts/run-stats.mjs --record "Which functions does grades.js export?"   record a new run first
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -8,27 +9,41 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Summarise the lines of a recorded run. Every line is one event: { "type": "...", "data": { ... } }.
- * Blank lines are ignored; lines that are not valid JSON are counted as `skipped`.
+ * Summarise the lines of a recorded run. Each line is one event: { type, data, id, timestamp, parentId }, except the
+ * last one, `result`, which is flat: { type, sessionId, exitCode, usage: { premiumRequests, … } }.
+ * Blank lines are ignored; lines that are not JSON are counted as `skipped`.
  * @param {string[]} lines
- * @returns {{ events: number, skipped: number, byType: Record<string, number>, tools: Record<string, number>, tokens: { input: number, output: number } }}
  */
 export function summarize(lines) {
-  // TODO 1: count events per type, tool calls per tool name, and add up the tokens.
-  return { events: 0, skipped: 0, byType: {}, tools: {}, tokens: { input: 0, output: 0 } };
+  const s = {
+    events: 0, skipped: 0, byType: {}, model: null,
+    tools: {}, turns: [],
+    tokens: { input: 0, output: 0, cacheRead: 0 },
+    premiumRequests: null, exitCode: null, errors: [], outcome: 'incomplete',
+  };
+  // TODO(M1): for each line: skip blank ones, JSON.parse the rest (a line that doesn't parse is `skipped`), count
+  //           `events` and `byType[type]`, and keep the first `data.model` you see as `model`.
+  // TODO(M2): tool.execution_start → s.tools[toolName].calls; tool.execution_complete (same toolCallId) → ok, denied
+  //           (success false, error.code "denied") or failed (success false, any other code).
+  // TODO(M3): s.turns: one { id, tools: [{ name, outcome }], said } per turnId (assistant.turn_start, and the turnId
+  //           of the tool events); tokens from the LAST session.usage_checkpoint (data.accountingSnapshot.modelMetrics,
+  //           summed over models); premiumRequests and exitCode from `result`; errors from session.error; outcome.
+  return s;
 }
 
 /**
- * Arguments for a safe recording run: prompt mode, JSON events, a credit cap, and no file writes.
+ * Arguments for a recording run: prompt mode, JSON events, never waits for a human, read-only (no file tools that
+ * write, no shell), and a credit cap.
  * @param {string} prompt
- * @returns {string[]} e.g. ['-p', prompt, ...]
+ * @param {{ model?: string }} [options]
+ * @returns {string[]}
  */
-export function recordArgs(prompt) {
-  // TODO 2: return the copilot arguments.
+export function recordArgs(prompt, { model } = {}) {
+  // TODO(M5): return the copilot arguments, e.g. ['-p', prompt, '-s', '--output-format', 'json', …].
   return [];
 }
 
-// ---------- you don't need to change anything below this line ----------
+// ---------- plumbing: you don't need to change anything below this line ----------
 
 function runCopilot(args) {
   let r = spawnSync('copilot', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -39,39 +54,63 @@ function runCopilot(args) {
   return r;
 }
 
-function print(summary, file) {
+const ICON = { ok: '🔧', denied: '⛔', failed: '❌', running: '⏳' };
+const MARK = { ok: ' ✓', denied: ' (denied)', failed: ' (failed)', running: ' (never finished)' };
+function print(s, file) {
   const list = (o) => Object.entries(o).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ×${v}`).join(' · ') || '-';
+  const tools = Object.entries(s.tools).map(([name, t]) => {
+    const extra = [t.denied && `${t.denied} denied`, t.failed && `${t.failed} failed`].filter(Boolean).join(', ');
+    return `${name} ${t.ok}/${t.calls} ok${extra ? ` (${extra})` : ''}`;
+  }).join(' · ') || '-';
+  const exit = s.exitCode === null ? 'no result event' : `exit ${s.exitCode}`;
+  const paid = s.premiumRequests == null ? '' : ` · ${s.premiumRequests} premium request(s)`;
   console.log(`\n📊 Run summary · ${file}`);
-  console.log(`   events   ${summary.events}${summary.skipped ? `  (${summary.skipped} line(s) skipped)` : ''}`);
-  console.log(`   by type  ${list(summary.byType)}`);
-  console.log(`   tools    ${list(summary.tools)}`);
-  console.log(`   tokens   ${summary.tokens.input} in · ${summary.tokens.output} out\n`);
+  console.log(`   events    ${s.events}${s.skipped ? `  (${s.skipped} line(s) skipped)` : ''}`);
+  console.log(`   by type   ${list(s.byType)}`);
+  console.log(`   model     ${s.model ?? '-'}`);
+  console.log(`   tools     ${tools}`);
+  console.log(`   tokens    ${s.tokens.input} in · ${s.tokens.output} out · ${s.tokens.cacheRead} cached`);
+  console.log(`   outcome   ${s.outcome} · ${exit}${paid}${s.errors.length ? ` · ${s.errors[0]}` : ''}`);
+  console.log('   timeline');
+  for (const t of s.turns) {
+    const steps = t.tools.map((x) => `${ICON[x.outcome] ?? '🔧'} ${x.name}${MARK[x.outcome] ?? ''}`);
+    if (t.said) steps.push('💬');
+    console.log(`     turn ${t.id.padEnd(3)} ${steps.join(' · ') || '-'}`);
+  }
+  console.log('');
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const args = process.argv.slice(2);
-  let file = args[0];
+  let files = args;
   if (args[0] === '--record') {
     const prompt = args.slice(1).join(' ') || 'Which functions does grades.js export? Answer in one line.';
     const runArgs = recordArgs(prompt);
     if (!runArgs.length) {
-      console.error('recordArgs() returns nothing yet: finish TODO 2 first.');
+      console.error('recordArgs() returns nothing yet: finish M5 first.');
       process.exit(1);
     }
-    console.log(`🎬 copilot ${runArgs.join(' ')}`);
+    console.log(`🎬 copilot ${runArgs.map((a) => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')}`);
     const r = runCopilot(runArgs);
-    if (r.status !== 0) {
-      console.error(`copilot failed (exit ${r.status}): ${(r.stderr || r.stdout || '').trim().slice(0, 500)}`);
+    if (r.status !== 0 && !String(r.stdout ?? '').trim()) {
+      console.error(`copilot failed (exit ${r.status}): ${(r.stderr || '').trim().slice(0, 500)}`);
       process.exit(1);
     }
     fs.mkdirSync('runs', { recursive: true });
-    file = path.join('runs', `run-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`);
+    const file = path.join('runs', `run-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`);
     fs.writeFileSync(file, r.stdout);
+    files = [file];
   }
-  if (!file) {
-    console.log('Usage: node scripts/run-stats.mjs <run.jsonl>   |   node scripts/run-stats.mjs --record "<prompt>"');
+  if (!files.length) {
+    console.log('Usage: node scripts/run-stats.mjs <run.jsonl> [more.jsonl …]   |   node scripts/run-stats.mjs --record "<prompt>"');
     process.exit(1);
   }
-  print(summarize(fs.readFileSync(file, 'utf8').split(/\r?\n/)), file);
+  for (const file of files) {
+    if (!fs.existsSync(file)) {
+      console.error(`${file} does not exist.`);
+      process.exit(1);
+    }
+    print(summarize(fs.readFileSync(file, 'utf8').split(/\r?\n/)), file);
+  }
 }

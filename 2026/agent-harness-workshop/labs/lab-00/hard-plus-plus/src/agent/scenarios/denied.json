@@ -1,0 +1,54 @@
+{
+  "name": "denied",
+  "about": "The permission gate allows npm test and stops rm -rf build; the model checks the build is still there.",
+  "prompt": "Run the tests, then clean up the build folder.",
+  "files": {
+    "build/app.js": "// built by npm run build: don't edit\nexport const version = '1.0.0';\n"
+  },
+  "run": {
+    "allow": [
+      "shell(npm test)"
+    ]
+  },
+  "steps": [
+    {
+      "say": "First the tests.",
+      "calls": [
+        {
+          "name": "bash",
+          "arguments": "{\"command\":\"npm test\"}"
+        }
+      ]
+    },
+    {
+      "expect": {
+        "resultIncludes": "pass"
+      },
+      "say": "The tests pass. Now the clean-up.",
+      "calls": [
+        {
+          "name": "bash",
+          "arguments": "{\"command\":\"rm -rf build\"}"
+        }
+      ]
+    },
+    {
+      "expect": {
+        "resultIncludes": "denied"
+      },
+      "say": "That was denied. Is the build still there?",
+      "calls": [
+        {
+          "name": "view",
+          "arguments": "{\"path\":\"build/app.js\"}"
+        }
+      ]
+    },
+    {
+      "expect": {
+        "resultIncludes": "built by npm run build"
+      },
+      "say": "The tests pass. Deleting build/ was denied, so it is still there: remove it yourself if you really want it gone."
+    }
+  ]
+}

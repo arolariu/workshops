@@ -1,19 +1,54 @@
-// Free checks for Lab 00 · medium.
+// Free checks for Lab 00 · medium: think first. The slash commands (/plan, /diff, /rewind, /usage) are interactive,
+// so the checks judge what they leave behind: the GPA feature, its tests, and PLAN.md.
 const expectError = (fn, type, label) => {
   try { fn(); } catch (e) { return e instanceof type ? null : `${label} threw ${e.name}, expected ${type.name}.`; }
   return `${label} did not throw (expected ${type.name}).`;
 };
 
+/** The body of a "## Title" section of PLAN.md (up to the next "## "), without HTML comments; null when missing. */
+function section(text, title) {
+  const parts = text.split(/^##\s+/m).slice(1);
+  const hit = parts.find((p) => p.split('\n')[0].trim().toLowerCase().startsWith(title.toLowerCase()));
+  return hit == null ? null : hit.split('\n').slice(1).join('\n').replace(/<!--[\s\S]*?-->/g, '').trim();
+}
+const plan = (t) => t.need('PLAN.md', 'PLAN.md is missing: it ships with the level (start over with x if you deleted it).');
+const need = (t, title) => {
+  const body = section(plan(t), title);
+  if (body == null) t.fail(`PLAN.md has no "## ${title}" section. Keep the four headings of the starter: Plan, Review, Rewind, Usage.`);
+  return body;
+};
+
+// "4.1", "1,234", "45.3k", "1.2M" → a number; anything else → NaN.
+const number = (cell) => {
+  const m = String(cell).trim().replace(/,/g, '').match(/^~?\s*(\d+(?:\.\d+)?)\s*([kKmM]?)$/);
+  if (!m) return NaN;
+  return Number(m[1]) * ({ k: 1e3, m: 1e6 }[m[2].toLowerCase()] ?? 1);
+};
+/** The usage table: header cells and { run → cells } for its rows. */
+function usageTable(body) {
+  const rows = body.split('\n').filter((l) => /^\s*\|/.test(l)).map((l) => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim()));
+  if (rows.length < 2) return null;
+  const [head, ...rest] = rows;
+  return { head: head.map((h) => h.toLowerCase()), rows: rest.filter((r) => !r.every((c) => /^:?-+:?$/.test(c))) };
+}
+
 export default (t) => [
-  t.check('PLAN.md holds a real plan (3+ steps)', () => {
-    const s = t.need('PLAN.md', 'Save the plan to `PLAN.md` (ask Copilot: "save this plan to PLAN.md").');
-    const steps = s.split('\n').filter((l) => /^\s*(\d+[.)]|[-*])\s+\S/.test(l)).length;
-    return steps >= 3 || `PLAN.md has ${steps} step(s). A plan needs at least 3 numbered or bulleted steps.`;
-  }),
+  t.check('PLAN.md holds the plan: 3+ numbered steps', () => {
+    const body = need(t, 'Plan');
+    const steps = body.split('\n').filter((l) => /^\s*\d+[.)]\s+\S/.test(l)).length;
+    return steps >= 3 || `PLAN.md's Plan section has ${steps} numbered step(s) (it needs 3+): paste the plan /plan wrote, or write it with Copilot.`;
+  }, { milestone: 'M1' }),
+  t.check('The plan names the function, its error handling and its tests', () => {
+    const body = need(t, 'Plan');
+    const missing = [[/\bgpa\b/i, 'the function (gpa)'], [/TypeError|RangeError|\berror|\bthrow|invalid/i, 'how bad input is handled'], [/\btests?\b/i, 'the tests']]
+      .filter(([re]) => !re.test(body)).map(([, what]) => what);
+    return !missing.length || `The plan doesn't mention ${missing.join(', ')}. A plan you can review says what, how it fails, and how you'll know it works.`;
+  }, { milestone: 'M1' }),
+
   t.check('grades.js exports gpa()', async () => {
     const m = await t.import('grades.js');
     return typeof m.gpa === 'function' || '`grades.js` has no exported `gpa` function yet.';
-  }),
+  }, { milestone: 'M2' }),
   t.check('gpa() weights by credits and rounds to 2 decimals', async () => {
     const { gpa } = await t.import('grades.js');
     if (typeof gpa !== 'function') return 'No gpa() yet.';
@@ -28,21 +63,59 @@ export default (t) => [
       if (got !== want) return `gpa(${JSON.stringify(input)}) returned ${got}, expected ${want}.`;
     }
     return true;
-  }),
+  }, { milestone: 'M2' }),
   t.check('gpa() rejects bad input with the right error types', async () => {
     const { gpa } = await t.import('grades.js');
     if (typeof gpa !== 'function') return 'No gpa() yet.';
     return expectError(() => gpa('nope'), TypeError, 'gpa("nope")')
       ?? expectError(() => gpa([]), RangeError, 'gpa([])')
       ?? expectError(() => gpa([{ credits: 5, finalGrade: 11 }]), RangeError, 'A final grade of 11')
+      ?? expectError(() => gpa([{ credits: 5, finalGrade: 0 }]), RangeError, 'A final grade of 0')
       ?? expectError(() => gpa([{ credits: 0, finalGrade: 8 }]), RangeError, '0 credits')
       ?? expectError(() => gpa([{ credits: 2.5, finalGrade: 8 }]), RangeError, '2.5 credits')
       ?? true;
-  }),
-  t.check('grades.test.js has tests for gpa()', () =>
-    /gpa\s*\(/.test(t.read('grades.test.js') ?? '') || 'Add at least one test for gpa() in grades.test.js.'),
+  }, { milestone: 'M2' }),
+  t.check('grades.test.js tests gpa(): the normal case and the errors', () => {
+    const s = t.read('grades.test.js') ?? '';
+    if (!/\bgpa\s*\(/.test(s)) return 'Add tests for gpa() in grades.test.js.';
+    return /assert\.throws\(\s*(?:\(\)\s*=>|function\s*\(\))\s*\{?\s*gpa\s*\(/.test(s) || 'Test the errors too: assert.throws(() => gpa(...), RangeError).';
+  }, { milestone: 'M2' }),
   t.check('npm test is green', () => {
     const r = t.unitTests();
     return (r.fail === 0 && r.pass > 0) || `${r.fail} test(s) fail: ${r.failing.slice(0, 3).join(' | ')}`;
-  }),
+  }, { milestone: 'M2' }),
+
+  t.check('PLAN.md has your review: 2+ findings from /diff', () => {
+    const body = need(t, 'Review');
+    const findings = body.split('\n').filter((l) => /^\s*([-*]|\d+[.)])\s+\S.{10,}/.test(l));
+    if (findings.length < 2) return `The Review section has ${findings.length} finding(s): after /diff, write at least 2 (one bullet each: what you saw, and what you did about it).`;
+    return findings.some((l) => /grades(\.test)?\.js/.test(l)) || 'Name the file in at least one finding (grades.js or grades.test.js), so a reader can find what you mean.';
+  }, { milestone: 'M3' }),
+  t.check('PLAN.md says which turn you undid with /rewind', () => {
+    const body = need(t, 'Rewind');
+    if (body.replace(/\s+/g, ' ').length < 40) return 'The Rewind section is empty: which request did you undo, and what did /rewind bring back?';
+    return /\/rewind/.test(body) || 'Say that /rewind undid it (and what came back).';
+  }, { milestone: 'M3' }),
+
+  t.check('PLAN.md compares /usage: plan-first versus direct', () => {
+    const body = need(t, 'Usage');
+    const table = usageTable(body);
+    if (!table) return 'The Usage section needs the table from the starter: | Run | AI credits | Input tokens | Output tokens |';
+    const col = (re) => table.head.findIndex((h) => re.test(h));
+    const cols = { credits: col(/credit|premium/), input: col(/input/), output: col(/output/) };
+    if (Object.values(cols).some((i) => i < 0)) return 'Keep the table\'s columns: Run, AI credits (or Premium requests), Input tokens, Output tokens.';
+    for (const run of ['plan-first', 'direct']) {
+      const row = table.rows.find((r) => r[0].toLowerCase().replace(/[`*]/g, '') === run);
+      if (!row) return `The table has no "${run}" row.`;
+      const bad = Object.entries(cols).filter(([, i]) => !(number(row[i]) > 0)).map(([k]) => k);
+      if (bad.length) return `The ${run} row needs a number > 0 for ${bad.join(', ')} (like 4.1, 45,300 or 45.3k): copy them from /usage.`;
+    }
+    return true;
+  }, { milestone: 'M4' }),
+  t.check('…and says which one cost more, and why', () => {
+    const body = need(t, 'Usage');
+    const prose = body.split('\n').filter((l) => !/^\s*\|/.test(l)).join(' ');
+    return (/plan-first|direct/i.test(prose) && /\b(more|less|fewer|cheaper|same|twice|half)\b/i.test(prose))
+      || 'Below the table, one or two sentences: which run cost more, and why (more turns? more context?).';
+  }, { milestone: 'M4' }),
 ];

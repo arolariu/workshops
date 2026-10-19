@@ -1,6 +1,6 @@
 # Lab 00 · 💻 Copilot CLI — Your agent runtime
 
-> **Harness layer:** Runtime · **Maturity:** L0 Bare · 🟢 together · 🟡 🔴 homework
+> **Harness layer:** Runtime · **Maturity:** L0 Bare · 🟢 together · 🟡 🔴 🟣 💎 homework
 >
 > **Threads:** 🔴 The red build · 📏 Measurement · 🪙 Tokens and budget · 🔐 Least privilege
 
@@ -71,6 +71,18 @@ back into the history. Then press **tab** to see the same task with a harness, o
 ## 💳 AI credits
 Every prompt costs AI credits. Student plans get a monthly budget, so: use `!command` for things that don't
 need AI, keep prompts focused, check `/usage`, and use `--max-ai-credits` (minimum 30) on scripted runs.
+The cap is a **soft** cap: usage is known only after a response, so the call that crosses it still completes, and
+the next one is blocked (`copilot help limits`).
+
+## 📈 What a scripted run prints
+`copilot -p "…" -s --output-format json` prints one JSON event per line, and nothing else:
+- `user.message`, then per turn `assistant.turn_start` → `assistant.message` (its `toolRequests` are the tool calls
+  the model wrote) → `tool.execution_start` and `tool.execution_complete` → `assistant.turn_end`. At the end:
+  `session.usage_checkpoint` (tokens per model) and a flat `result` (`exitCode`, `usage.premiumRequests`).
+- A refused call is a `tool.execution_complete` with `success: false` and `error.code: "denied"`: by a hook
+  (`Denied by preToolUse hook: …`) or by the permission system (`Permission denied because no interactive user
+  response was available`). Any other code is a failure.
+- `session.tools_updated` and `assistant.message` name the model that really ran (`auto` picks one for you).
 
 ## 🏛️ In the enterprise
 - **At scale:** every scripted run can emit JSON events (`--output-format json`): which tools ran, what they
@@ -84,8 +96,10 @@ need AI, keep prompts focused, check `/usage`, and use `--max-ai-credits` (minim
 | Level | Mission | You practise |
 |---|---|---|
 | 🟢 easy | **First contact**: find out why the build is red, without touching the code | sessions, trust, `@file`, `!command` |
-| 🟡 medium | **Think first**: plan a GPA feature, then build it and review the diff | `/plan`, `/diff`, `/rewind` |
-| 🔴 hard | **Agent in a script**: record a run as JSON events and build a mini dashboard | `-p`, `--output-format json`, permission flags |
+| 🟡 medium | **Think first**: plan a GPA feature, review the diff, undo a bad turn, and compare what planning cost | `/plan`, `/diff`, `/rewind`, `/usage` |
+| 🔴 hard | **Agent in a script**: read real JSON runs (tools, denials, tokens, a timeline per turn), prove it with tests, and record new runs read-only with a cap | `-p`, `--output-format json`, permission flags |
+| 🟣 hard+ | **Flight recorder**: record one prompt N times with its setup, compare two runs, measure the spread, and explain it | nondeterminism, observability |
+| 💎 hard++ | **Build the loop**: your own agent loop around a scripted fake model, with a permission gate, stop rules and Copilot's JSON events | what a harness *is*, from the inside |
 
 ## Common pitfalls
 - **"Copilot doesn't see my files"**: start it *inside* the exercise's `src/` folder.
