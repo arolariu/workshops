@@ -31,7 +31,7 @@ export default (t) => [
     const r = t.copilot(['instruction', 'list', '--json']);
     let list = [];
     try { list = JSON.parse(r.stdout); } catch { return `Could not read the list: ${r.all.trim().slice(0, 200)}`; }
-    const hit = list.find((s) => /\.github\/instructions\/.+\.instructions\.md/.test(s.sourcePath ?? ''));
+    const hit = list.find((s) => /\.github\/instructions\/.+\.instructions\.md/.test(String(s.sourcePath ?? '').replace(/\\/g, '/')));
     return (hit && Array.isArray(hit.applyTo) && hit.applyTo.length > 0) || 'Copilot does not list your file with an applyTo. Check the folder, the file name and the frontmatter.';
   }, { needs: ['copilot'] }),
   t.check('grades.test.js has 3+ new weightedAverage tests', () => {
