@@ -473,3 +473,100 @@ Without annotations, the context part says "This recording has no annotations: i
   - 6 → Task 6 Step 1;
   - 7 → Task 8.
 - **Names used across tasks:** `LAYERS`, `scanHarness`, `scorecard`, `maturity`, `measureMcp`, `contextBudget`, `xrayReport`, `xrayLines`, `inheritedChecks`, `inheritedLines`, `parseTrace`, `timelineText`, `parseRecording`, `replayTurns` and `replayLines`.
+
+## Implementation notes (done)
+
+**Commits, in order.**
+- e5c2030: the plan.
+- f2e4fd0: Task 1.
+- e85a547: Task 3.
+- 13b43ba: Task 2.
+- f3cbcf6: Task 4.
+- 14b180b and e97ca3c: Task 5.
+- 87bcbda: Task 6.
+- d23af17: Task 7.
+- e4202d9: Task 8.
+- df20868: Task 9.
+- a6b4530: smoke-test fixes.
+- One more commit holds the code-review fixes and these notes.
+
+**Verification.**
+- 318/318 unit tests pass.
+- `verify --chain --bring` is green: the chain is in sync, and `--bring` gives the same counts as Phase 2.
+- `starters` matches the published starters.
+- **TUI smoke test, real terminal at 80×24:**
+  - home, then **u** (the replay), ←/→ and tab, scrolling to the denial, and **b**;
+  - Lab 04 easy, then **u** (the X-ray);
+  - `NO_COLOR=1 node labs/start.mjs replay harnessed --no-anim`, then **b** to go home.
+- **Screenshots at 120×40/50** (`tui-shot`):
+  - both recordings;
+  - the X-ray of Lab 04 easy `src/` and `sol/` (MCP measured: "studybuddy: 3 tool schemas ≈182");
+  - the X-ray of Lab 05 hard (L4 Guarded);
+  - Lab 05 easy after a pass, with the advisory group under the takeaway.
+- **The NO_COLOR subprocess test** now drives the X-ray and both replays at 80 columns.
+
+**AI credits spent this phase: 7 prompts**, each capped at `--max-ai-credits=30`, and each reporting `premiumRequests: 1`.
+- **2 spike prompts.**
+- **5 validation prompts** of the traced agent checks against `sol/`:
+  - lab-00/easy: 1;
+  - lab-03/easy: 2;
+  - lab-05/easy: 2. The first failed. Its new timeline showed why: `⛔ powershell Get-Item … (denied)` by the permission system, before the agent ever reached `rm`. The second ran after the fix below and passed with `⛔ … (denied by a hook)`.
+
+**Deviations, beyond the table above.**
+- **`replay` defaults to `bare` everywhere:** TUI, CLI and linear mode. Step 1 said the CLI would print the harnessed run. "Problem first, then tab for the harness" is the Lab 00 story, and one default is simpler.
+- **`expect` gets `answer`** (the last message) next to `output` (every message, as `-s` printed them). Existing checks are unchanged.
+- **`parseTrace(stdout, { cwd })`:**
+  - paths are shown relative to the run folder, or by their tail;
+  - a cut timeline still counts its hidden denials and failures;
+  - token counts under 1,000 print as plain numbers.
+- **The trace is only parsed when JSON was asked for** (`wantsJson(args)`). `trace: false` keeps the raw text even when it contains a JSON-looking line.
+  - A failed run with no message falls back to the raw tail.
+  - A truncated run says so in its failure message.
+- **Lab 05 easy's agent check allows every shell command** (`allow: ['shell']`). This is the cheap fix from decision 2. The narrower list made the agent's read-only first look fail, so the hook was never reached.
+  - The check's comment says why: the guard must win even when someone widens the allow list.
+  - That matches the line in Lab 05 hard's `todo.md`.
+- **The doctor now requires `--output-format`** (`COPILOT_CAPABILITIES`), because every agent check depends on it. Copilot CLI 1.0.99-2 lists it.
+- **Inherited checks run after every complete check run, as Step 2 says**, not only after a pass. The readme now says so.
+- **Inherited checks start MCP servers on their own only when the server is `node <a script inside the folder>`.**
+  - Anything else, `npx -y …` for example, waits for the explicit X-ray. That way a check run or a save in watch mode never downloads a package.
+  - The X-ray starts any local server.
+  - `type: "local"` (the CLI's own name for stdio) counts as stdio.
+  - `kit.mcpClient` finds commands like `runProcess` does: PATH and PATHEXT, with `.cmd` files run through ComSpec. On close it stops the whole tree.
+- **Scorecard choices** (so they're on record):
+  - `WHEN` also accepts "use for / to / after / before".
+  - A read-only role is detected by name (`review` or `audit`) or by description (`read-only`, `never edits`). A "fixer" is never flagged.
+  - The scan skips `node_modules`, `.git` and `runs` at any depth.
+  - `tools: ['*']` and `['all']` mean every tool. They fail `agent-tools`, and `agent-readonly` for read-only roles.
+  - `apm-pinned` needs a tag (`#v1.0.0`, `#1.2`, `#v2.0.0-beta.1`) or a commit SHA. A branch (`#main`) is not a pin.
+  - A root-level `plugin.json` shows in the tree on its own, without claiming every file.
+- **L5 for Labs 06–07:** their reference solutions compute as L4 until a `HARNESS.md` exists (Lab 08). The spec tags those labs L5.
+- **Fixed in Phase 2 code, found by the smoke test:** check-yourself questions and explanations that are wrapped over source lines now read as one paragraph. Lists, code and tables keep their lines.
+
+**PR #1 follow-ups.**
+- **The flaky "noisy learner output" test.** Under 8× parallel load, the `run-checks` child sometimes sits idle before its first event. 640 isolated runs never hung, so the root cause is unknown. Two safeguards now:
+  - `runChecks` stops a run whose plan doesn't arrive within `startTimeout` (60 s);
+  - the test has a 120 s run timeout and a 180 s test timeout.
+- **A stall after `done` is already covered:**
+  - `run-checks` calls `process.exit(0)` right after `done`;
+  - `runProcess` finishes 1.5 s after `exit`, even when descendants keep the pipes open.
+
+**Carried to Phase 4** (unchanged): the flaky agent checks of lab-01/hard and lab-05/medium.
+
+**Code review** (independent reviewer, range 42543e8..a6b4530): "with fixes", no critical findings. Fixed, each with a test:
+- `*` tools passed as read-only;
+- the doctor didn't check `--output-format`;
+- the trace was parsed with `trace: false`;
+- no `why` on a failed JSON run;
+- the readme said "after a pass";
+- frozen spinners on the X-ray and the inherited group;
+- `local` servers, and `.cmd` commands on Windows;
+- a root `plugin.json`;
+- branch pins;
+- missing tests for linear inherited checks and for `*` tools;
+- inherited checks starting `npx`;
+- truncated output;
+- the footer spacing;
+- the flat `result` event in the recordings;
+- `quiz.unwrap` flattening lists;
+- "0.0k" token counts;
+- a zero-width bar segment.

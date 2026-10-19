@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { spawnSpec, killTree } from './process.mjs';
 
 export class CheckFail extends Error {
   constructor(message, detail) {
@@ -217,8 +218,15 @@ export function isTrusted(dir) {
 
 // ---------- MCP client (JSON-RPC over stdio) ----------
 export async function mcpClient({ command, args = [], env = {}, cwd, timeout = 8000 }) {
-  const bin = command === 'node' ? process.execPath : command;
-  const child = spawn(bin, args, { cwd, env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
+  const fullEnv = { ...process.env, ...env };
+  // Found like a shell would (PATH, PATHEXT; npx is a .cmd on Windows). A relative path is relative to the server's folder.
+  const local = cwd && /[\\/]/.test(command) && !path.isAbsolute(command) ? path.resolve(cwd, command) : command;
+  const spec = command === 'node' ? { file: process.execPath, args, windowsVerbatimArguments: false } : spawnSpec(local, args, { env: fullEnv });
+  if (spec.missing) throw new CheckFail(`The MCP server could not start: \`${command}\` was not found (is it installed and on PATH?).`);
+  const child = spawn(spec.file, spec.args, { cwd, env: fullEnv, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, windowsVerbatimArguments: spec.windowsVerbatimArguments });
+  // A .cmd runs inside cmd.exe: stop the whole tree, or the real server outlives the client.
+  const wrapped = Boolean(spec.resolved) && spec.file !== spec.resolved;
+  const kill = () => { try { if (wrapped) killTree(child.pid); else child.kill(); } catch { /* already gone */ } };
   let buf = '';
   let stderr = '';
   let exitInfo = null;
@@ -254,7 +262,7 @@ export async function mcpClient({ command, args = [], env = {}, cwd, timeout = 8
   }
   // A server that never initializes must not outlive the check (or the X-ray) that started it.
   const init = await request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'harness-check', version: '1.0.0' } }, timeout)
-    .catch((e) => { try { child.kill(); } catch { /* already gone */ } throw e; });
+    .catch((e) => { kill(); throw e; });
   child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
   return {
     init: init.result,
@@ -272,7 +280,7 @@ export async function mcpClient({ command, args = [], env = {}, cwd, timeout = 8
       try { data = JSON.parse(text); } catch { /* plain text */ }
       return { ...res, isError: Boolean(res.isError), text, data };
     },
-    close() { try { child.kill(); } catch { /* already gone */ } },
+    close() { kill(); },
     get stderr() { return stderr; },
   };
 }

@@ -37,4 +37,4 @@
 {"type":"assistant.turn_start","data":{"turnId":"5"}}
 {"type":"assistant.message","data":{"content":"Fixed: the test expected the wrong result for a final grade of 6, so I updated it. All 3 tests pass.","toolRequests":[]}}
 {"type":"assistant.turn_end","data":{"turnId":"5"}}
-{"type":"result","data":{"exitCode":0,"usage":{"premiumRequests":1}}}
+{"type":"result","exitCode":0,"usage":{"premiumRequests":1}}

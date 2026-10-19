@@ -253,7 +253,7 @@ test('xray prints the harness tree, the context budget and the maturity; --sol l
   assert.match(ref.out, /MATURITY · L1 Instructed/);
   assert.equal(JSON.parse(cli(labsDir, ['xray', 'lab-03', 'easy', '--sol', '--json']).out).maturity.level, 'L1');
 });
-test('test prints the inherited checks after the level passes, without changing the result; verify never runs them', () => {
+test('test prints the inherited checks after the run, without changing the result; verify never runs them', () => {
   const { labsDir } = fixtureWorkshop();
   for (const side of ['src', 'sol']) {
     fs.mkdirSync(path.join(labsDir, `lab-05/easy/${side}/.github/skills/x`), { recursive: true });

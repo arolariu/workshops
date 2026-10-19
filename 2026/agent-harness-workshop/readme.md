@@ -66,8 +66,8 @@ with a harness).
 **Under the hood.** The 🔬 X-ray (**u** on a level, or `node labs/start.mjs xray lab-04 easy`) shows your harness as
 a tree, marks what you added (🆕), changed (✏️) or brought in (🧳), estimates what it adds to every turn of the
 model's context (≈ characters ÷ 4; MCP servers get 5 seconds to list their tools, or show "not measured"), and scores
-it against the rules the labs teach, with a maturity level from L0 (bare) to L5 (governed). After a level's checks
-pass, 🧱 *Your harness so far* re-runs the earlier labs' rules on your folder: it's advisory, so it never changes
+it against the rules the labs teach, with a maturity level from L0 (bare) to L5 (governed). After every check run on a
+level, 🧱 *Your harness so far* re-runs the earlier labs' rules on your folder: it's advisory, so it never changes
 whether the level passes. And every 🤖 agent check keeps a 🧭 timeline of the run: each tool call, whether a hook or
 the permission system denied it, and the tokens Copilot reported.
 

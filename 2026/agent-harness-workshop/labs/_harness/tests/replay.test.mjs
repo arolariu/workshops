@@ -116,3 +116,13 @@ test('a turn on screen: the four parts, inside 78 columns, and the denial spelle
   assert.match(replayLines(real, 0, { W: 76, fmt: PLAIN }).join('\n'), /This recording has no annotations/);
   assert.match(replayLines(harnessed, 99, { W: 76, fmt: PLAIN }).join('\n'), /TURN 6 OF 6/i, 'an index past the end shows the last turn');
 });
+
+test('a recording with more context segments than columns still draws (each segment at least one block)', () => {
+  const segments = Array.from({ length: 70 }, (_, i) => ({ name: `s${i}`, tokens: 10 + i }));
+  const rec = { title: 'x', scripted: false, problems: [], turns: replayTurns(parseRecording([
+    JSON.stringify({ type: 'harness.context', data: { segments } }),
+    JSON.stringify({ type: 'assistant.message', data: { content: 'Done.' } }),
+  ].join('\n')).events) };
+  const lines = replayLines(rec, 0, { W: 40, fmt: PLAIN });
+  assert.ok(lines.some((l) => /CONTEXT WINDOW/.test(l)));
+});

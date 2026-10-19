@@ -13,9 +13,10 @@ const SEGMENTS = {
 };
 const letterOf = (name) => SEGMENTS[name]?.letter ?? name.slice(0, 1).toUpperCase();
 
-/** Bar widths in proportion to the tokens, at least 1 for every non-empty segment, adding up to `cols`. */
+/** Bar widths in proportion to the tokens, at least 1 for every non-empty segment, adding up to `cols` (or more). */
 function shares(segments, cols) {
   const shown = segments.filter((s) => s.tokens > 0);
+  cols = Math.max(cols, shown.length);
   const total = shown.reduce((n, s) => n + s.tokens, 0) || 1;
   const w = shown.map((s) => Math.max(1, Math.round((s.tokens / total) * cols)));
   let over = w.reduce((n, x) => n + x, 0) - cols;

@@ -104,7 +104,10 @@ export function scanHarness(dir) {
   }
   scan.plugins = files.filter((f) => /(^|\/)plugin\.json$/.test(f) && f.split('/').length <= 3 && !f.startsWith('.github/')).map((f) => {
     const p = json(f);
-    for (const g of files) if (g.startsWith(`${path.posix.dirname(f)}/`)) art('distribution', g);
+    const folder = path.posix.dirname(f);
+    // A plugin at the root is the whole folder: list its manifest, not every file.
+    if (folder === '.') art('distribution', f);
+    else for (const g of files) if (g.startsWith(`${folder}/`)) art('distribution', g);
     return { path: f, name: p?.name ?? null, version: p?.version ?? null, description: p?.description ?? null };
   });
   scan.workflows = files.filter((f) => /^\.github\/workflows\/[^/]+\.md$/.test(f)).map((f) => {
@@ -132,7 +135,10 @@ export function present(scan, layer) {
 }
 
 const READ_ONLY_ROLE = (a) => /review|audit/i.test(a.name) || /read-only|readonly|never edits/i.test(a.description);
-const WRITE_TOOLS = /^(edit|write|execute|shell|bash|powershell|\*|all)\b/i;
+const EVERY_TOOL = /^(\*|all)$/i;
+const WRITE_TOOLS = /^(?:\*|(?:edit|write|execute|shell|bash|powershell|all)\b)/i;
+// A pin is a version tag (v1.0.0, 1.2, v2.0.0-beta.1) or a commit SHA; a branch (#main) moves.
+const PINNED = /#(?:v?\d+(?:\.\d+)*(?:[-+][\w.-]+)?|[0-9a-f]{7,40})$/i;
 const WHEN = /\buse (it |this )?when\b|\bwhen (the user|you|asked|someone)\b|\buse (it )?(after|before|to|for)\b/i;
 const READ_TOOL = /^(get|list|search|read|find)_/;
 const WRITE_TOOL = /^(mark|set|create|update|delete|add|remove|save|write)_/;
@@ -172,8 +178,9 @@ export function scorecard(scan, { mcpTools } = {}) {
   // Agents
   if (!scan.agents.length) ['agent-tools', 'agent-readonly'].forEach(none('agents', 'custom agents'));
   else {
-    const open = scan.agents.filter((a) => !a.tools?.length);
-    add('agent-tools', 'agents', !open.length, open.length ? list(open.map((a) => `${a.name}: no tools list, so it can use every tool`)) : 'Every agent has an explicit tools list.', open.map((a) => a.path));
+    const open = scan.agents.filter((a) => !a.tools?.length || a.tools.some((t) => EVERY_TOOL.test(t)));
+    const why = (a) => (a.tools?.length ? `${a.name}: tools [${a.tools.join(', ')}] allows every tool` : `${a.name}: no tools list, so it can use every tool`);
+    add('agent-tools', 'agents', !open.length, open.length ? list(open.map(why)) : 'Every agent has an explicit tools list.', open.map((a) => a.path));
     const ro = scan.agents.filter(READ_ONLY_ROLE);
     const leaks = ro.map((a) => ({ a, w: (a.tools ?? ['(every tool)']).filter((x) => WRITE_TOOLS.test(x) || x === '(every tool)') })).filter((x) => x.w.length);
     if (!ro.length) add('agent-readonly', 'agents', null, 'No read-only role (reviewer, auditor) to check.');
@@ -215,7 +222,7 @@ export function scorecard(scan, { mcpTools } = {}) {
   // Distribution
   if (!scan.apm) none('distribution', 'apm.yml')('apm-pinned');
   else {
-    const loose = scan.apm.deps.filter((d) => !/#[^#\s]+$/.test(d));
+    const loose = scan.apm.deps.filter((d) => !PINNED.test(d));
     add('apm-pinned', 'distribution', !loose.length, loose.length ? `Pin these to a tag (owner/repo#v1.0.0): ${loose.join(', ')}` : `Every dependency is pinned (${scan.apm.deps.length}).`, ['apm.yml']);
   }
   if (!scan.plugins.length) none('distribution', 'plugin.json')('plugin-manifest');

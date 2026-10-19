@@ -72,7 +72,7 @@ export function parseTrace(stdout, { cwd } = {}) {
   return { ok: true, events: events.length, output, answer: texts.at(-1) ?? '', timeline, usage };
 }
 
-const k = (n) => `${(n / 1000).toFixed(1)}k`;
+const k = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 const ICON = { tool: '🔧', denied: '⛔', failed: '❌', running: '⏳' };
 /** "🔧 view README.md ✓ · ⛔ powershell Remove-Item … (denied by a hook) · 💬 answer · Σ ≈98.6k in / 0.5k out tokens" */
 export function timelineText(trace, { max = 8 } = {}) {

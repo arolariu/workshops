@@ -62,6 +62,40 @@ test('MCP tool schemas are measured from tools/list; a silent server is "not mea
   assert.match(b.every.find((x) => x.label.startsWith('silent')).note, /not measured/);
 });
 
+test('MCP: "local" servers (the CLI\'s own word for stdio) are measured, and commands are found on PATH like a shell would (npx is a .cmd on Windows)', async () => {
+  const dir = writeTree(tmpdir(), { 'mcp/ok.mjs': SERVER });
+  const bin = path.join(dir, 'bin');
+  fs.mkdirSync(bin);
+  if (process.platform === 'win32') fs.writeFileSync(path.join(bin, 'fakemcp.cmd'), `@"${process.execPath}" "%~dp0..\\mcp\\ok.mjs" %*\r\n`);
+  else fs.writeFileSync(path.join(bin, 'fakemcp'), `#!/bin/sh\nexec "${process.execPath}" "$(dirname "$0")/../mcp/ok.mjs" "$@"\n`, { mode: 0o755 });
+  const PATH = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH';
+  const r = await measureMcp(dir, [
+    { name: 'local', type: 'local', command: 'node', args: ['mcp/ok.mjs'], env: {} },
+    { name: 'onpath', type: 'stdio', command: 'fakemcp', args: [], env: { [PATH]: `${bin}${path.delimiter}${process.env[PATH] ?? ''}` } },
+    { name: 'nowhere', type: 'stdio', command: 'no-such-mcp-server-xyz', args: [], env: {} },
+  ], { timeout: 4000 });
+  assert.equal(r.local.tools?.[0]?.name, 'get_deadlines', JSON.stringify(r.local));
+  assert.equal(r.onpath.tools?.[0]?.name, 'get_deadlines', JSON.stringify(r.onpath));
+  assert.match(r.nowhere.error, /no-such-mcp-server-xyz.*not found/);
+});
+
+test('inherited checks only start node servers inside the folder by themselves; anything else waits for the X-ray', async () => {
+  const dir = writeTree(tmpdir(), {
+    'mcp/ok.mjs': SERVER,
+    '.mcp.json': mcpJson({
+      mine: { type: 'stdio', command: 'node', args: ['mcp/ok.mjs'] },
+      download: { type: 'stdio', command: 'npx', args: ['-y', 'some-mcp-package'] },
+      outside: { type: 'stdio', command: 'node', args: ['../elsewhere.mjs'] },
+    }),
+  });
+  const auto = await measureMcp(dir, scanHarness(dir).mcp.servers, { timeout: 3000, localOnly: true });
+  assert.equal(auto.mine.tools?.[0]?.name, 'get_deadlines');
+  for (const name of ['download', 'outside']) assert.match(auto[name].error, /not started automatically/, name);
+  const g = await inheritedChecks({ ex: { labId: 'lab-05' }, dir, timeout: 3000 });
+  const mcp = g.layers.find((l) => l.id === 'mcp');
+  assert.ok(mcp.rules.some((r) => /not started automatically/.test(r.message)), JSON.stringify(mcp.rules));
+});
+
 test('marks: 🆕 for files the seed does not have, ✏️ for changed ones, 🧳 for brought ones', () => {
   const dir = writeTree(tmpdir(), { 'AGENTS.md': 'mine\n', '.github/skills/s/SKILL.md': 'new\n', '.mcp.json': '{}', 'README.md': 'x' });
   const manifest = { exercises: {}, chain: { 'lab-05/easy': { from: 'lab-04/easy', starter: {}, inherited: { 'AGENTS.md': blobId(Buffer.from('seed\n')), '.mcp.json': blobId(Buffer.from('{}')) } } } };

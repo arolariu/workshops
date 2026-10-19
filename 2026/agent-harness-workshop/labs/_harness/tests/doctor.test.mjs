@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { inspectEnvironment, TOOLS } from '../doctor.mjs';
 import { tmpdir, writeTree } from './helpers.mjs';
 
-const HELP = 'Usage: copilot [options]\n  --agent <agent>\n  --plugin-dir <directory>\n  --allow-tool\n  --deny-tool\n  --max-ai-credits <credits>\n  --no-ask-user\n  -s, --silent\nCommands:\n  instruction  Inspect instruction sources\n';
+const HELP = 'Usage: copilot [options]\n  --agent <agent>\n  --plugin-dir <directory>\n  --allow-tool\n  --deny-tool\n  --max-ai-credits <credits>\n  --no-ask-user\n  --output-format <format>\n  -s, --silent\nCommands:\n  instruction  Inspect instruction sources\n';
 /** A fake probe: answers from a table keyed by "command arg arg". */
 const probeFrom = (table, calls = []) => async (cmd, args) => {
   const key = [cmd, ...args].join(' ');
@@ -58,6 +58,9 @@ test('a Copilot without the flags the labs use is incompatible', async () => {
   const report = await inspectEnvironment({ ...base, platform: 'linux', arch: 'x64', probe: probeFrom({ ...all, 'copilot --help': HELP.replace('--max-ai-credits <credits>\n', '') }) });
   assert.equal(item(report, 'copilot').status, 'incompatible');
   assert.match(item(report, 'copilot').message, /--max-ai-credits/);
+  const noJson = await inspectEnvironment({ ...base, platform: 'linux', arch: 'x64', probe: probeFrom({ ...all, 'copilot --help': HELP.replace('--output-format <format>\n', '') }) });
+  assert.equal(item(noJson, 'copilot').status, 'incompatible', 'agent checks need JSON events for their timeline');
+  assert.match(item(noJson, 'copilot').message, /--output-format/);
 });
 
 test('an old Node is incompatible and blocks the core', async () => {

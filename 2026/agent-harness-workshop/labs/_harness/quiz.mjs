@@ -1,8 +1,9 @@
 // The "❓ Check yourself" section of a todo.md: a question, 2-4 numbered options, and the answer as **N.** at the start of
 // a <details> body (the rest of that body explains it). Inside <details>, GitHub does not give the answer away.
 const OPTION = /^\s*(\d+)\.\s+(.*)$/;
-// Markdown joins the lines of a paragraph; only a blank line starts a new one.
-const unwrap = (s) => s.trim().split(/\n\s*\n/).map((p) => p.split('\n').map((l) => l.trim()).filter(Boolean).join(' ')).join('\n\n');
+// Markdown joins the lines of a paragraph; only a blank line starts a new one. Lists, code and tables keep their lines.
+const BLOCK = /^\s*([-*+]\s|\d+\.\s|```|\||>)/m;
+const unwrap = (s) => s.trim().split(/\n\s*\n/).map((p) => (BLOCK.test(p) ? p.split('\n').map((l) => l.trimEnd()).join('\n') : p.split('\n').map((l) => l.trim()).filter(Boolean).join(' '))).join('\n\n');
 
 /** { question, options, answer, why, numbers }, or null when the section is missing or has no numbered options. */
 export function parseQuiz(block) {

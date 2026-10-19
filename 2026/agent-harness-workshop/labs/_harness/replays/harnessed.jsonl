@@ -37,4 +37,4 @@
 {"type":"assistant.turn_start","data":{"turnId":"5"}}
 {"type":"assistant.message","data":{"content":"Fixed hasPassed in grades.js: a student now also needs an exam grade of at least 5, as the failing test said. All 3 tests pass.\n\nHarness check: AGENTS.md loaded","toolRequests":[]}}
 {"type":"assistant.turn_end","data":{"turnId":"5"}}
-{"type":"result","data":{"exitCode":0,"usage":{"premiumRequests":1}}}
+{"type":"result","exitCode":0,"usage":{"premiumRequests":1}}

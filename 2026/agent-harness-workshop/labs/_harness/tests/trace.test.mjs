@@ -24,7 +24,7 @@ test('a real run (Copilot CLI 1.0.99-2): the answer, every tool call, the hook d
   const line = timelineText(t);
   assert.match(line, /🔧 view README\.md ✓/);
   assert.match(line, /⛔ powershell Remove-Item [^·]*\(denied by a hook\)/);
-  assert.match(line, /💬 answer · Σ ≈98\.6k in \/ 0\.5k out tokens$/);
+  assert.match(line, /💬 answer · Σ ≈98\.6k in \/ 526 out tokens$/);
 });
 
 test('paths read as the agent saw its folder: relative to the run folder, or the tail when they are elsewhere', () => {
@@ -76,5 +76,5 @@ test('a cut timeline still says how many hidden steps were denied or failed, and
   lines.push(ev('tool.execution_start', { toolCallId: 'd', toolName: 'bash', arguments: { command: 'rm -rf /' } }), ev('tool.execution_complete', { toolCallId: 'd', success: false, error: { code: 'denied', message: 'Denied by preToolUse hook: no' } }));
   lines.push(ev('tool.execution_start', { toolCallId: 'f', toolName: 'bash', arguments: { command: 'npm test' } }), ev('tool.execution_complete', { toolCallId: 'f', success: false, error: { code: 'failure', message: 'exit 1' } }));
   lines.push(ev('assistant.message', { content: 'Done.' }), ev('session.usage_checkpoint', { accountingSnapshot: { modelMetrics: { m: { usage: { inputTokens: 2000, outputTokens: 100 } } } } }));
-  assert.match(timelineText(parseTrace(lines.join('\n')), { max: 3 }), /f2\.js ✓ · … 5 more \(1 denied, 1 failed\) · 💬 answer · Σ ≈2\.0k in \/ 0\.1k out tokens$/);
+  assert.match(timelineText(parseTrace(lines.join('\n')), { max: 3 }), /f2\.js ✓ · … 5 more \(1 denied, 1 failed\) · 💬 answer · Σ ≈2\.0k in \/ 100 out tokens$/);
 });

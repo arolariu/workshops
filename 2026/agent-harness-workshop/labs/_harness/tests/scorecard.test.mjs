@@ -58,6 +58,12 @@ test('agents: an explicit tool list reaches L3; a reviewer that can edit does no
   const open = run({ ...base, '.github/agents/reviewer.agent.md': '---\nname: reviewer\ndescription: Reviews.\n---\nx\n' });
   assert.equal(open.rule('agent-tools').ok, false);
   assert.equal(open.m.level, 'L2');
+  for (const every of ["['*']", "['all']"]) {
+    const star = run({ ...base, '.github/agents/reviewer.agent.md': REVIEWER(every) });
+    assert.equal(star.rule('agent-tools').ok, false, `${every} is every tool, not a list`);
+    assert.match(star.rule('agent-tools').message, /reviewer: tools .* allows every tool/);
+    assert.equal(star.rule('agent-readonly').ok, false, `${every} is not read-only`);
+  }
 });
 
 test('MCP: tools are measured when given; a server that did not answer is "not measured", never a failure', () => {
@@ -103,6 +109,15 @@ test('L5 needs a pinned, shared harness and HARNESS.md; workflows are checked wh
   const plugin = run({ 'p/plugin.json': JSON.stringify({ name: 'p', version: '1.0.0' }) });
   assert.equal(plugin.rule('plugin-manifest').ok, false);
   assert.match(plugin.rule('plugin-manifest').message, /description/);
+  const root = run({ 'plugin.json': JSON.stringify({ name: 'p', version: '1.0.0', description: 'x' }), 'index.js': 'x' });
+  assert.deepEqual(root.scan.artifacts.filter((a) => a.layer === 'distribution').map((a) => a.path), ['plugin.json'], 'a plugin at the root shows in the tree, without claiming every file');
+  for (const ref of ['main', 'master', 'HEAD', 'my-branch']) {
+    const branch = run({ ...l4, 'apm.yml': `name: x\ndependencies:\n  apm:\n    - microsoft/apm-sample-package#${ref}\n` });
+    assert.equal(branch.rule('apm-pinned').ok, false, `#${ref} is a branch, not a pin`);
+  }
+  for (const ref of ['v1.0.0', '1.2', 'v2.0.0-beta.1', '3f2c1ab', 'a'.repeat(40)]) {
+    assert.equal(run({ ...l4, 'apm.yml': `name: x\ndependencies:\n  apm:\n    - o/r#${ref}\n` }).rule('apm-pinned').ok, true, `#${ref} is a pin`);
+  }
 });
 
 test('broken files are reported as problems, never thrown', () => {

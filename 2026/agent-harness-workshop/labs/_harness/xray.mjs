@@ -10,11 +10,22 @@ import { blobId, chainEntry } from './chain.mjs';
 /** ≈ tokens: characters ÷ 4. Real tokenizers differ, so it is always shown with "≈". */
 export const tokens = (text) => Math.ceil(String(text ?? '').length / 4);
 
-/** { [server]: { tools } | { error } }. Only local (stdio) servers are started; each is stopped afterwards. */
-export async function measureMcp(dir, servers, { timeout = 5000 } = {}) {
+/** Is this server `node <a script inside dir>`? Only those start by themselves (for the inherited checks). */
+function ownNodeServer(dir, s) {
+  if (!/^node(\.exe)?$/i.test(path.basename(String(s.command ?? ''))) || !s.args?.[0] || s.args[0].startsWith('-')) return false;
+  const rel = path.relative(path.resolve(dir), path.resolve(dir, s.args[0]));
+  return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+/**
+ * { [server]: { tools } | { error } }. Only local (stdio) servers are started; each is stopped afterwards.
+ * localOnly: start only `node` servers whose script is inside the folder (never a download like `npx -y …`).
+ */
+export async function measureMcp(dir, servers, { timeout = 5000, localOnly = false } = {}) {
   const out = {};
   await Promise.all((servers ?? []).map(async (s) => {
-    if (s.type !== 'stdio' || !s.command) { out[s.name] = { error: s.url ? 'a remote server: not measured' : 'no command to start it' }; return; }
+    if (!['stdio', 'local'].includes(s.type) || !s.command) { out[s.name] = { error: s.url ? 'a remote server: not measured' : 'no command to start it' }; return; }
+    if (localOnly && !ownNodeServer(dir, s)) { out[s.name] = { error: 'not started automatically: only node servers inside this folder are. Press u on the level to X-ray it' }; return; }
     let client = null;
     let timer = null;
     const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`did not answer within ${Math.round(timeout / 1000)} s`)), timeout); });
@@ -100,7 +111,7 @@ export async function inheritedChecks({ ex, dir, measure = true, timeout = 5000 
   if (!layers.length) return null;
   const scan = scanHarness(dir);
   const wantMcp = measure && layers.some((l) => l.id === 'mcp') && scan.mcp?.servers.length;
-  const mcpTools = wantMcp ? await measureMcp(dir, scan.mcp.servers, { timeout }) : {};
+  const mcpTools = wantMcp ? await measureMcp(dir, scan.mcp.servers, { timeout, localOnly: true }) : {};
   const rules = scorecard(scan, { mcpTools });
   const group = layers.map((l) => ({ ...l, present: present(scan, l.id), rules: rules.filter((r) => r.layer === l.id && (r.ok !== null || /^not measured/.test(r.message))) }));
   const all = group.flatMap((g) => g.rules);

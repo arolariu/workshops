@@ -523,7 +523,7 @@ export async function startTui({
     wrap(`💡 ${inline(tip)}`, W() - 2).forEach((l) => L.push(`  ${dim(l)}`));
     L.push(...para(dim(`✨ ${creditLine()}`), '  ', '     '));
     L.push(...para(dim(`📧 Questions, ideas or feedback? ${BRAND.email}`), '  ', '     '));
-    return { lines: L, focus, footer: footer([['↑↓', 'choose'], ['⏎', 'open'], [`0-${Number(catalog.at(-1)?.num ?? 7)}`, 'jump'],     ['n', 'next up'], ['/', 'search'], ['p', 'path'], ['u', 'replay'], ['d', 'doctor'], ['e', 'export'], ['?', 'help'], ['q', 'quit']]) };
+    return { lines: L, focus, footer: footer([['↑↓', 'choose'], ['⏎', 'open'], [`0-${Number(catalog.at(-1)?.num ?? 7)}`, 'jump'], ['n', 'next up'], ['/', 'search'], ['p', 'path'], ['u', 'replay'], ['d', 'doctor'], ['e', 'export'], ['?', 'help'], ['q', 'quit']]) };
   }
 
   function labScreen() {
@@ -1713,6 +1713,8 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
     || S.screen === 'splash'
     || S.run?.running
     || S.agent?.phase === 'running'
+    || (S.screen === 'xray' && S.xray && !S.xray.report && !S.xray.error)
+    || (S.screen === 'checks' && S.run?.inherited === 'loading')
     || (S.celebrate && t - S.celebrate.at < 3600)
     || (S.screen === 'home' && t - S.t.home < 1000)
     || (S.screen === 'lab' && t - S.t.lab < 450)

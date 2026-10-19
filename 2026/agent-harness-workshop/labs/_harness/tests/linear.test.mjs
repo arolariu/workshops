@@ -224,3 +224,12 @@ test('linear replay prints the turns of either recording', async () => {
   assert.match(text, /denied by a hook: Recursive force-deletes/);
   assert.match(text, /There is no recording "hamster"/);
 });
+test('linear checks print the inherited group after the result, and it changes nothing that is recorded', async () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.mkdirSync(path.join(labsDir, 'lab-05/easy/src/.github/skills/x'), { recursive: true });
+  fs.writeFileSync(path.join(labsDir, 'lab-05/easy/src/.github/skills/x/SKILL.md'), '---\nname: wrong\ndescription: Helps.\n---\n1.\n');
+  fs.writeFileSync(path.join(labsDir, 'lab-05/easy/src/done.txt'), 'x\n');
+  const { text } = await session(['open lab-05 easy', 'checks', 'quit'], { labsDir });
+  assert.match(text, /All 1 checks passed\.[\s\S]*YOUR HARNESS SO FAR · advisory[\s\S]*Skills name "wrong"/);
+  assert.equal(progressStore(labsDir).get('lab-05/easy').checks, 'pass', 'a failing inherited rule never turns the pass into a fail');
+});

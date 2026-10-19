@@ -49,7 +49,7 @@ export const recoveryFor = (tool) => TOOLS[tool]?.recovery ?? `Install \`${tool}
 
 /** Reviewed minimums. Copilot is validated by the capabilities the labs use rather than by a version number. */
 export const MINIMUMS = { node: '22.0.0', git: '2.20.0', pwsh: '6.0.0' };
-export const COPILOT_CAPABILITIES = ['--max-ai-credits', '--plugin-dir', '--allow-tool', '--deny-tool', '--no-ask-user', '--agent', 'instruction'];
+export const COPILOT_CAPABILITIES = ['--max-ai-credits', '--plugin-dir', '--allow-tool', '--deny-tool', '--no-ask-user', '--agent', '--output-format', 'instruction'];
 /** Tools a lab needs (required) or benefits from (recommended). */
 export const LAB_TOOLS = { 'lab-02': { required: ['git'] }, 'lab-06': { required: ['apm'] }, 'lab-07': { recommended: ['gh', 'gh-aw'] } };
 export const OPTIONAL_TOOLS = ['git', 'apm', 'gh', 'gh-aw'];

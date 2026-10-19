@@ -34,6 +34,8 @@ test('a question or an explanation wrapped over source lines reads as one paragr
   const q = parseQuiz('The model insists it has a good reason\nto delete the folder.\n\nWhat holds?\n1. a\n2. b\n<details><summary>A</summary>\n\n**2.** The hook runs\noutside the model.\n\nAlways.\n</details>');
   assert.equal(q.question, 'The model insists it has a good reason to delete the folder.\n\nWhat holds?');
   assert.equal(q.why, 'The hook runs outside the model.\n\nAlways.');
+  const listed = parseQuiz('Q?\n1. a\n2. b\n<details><summary>A</summary>\n\n**1.** Two reasons:\n- it runs first\n- it cannot be argued with\n\n```\nnpm test\n```\n</details>');
+  assert.equal(listed.why, 'Two reasons:\n- it runs first\n- it cannot be argued with\n\n```\nnpm test\n```', 'lists and code keep their lines');
 });
 
 test('a missing section is null; a broken one says what is wrong', () => {

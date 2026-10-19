@@ -11,7 +11,7 @@ import { tmpdir, writeTree } from './helpers.mjs';
 // Unpaid, offline-safe fixtures: fake tools packed as real archives, served from a local mirror. Nothing real is installed.
 const WIN = process.platform === 'win32';
 const KEY = platformKey();
-const HELP = 'Usage\n  --agent\n  --plugin-dir\n  --allow-tool\n  --deny-tool\n  --max-ai-credits\n  --no-ask-user\nCommands:\n  instruction\n';
+const HELP = 'Usage\n  --agent\n  --plugin-dir\n  --allow-tool\n  --deny-tool\n  --max-ai-credits\n  --no-ask-user\n  --output-format\nCommands:\n  instruction\n';
 const script = (name, js) => (WIN
   ? { [`${name}.cmd`]: `@"${process.execPath}" "%~dp0${name}.js" %*\r\n`, [`${name}.js`]: js }
   : { [name]: `#!/bin/sh\nexec "${process.execPath}" "$(dirname "$0")/${name}.js" "$@"\n`, [`${name}.js`]: js });

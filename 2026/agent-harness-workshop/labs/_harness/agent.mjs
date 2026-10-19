@@ -34,6 +34,9 @@ export function copilotArgs(specIn, kit) {
   return args;
 }
 
+/** Did these arguments ask Copilot for JSON events (`--output-format json` or `--output-format=json`)? */
+export const wantsJson = (args) => args.some((a, i) => /^--output-format=json$/i.test(a) || (a === '--output-format' && /^json$/i.test(String(args[i + 1] ?? ''))));
+
 const show = (a) => (/^[\w\-./:=@,]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`);
 export const displayCommand = (cmd, args) => [cmd, ...args].map(show).join(' ');
 export const specCommand = (spec, kit) => (spec.command ? displayCommand(spec.command[0], spec.command.slice(1)) : displayCommand('copilot', copilotArgs(spec, kit)));
@@ -254,7 +257,7 @@ async function runSuite({ exDir, target, labsDir, labId, level, signal, onEvent 
     // print. expect(kit, { output: every message, answer: the last one, stderr, code }).
     let output = res.stdout.trim();
     let answer = output;
-    if (!spec.command) {
+    if (!spec.command && wantsJson(args)) {
       const trace = parseTrace(res.stdout, { cwd: work });
       c.traced = trace.ok;
       if (trace.ok) {
@@ -269,9 +272,11 @@ async function runSuite({ exDir, target, labsDir, labId, level, signal, onEvent 
     if (res.missing) { done('blocked', `Could not start \`${shown}\`. ${shown === 'copilot' ? recoveryFor('copilot') : ''}`.trim(), { output }); continue; }
     if (res.error) { done('fail', `Could not run the agent: ${res.error}`, { output }); continue; }
     if (res.timedOut) { done('fail', 'The agent run took too long and was stopped.', { output }); continue; }
+    // More output than runProcess keeps: the end of the run (with the answer) may be missing, so say so.
+    const cut = res.truncated ? ' (Copilot printed more than the app keeps, so the end of its output is missing.)' : '';
     if (res.code !== 0 && !spec.allowNonZero) {
-      const why = `${res.stderr}\n${output}`.trim().split('\n').slice(-4).join(' ').slice(0, 400);
-      done('fail', `The run ended with exit code ${res.code}. ${why}${/auth|login|token/i.test(why) ? ' (Are you logged in? Run `copilot` and use /login.)' : ''}`, { output });
+      const why = `${res.stderr}\n${output || res.stdout.trim()}`.trim().split('\n').slice(-4).join(' ').slice(0, 400);
+      done('fail', `The run ended with exit code ${res.code}. ${why}${/auth|login|token/i.test(why) ? ' (Are you logged in? Run `copilot` and use /login.)' : ''}${cut}`, { output });
       continue;
     }
     onEvent({ type: 'verdict', idx, name: spec.name });
@@ -283,8 +288,8 @@ async function runSuite({ exDir, target, labsDir, labId, level, signal, onEvent 
       continue;
     }
     if (verdict.aborted) { cancelled = true; done('cancelled', 'Cancelled while the result was being checked.', { output }); break; }
-    if (typeof verdict.value === 'string') done('fail', verdict.value, { output });
-    else if (verdict.value === false) done('fail', 'The agent did not do what we expected.', { output });
+    if (typeof verdict.value === 'string') done('fail', `${verdict.value}${cut}`, { output });
+    else if (verdict.value === false) done('fail', `The agent did not do what we expected.${cut}`, { output });
     else done('pass', '', { output });
   }
 

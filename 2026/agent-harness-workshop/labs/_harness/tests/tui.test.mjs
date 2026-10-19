@@ -615,7 +615,7 @@ test('inherited checks show under the results, advisory: the level still passes 
   t.quit();
 });
 test('the agent screen shows what happened in each case, and says when there was no JSON trace', async () => {
-  const timeline = '⛔ powershell rm -rf x (denied by a hook) · 💬 answer · Σ ≈1.2k in / 0.0k out tokens';
+  const timeline = '⛔ powershell rm -rf x (denied by a hook) · 💬 answer · Σ ≈1.2k in / 40 out tokens';
   const t = await app({
     open: 'lab-00/easy',
     size: { columns: 120, rows: 40 },

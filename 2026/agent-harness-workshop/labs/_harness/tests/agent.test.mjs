@@ -180,6 +180,8 @@ function fakeCopilot(root) {
   fs.writeFileSync(script, `const args = process.argv.slice(2);
 const prompt = args[args.indexOf('-p') + 1] ?? '';
 const ev = (type, data) => JSON.stringify({ type, data });
+if (prompt.includes('JSONTEXT')) { console.log('{"type":"note","data":{}}'); console.log('plain words'); process.exit(0); }
+if (prompt.includes('FAILJSON')) { console.log(ev('session.error', { message: 'Credit cap reached' })); process.exit(1); }
 if (!prompt.includes('TRACE')) { console.log('A plain answer.'); process.exit(0); }
 console.log([
   ev('assistant.message', { content: 'Looking at it.', toolRequests: [{ toolCallId: 't1', name: 'powershell', arguments: { command: 'rm -rf x' } }] }),
@@ -205,7 +207,7 @@ test('a traced run: expect gets the answer text, the case keeps a timeline, and 
   const result = await runAgentChecks({ ...base, copilotBin: fakeCopilot(path.dirname(labsDir)) });
   assert.equal(result.state, 'pass', JSON.stringify(result.results[0]));
   const c = result.results[0];
-  assert.match(c.timeline, /⛔ powershell rm -rf x \(denied by a hook\) · 💬 answer · Σ ≈1\.2k in \/ 0\.0k out tokens/);
+  assert.match(c.timeline, /⛔ powershell rm -rf x \(denied by a hook\) · 💬 answer · Σ ≈1\.2k in \/ 40 out tokens/);
   assert.equal(c.traced, true);
   const saved = JSON.parse(fs.readFileSync(path.join(result.dir, 'case-1', 'trace.json'), 'utf8'));
   assert.equal(saved.timeline[0].by, 'hook');
@@ -219,4 +221,18 @@ test('without JSON in the output, expect gets the raw text and no timeline is in
   assert.equal(result.state, 'pass', JSON.stringify(result.results[0]));
   assert.equal(result.results[0].traced, false);
   assert.equal(result.results[0].timeline ?? null, null);
+});
+test('trace: false keeps the raw text even when a line of it looks like a JSON event', async () => {
+  const { base, labsDir } = fixture(`export default [{ name: 'text', prompt: 'JSONTEXT', trace: false, expect: (t, { output, answer }) => (output.includes('plain words') && output.includes('"type"') && answer === output) || 'got: ' + JSON.stringify({ output, answer }) }];`);
+  const result = await runAgentChecks({ ...base, copilotBin: fakeCopilot(path.dirname(labsDir)) });
+  assert.equal(result.state, 'pass', JSON.stringify(result.results[0]));
+  assert.equal(result.results[0].traced, undefined, 'no trace was asked for');
+  assert.equal(result.results[0].timeline ?? null, null);
+});
+
+test('a failed traced run with no message still says why: the raw output tail', async () => {
+  const { base, labsDir } = fixture(`export default [{ name: 'fails', prompt: 'FAILJSON', expect: () => true }];`);
+  const result = await runAgentChecks({ ...base, copilotBin: fakeCopilot(path.dirname(labsDir)) });
+  assert.equal(result.state, 'fail');
+  assert.match(result.results[0].message, /exit code 1\..*Credit cap reached/);
 });
