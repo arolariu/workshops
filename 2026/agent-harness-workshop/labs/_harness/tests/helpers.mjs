@@ -91,3 +91,25 @@ export function fixtureWorkshop({ noDuration = [] } = {}) {
   writeTree(labsDir, files);
   return { root, labsDir };
 }
+
+/**
+ * A tiny course for chain and bring tests: { 'lab-00/easy': { src: {...}, sol: {...} }, ... }, optional course.json
+ * level rules, and checks that pass when src/done.txt exists. Returns the labs folder.
+ */
+export function chainCourse(levels, rules = null) {
+  const labsDir = path.join(tmpdir('harness chain '), 'labs');
+  const files = {};
+  for (const [key, { src = {}, sol = {} }] of Object.entries(levels)) {
+    const [lab, level] = key.split('/');
+    files[`${lab}/readme.md`] = `# Lab ${lab.slice(4)} · 🧪 Fixture ${lab.slice(4)} — a fixture\n`;
+    files[`${key}/todo.md`] = `# 🟢 ${level} · Fixture ${key}\n\n> 🕐 10 min · 🆓 free checks\n\n## 🎯 Mission\nGo.\n`;
+    files[`${key}/tests/checks.mjs`] = "export default (t) => [t.check('done.txt exists', () => t.exists('done.txt') || 'Create `done.txt`.')];\n";
+    fs.mkdirSync(path.join(labsDir, key, 'src'), { recursive: true });
+    fs.mkdirSync(path.join(labsDir, key, 'sol'), { recursive: true });
+    for (const [f, c] of Object.entries(src)) files[`${key}/src/${f}`] = c;
+    for (const [f, c] of Object.entries(sol)) files[`${key}/sol/${f}`] = c;
+  }
+  if (rules) files['_harness/course.json'] = JSON.stringify({ levels: rules });
+  writeTree(labsDir, files);
+  return labsDir;
+}

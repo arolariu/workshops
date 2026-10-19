@@ -161,12 +161,68 @@ export async function run(ctx) {
     process.exit(report.ready ? 0 : 1);
   }
 
+  if (cmd === 'sync-seeds') {
+    const ch = await import('./chain.mjs');
+    const { loadCourse, saveCourse } = await import('./course.mjs');
+    const course = loadCourse(labsDir);
+    const result = ch.computeChain({ catalog, course, manifest: ch.loadManifest(labsDir), bootstrap: Boolean(opt.bootstrap) });
+    const dry = Boolean(opt['dry-run']);
+    say();
+    say(`  🔗 ${bold(bright('Sync the seeded chain'))} ${dim(dry ? '— dry run: nothing is written' : '— every level starts from the reference result of the level before it')}`);
+    say();
+    chainLines(result, { overrides: result.overridesFound, verbose: Boolean(opt.verbose) }).forEach((l) => say(l));
+    say();
+    if (result.problems.length) {
+      say(`  ❌ ${red(`${result.problems.length} problem(s), so nothing was written:`)}`);
+      for (const p of result.problems) wrap(`${p.key} · ${p.message}`, 96).forEach((l, i) => say(`     ${i ? '  ' : dim('• ')}${yellow(l)}`));
+      say();
+      process.exit(1);
+    }
+    const changes = result.levels.reduce((n, l) => n + l.src.write.length + l.src.remove.length + l.sol.write.length + l.sol.remove.length, 0);
+    const found = Object.entries(result.overridesFound);
+    if (dry) {
+      say(`  👀 ${white(`${changes} file change(s)${found.length ? ` and ${found.length} level(s) with new overrides` : ''} would be written.`)} ${dim('Run again without --dry-run to do it.')}`);
+      say();
+      return;
+    }
+    if (found.length) {
+      const raw = { ...course };
+      delete raw.file;
+      raw.levels = { ...(raw.levels ?? {}) };
+      for (const [key, files] of found) raw.levels[key] = { ...(raw.levels[key] ?? {}), overrides: [...new Set([...(raw.levels[key]?.overrides ?? []), ...files])].sort() };
+      raw.levels = Object.fromEntries(Object.entries(raw.levels).sort(([a], [b]) => (a < b ? -1 : 1)));
+      say(`  📝 ${white('Recorded the overrides in')} ${cyan(rel(saveCourse(labsDir, raw)))}`);
+    }
+    const w = ch.writeChain({ labsDir, result });
+    say(`  ✅ ${bright(`Wrote ${w.written} file(s), removed ${w.removed}.`)} ${w.backupDir ? `${dim('Backup:')} ${cyan(rel(w.backupDir))} ` : ''}${dim('Updated')} ${cyan(rel(ch.manifestFile(labsDir)))}${dim('. Commit them together.')}`);
+    say();
+    return;
+  }
+
   if (cmd === 'verify') {
     const { runChecks } = await import('./checks.mjs');
     process.env.HARNESS_VERIFY = '1';
     const only = pos[1] ? String(pos[1]).replace(/^lab-?/i, '').padStart(2, '0') : null;
     let problems = 0;
     say();
+    if (opt.chain) {
+      const ch = await import('./chain.mjs');
+      const { loadCourse } = await import('./course.mjs');
+      const manifest = ch.loadManifest(labsDir);
+      const result = ch.computeChain({ catalog, course: loadCourse(labsDir), manifest });
+      say(`  🔗 ${bold(bright('Checking the chain'))} ${dim(`— ${rel(ch.manifestFile(labsDir))} and every src/ and sol/ must match the computed chain`)}`);
+      say();
+      const report = ch.chainIssues({ result, manifest });
+      for (const x of report) {
+        say(`   ${x.issues.length ? '❌' : '✅'} ${white(x.key.padEnd(22))} ${dim(x.from ? `← ${x.from}` : 'start of the chain')}`);
+        for (const issue of x.issues) wrap(issue, 92).forEach((l, i) => say(`        ${i ? '  ' : dim('↳ ')}${yellow(l)}`));
+      }
+      const bad = report.filter((x) => x.issues.length).length;
+      problems += bad;
+      say();
+      say(bad ? `  ❌ ${red(`The chain has drifted in ${bad} level(s).`)} ${dim('Run')} ${cyan('node labs/start.mjs sync-seeds')} ${dim('(add --dry-run to preview).')}` : `  ✅ ${bright('The chain is in sync.')}`);
+      say();
+    }
     say(`  🔍 ${bold(bright('Verifying the labs'))} ${dim('— every src/ should fail at least one check, every sol/ should pass them all')}`);
     say();
     for (const lab of catalog.filter((l) => !only || l.num === only)) {
@@ -196,7 +252,9 @@ export async function run(ctx) {
     say();
     if (opt.write) {
       try {
-        const manifest = ws.buildStarterManifest(labsDir, catalog);
+        let previous = null;
+        try { previous = JSON.parse(fs.readFileSync(ws.DEFAULT_MANIFEST, 'utf8')); } catch { /* none yet */ }
+        const manifest = ws.buildStarterManifest(labsDir, catalog, { previous });
         fs.writeFileSync(ws.DEFAULT_MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
         say(`  ✅ ${bright(`Wrote ${rel(ws.DEFAULT_MANIFEST)}`)} ${dim(`(${Object.keys(manifest.exercises).length} exercises from ${manifest.revision.slice(0, 12)}). Commit it with the starter changes.`)}`);
       } catch (e) { fail(e.message, 1); }
@@ -215,6 +273,21 @@ export async function run(ctx) {
   void bold;
 }
 
+/** One line per level for sync-seeds: where it starts from and what would change. */
+function chainLines(result, { overrides = {}, verbose = false } = {}) {
+  const names = (xs) => (verbose || xs.length <= 4 ? xs.join(', ') : `${xs.slice(0, 4).join(', ')}, +${xs.length - 4} more`);
+  return result.levels.map((l) => {
+    const parts = [];
+    if (l.src.write.length) parts.push(`src: ${names(l.src.write)}`);
+    if (l.sol.write.length && names(l.sol.write) !== names(l.src.write)) parts.push(`sol: ${names(l.sol.write)}`);
+    const gone = [...new Set([...l.src.remove, ...l.sol.remove])];
+    if (gone.length) parts.push(`remove: ${names(gone)}`);
+    if (overrides[l.key]) parts.push(`new override: ${overrides[l.key].join(', ')}`);
+    const icon = l.pred ? (parts.length ? '✏️ ' : '✅') : '🌱';
+    return `   ${icon} ${white(l.key.padEnd(22))} ${dim(l.pred ? `← ${l.pred.key.padEnd(22)}` : 'start of the chain'.padEnd(24))} ${parts.length ? yellow(parts.join(' · ')) : dim('in sync')}`;
+  });
+}
+
 /** Facilitators: does starters.json still describe the committed src/ folders? null without git. */
 function starterDrift(ws, labsDir, catalog) {
   let current;
@@ -223,6 +296,7 @@ function starterDrift(ws, labsDir, catalog) {
   try { saved = JSON.parse(fs.readFileSync(ws.DEFAULT_MANIFEST, 'utf8')); } catch { /* missing */ }
   if (!saved) return { ok: false, message: `${path.basename(ws.DEFAULT_MANIFEST)} is missing.` };
   const keys = new Set([...Object.keys(current.exercises), ...Object.keys(saved.exercises ?? {})]);
-  const differ = [...keys].filter((k) => JSON.stringify(current.exercises[k] ?? null) !== JSON.stringify(saved.exercises?.[k] ?? null));
+  const entries = (o) => JSON.stringify(Object.entries(o ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+  const differ = [...keys].filter((k) => entries(current.exercises[k]) !== entries(saved.exercises?.[k]));
   return differ.length ? { ok: false, message: `out of date for ${differ.length} exercise(s): ${differ.slice(0, 5).join(', ')}${differ.length > 5 ? ', …' : ''}` } : { ok: true, message: `matches the committed starters (${keys.size} exercises).` };
 }

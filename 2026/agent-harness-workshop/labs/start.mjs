@@ -45,7 +45,8 @@ const COMMANDS = {
   path: { args: [0, 1], opts: { ascii: 'flag' } },
   export: { args: [0, 0], opts: { format: 'value', name: 'value', dir: 'value', path: 'value', ascii: 'flag' } },
   doctor: { args: [0, 0], opts: { full: 'flag', lab: 'value', json: 'flag', ascii: 'flag' } },
-  verify: { args: [0, 1], opts: { verbose: 'flag', ascii: 'flag' } },
+  verify: { args: [0, 1], opts: { chain: 'flag', bring: 'flag', verbose: 'flag', ascii: 'flag' } },
+  'sync-seeds': { args: [0, 0], opts: { bootstrap: 'flag', 'dry-run': 'flag', verbose: 'flag', ascii: 'flag' } },
   starters: { args: [0, 0], opts: { write: 'flag', ascii: 'flag' } },
   help: { args: [0, 1], opts: { ascii: 'flag' } },
 };
@@ -130,6 +131,8 @@ function usage() {
   say();
   say(`  ${white('Facilitators')}`);
   row('node labs/start.mjs verify', 'every src/ must fail, every sol/ must pass');
+  row('node labs/start.mjs verify --chain', '…and the seeded chain has not drifted');
+  row('node labs/start.mjs sync-seeds [--dry-run]', 'rebuild every level\'s src/ and sol/ from the chain');
   row('node labs/start.mjs starters [--write]', 'check (or rebuild) the published starter manifest');
   row('node labs/start.mjs --path=builder --no-intro', 'start the app on a path, without the welcome screen');
   row('node labs/start.mjs --exercise=lab-03/easy', 'start the app on one exercise');

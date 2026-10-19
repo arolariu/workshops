@@ -161,8 +161,9 @@ function readManifest(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
 }
 
-/** Build starters.json from git HEAD: every tracked file of every exercise's src/, as git blob IDs. */
-export function buildStarterManifest(labsDir, catalog, { gitBin = 'git' } = {}) {
+/** Build starters.json from git HEAD: every tracked file of every exercise's src/, as git blob IDs. The seeded chain's
+ * section (`previous.chain`, written by sync-seeds) is carried over unchanged. */
+export function buildStarterManifest(labsDir, catalog, { gitBin = 'git', previous = null } = {}) {
   const head = gitText(gitBin, ['rev-parse', 'HEAD'], { cwd: labsDir });
   if (head.missing || head.status !== 0) throw new Error('Building the starter manifest needs git and a commit.');
   const exercises = {};
@@ -178,7 +179,9 @@ export function buildStarterManifest(labsDir, catalog, { gitBin = 'git' } = {}) 
       if (Object.keys(files).length) exercises[ex.key] = files;
     }
   }
-  return { format: 1, revision: head.text.trim(), note: 'Git blob IDs of every published starter file. Regenerate with: node labs/start.mjs starters --write', exercises };
+  const manifest = { format: previous?.chain ? 2 : 1, revision: head.text.trim(), note: previous?.note ?? 'Git blob IDs of every published starter file. Regenerate with: node labs/start.mjs starters --write', exercises };
+  if (previous?.chain) manifest.chain = previous.chain;
+  return manifest;
 }
 
 /** Does the folder's content match the published starter? (Line endings are normalized for the comparison.) */

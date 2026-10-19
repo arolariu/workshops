@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { fixtureWorkshop, tmpdir } from './helpers.mjs';
+import { fixtureWorkshop, tmpdir, chainCourse } from './helpers.mjs';
 
 const START = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'start.mjs');
 const cli = (labsDir, args, extraEnv = {}) => {
@@ -130,4 +130,33 @@ test('without a terminal, the app explains itself; --linear works anywhere', () 
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /3 exercise\(s\) on the Security path/);
   void json;
+});
+
+const CHAIN_BASE = {
+  'lab-00/easy': { src: { 'app.js': 'v1\n' }, sol: { 'app.js': 'v1\n', 'done.txt': 'x\n', 'FINDINGS.md': 'found\n' } },
+  'lab-00/medium': { src: { 'app.js': 'v1 medium\n' }, sol: { 'app.js': 'v1 medium\n', 'done.txt': 'x\n' } },
+  'lab-01/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+};
+
+test('sync-seeds --dry-run shows the plan and writes nothing; verify --chain reports drift until synced', () => {
+  const labsDir = chainCourse(CHAIN_BASE);
+  const dry = cli(labsDir, ['sync-seeds', '--bootstrap', '--dry-run']);
+  assert.equal(dry.code, 0, dry.out);
+  assert.match(dry.out, /lab-00\/medium\s+← lab-00\/easy/);
+  assert.match(dry.out, /override.*app\.js/);
+  assert.ok(!fs.existsSync(path.join(labsDir, 'lab-01/easy/src/FINDINGS.md')));
+  const refused = cli(labsDir, ['sync-seeds']);
+  assert.equal(refused.code, 1, 'without --bootstrap the differing app.js is a problem');
+  assert.match(refused.out, /app\.js differs from the version inherited from lab-00\/easy/);
+  const drift = cli(labsDir, ['verify', '--chain']);
+  assert.notEqual(drift.code, 0);
+  assert.match(drift.out, /❌ lab-01\/easy/);
+  const sync = cli(labsDir, ['sync-seeds', '--bootstrap']);
+  assert.equal(sync.code, 0, sync.out);
+  assert.equal(fs.readFileSync(path.join(labsDir, 'lab-01/easy/src/FINDINGS.md'), 'utf8'), 'found\n');
+  assert.match(fs.readFileSync(path.join(labsDir, '_harness/course.json'), 'utf8'), /"overrides": \["app\.js"\]/);
+  const clean = cli(labsDir, ['verify', '--chain']);
+  assert.match(clean.out, /✅ lab-01\/easy/);
+  assert.match(clean.out, /The chain is in sync/);
+  assert.equal(cli(labsDir, ['sync-seeds']).code, 0, 'a second sync has nothing to do');
 });
