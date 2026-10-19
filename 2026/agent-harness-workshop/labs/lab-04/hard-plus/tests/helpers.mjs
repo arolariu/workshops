@@ -45,10 +45,13 @@ export async function board(t, { token = TOKEN, data = boardData(t) } = {}, fn) 
   try { return await fn(c); } finally { c.close(); }
 }
 
-/** The board tool from tools/list, or a failure that says how to add it. */
+/** The board tool from tools/list, or a failure that says how to add it (and why it may be missing). */
 export async function boardTool(t, c) {
   const tool = (await c.tools()).find((x) => x.name === 'get_board_posts');
-  if (!tool) t.fail('tools/list does not show get_board_posts yet: register boardTool from mcp/board.mjs in studybuddy-server.mjs (TODO(M1)).');
+  if (!tool) {
+    const said = /board/i.test(c.stderr) ? ` The server said: ${c.stderr.trim().split('\n').filter((l) => /board/i.test(l)).pop().slice(0, 200)}` : '';
+    t.fail(`tools/list does not show get_board_posts yet: register boardTool from mcp/board.mjs in studybuddy-server.mjs (TODO(M1)).${said}`);
+  }
   return tool;
 }
 

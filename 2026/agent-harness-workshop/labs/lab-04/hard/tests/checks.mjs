@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { connect, serverConfig } from './common.mjs';
+import { connect, serverConfig, noCopilot, suiteRun, noCopilotIn } from './common.mjs';
 import { MUTANTS, mutant } from './mutants.mjs';
 
 const SERVER = 'mcp/studybuddy-server.mjs';
@@ -56,8 +56,10 @@ export default (t) => [
   }), { milestone: 'M2' }),
   t.check('Bad input comes back as isError results that say what to do, and writes nothing', () => {
     const file = fresh(t);
+    const snapshot = () => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null);
     return session(t, file, async (c) => {
       await markDone(t, c);
+      const before = snapshot(); // a server may create an empty state file when it starts: that's fine
       const unknown = await c.call('mark_done', { id: 'A9' });
       const bad = toolError(unknown, 'id "A9"');
       if (bad) return bad;
@@ -68,7 +70,8 @@ export default (t) => [
         if (problem) return problem;
         if (!mention.test(r.text)) return `${what}: say which input is wrong (${mention.source.replace(/\\b/g, '')}). Got: ${r.text.slice(0, 120)}`;
       }
-      return !fs.existsSync(file) || `A bad call wrote the state file: ${fs.readFileSync(file, 'utf8').slice(0, 80)}`;
+      const after = snapshot();
+      return after === before || `A bad call changed the state file (before: ${before === null ? 'none' : before.slice(0, 60)}; after: ${String(after).slice(0, 60)}). Refuse first, write only for a valid id.`;
     });
   }, { milestone: 'M2' }),
   t.check('An unknown tool is a protocol error, not a tool result', () => session(t, fresh(t), async (c) => {
@@ -122,14 +125,15 @@ export default (t) => [
     const spyLog = path.join(t.tmp(), 'fs.jsonl');
     const { server } = serverConfig(t);
     const spy = pathToFileURL(path.join(t.exDir, 'tests', 'fs-spy.mjs')).href;
-    const c = await t.mcp({ command: 'node', args: ['--import', spy, ...(server.args ?? [])], env: { ...(server.env ?? {}), STUDYBUDDY_STATE: file, FS_SPY_LOG: spyLog } });
+    const guard = noCopilot(t);
+    const c = await t.mcp({ command: 'node', args: ['--import', spy, ...(server.args ?? [])], env: { ...(server.env ?? {}), STUDYBUDDY_STATE: file, FS_SPY_LOG: spyLog, ...guard.env } });
     try {
       await markDone(t, c);
       for (const id of ['A1', 'A2']) {
         const r = await c.call('mark_done', { id });
         if (r.isError) return `mark_done("${id}") failed: ${r.text}`;
       }
-    } finally { c.close(); }
+    } finally { c.close(); guard.assert(); }
     const ops = fs.existsSync(spyLog) ? fs.readFileSync(spyLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
     const direct = ops.filter((o) => !/rename|copy|cp/.test(o.op) && same(o.paths[0], file));
     if (direct.length) return `The server writes straight into state.json (${direct[0].op}). If it stops halfway (a crash, a full disk, a second process reading), the file is half-written. Write a temp file next to it, then rename it over state.json.`;
@@ -157,23 +161,27 @@ export default (t) => [
   }, { milestone: 'M4' }),
 
   // M5 · A contract suite
-  t.check('Your contract suite passes on your server', () => {
+  t.check('Your contract suite passes on your server', async () => {
     if (!t.exists(SUITE)) return `${SUITE} is missing.`;
-    const r = t.unitTests({ files: [SUITE] });
+    const r = await suiteRun(t, t.dir, SUITE);
+    noCopilotIn(t, r);
     if (r.fail) return `node --test ${SUITE}: ${r.fail} of ${r.total} failing: ${r.failing.slice(0, 2).join(' | ')}`;
-    return r.pass >= 6 || `node --test ${SUITE} ran ${r.pass} passing test(s) (${r.total} in all, todos included); write at least 6 real ones (todo.md, M5).`;
-  }, { milestone: 'M5', timeout: 120000 }),
-  t.check('Your suite passes on the reference server and catches all 6 broken ones', () => {
+    return r.pass >= 6 || `node --test ${SUITE} has ${r.pass} passing test(s); write at least 6 (the example counts, todos don't). See todo.md, M5.`;
+  }, { milestone: 'M5', timeout: 150000 }),
+  t.check('Your suite passes on the reference server and catches all 6 broken ones', async () => {
+    if (!t.exists(SUITE)) return `${SUITE} is missing.`;
     const reference = t.sol(SERVER);
     if (!reference) return 'The reference server is missing (labs/lab-04/hard/sol). Restore the workshop files.';
     const run = (source) => {
       const copy = t.copy(t.tmp());
       fs.writeFileSync(path.join(copy, SERVER), source);
-      return t.unitTests({ cwd: copy, files: [SUITE] });
+      return suiteRun(t, copy, SUITE);
     };
-    const control = run(reference);
+    // All seven at once: the reference (the control) and the six broken servers.
+    const [control, ...broken] = await Promise.all([run(reference), ...MUTANTS.map((name) => run(mutant(name, reference)))]);
+    noCopilotIn(t, control, ...broken);
     if (control.fail || !control.pass) return `On the reference server your suite has ${control.fail} failing test(s): ${control.failing.slice(0, 2).join(' | ')}. Test the contract in todo.md, not your own wording.`;
-    const survived = MUTANTS.filter((name) => run(mutant(name, reference)).fail === 0);
+    const survived = MUTANTS.filter((name, i) => broken[i].fail === 0);
     return !survived.length || `Your suite passes on broken servers: ${survived.join(', ')}. Add a test for each (todo.md, M5 lists what each one breaks).`;
-  }, { milestone: 'M5', timeout: 240000 }),
+  }, { milestone: 'M5', timeout: 150000 }),
 ];

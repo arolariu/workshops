@@ -2,25 +2,11 @@
 // stdio and HTTP (tests/helpers.mjs), the way any MCP client would, and stop every server they start.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { SERVER, VERSIONS, TOKEN, withStdio, withHttp, httpWithoutToken, rpc } from './helpers.mjs';
+import { suiteRun, noCopilotIn } from './common.mjs';
 import { MUTANTS, mutant } from './mutants.mjs';
 
-/** Like t.unitTests, but async, so the suite can run against the reference and the six mutants at the same time. */
-function suiteRun(cwd, file) {
-  return new Promise((resolve) => {
-    const child = spawn(process.execPath, ['--test', '--test-reporter=tap', file], { cwd, env: { ...process.env, NODE_OPTIONS: '' }, windowsHide: true });
-    let out = '';
-    child.stdout.on('data', (d) => { out += d; });
-    const timer = setTimeout(() => child.kill(), 120000);
-    child.on('close', () => {
-      clearTimeout(timer);
-      const num = (k) => Number((out.match(new RegExp(`^# ${k} (\\d+)`, 'm')) ?? [])[1] ?? 0);
-      const failing = [...out.matchAll(/^\s*not ok \d+ - (.*)$/gm)].map((m) => m[1].trim()).filter((n) => !/\.(m?js|cjs)$/.test(n));
-      resolve({ pass: num('pass'), fail: num('fail') || (num('pass') ? 0 : 1), failing });
-    });
-  });
-}
+const PAGE_SIZE = 10;
 
 const SUITE = 'mcp-conformance.test.mjs';
 const TOOLS = ['search_courses', 'get_course', 'plan_study_weeks', 'find_courses'];
@@ -88,8 +74,8 @@ export default (t) => [
     c.send('this is not json');
     const parse = await c.waitFor((m) => m.error?.code === -32700);
     if (!parse || parse.id !== null) return `A line that isn't JSON gets { id: null, error: { code: -32700 } }, got ${show(parse ?? 'nothing')}.`;
-    const invalid = await (c.send({ jsonrpc: '1.0', id: 'v1', method: 'ping' }), c.waitFor((m) => m.id === 'v1'));
-    if (invalid?.error?.code !== -32600) return `A request without "jsonrpc": "2.0" gets -32600 (Invalid Request), got ${show(invalid ?? 'nothing')}.`;
+    const invalid = await (c.send({ jsonrpc: '1.0', id: 'v1', method: 'ping' }), c.waitFor((m) => m.id === 'v1' || (m.id === null && m.error?.code === -32600)));
+    if (invalid?.error?.code !== -32600) return `A request without "jsonrpc": "2.0" gets -32600 (Invalid Request), with its id or with id: null, got ${show(invalid ?? 'nothing')}.`;
     const unknown = errorCode(await c.request('library/explode', {}), -32601, 'An unknown method');
     if (unknown) return unknown;
     const bad = c.lines.find((l) => { try { return JSON.parse(l).jsonrpc !== '2.0'; } catch { return true; } });
@@ -136,7 +122,10 @@ export default (t) => [
     if (!p || !p.arguments?.some((a) => a.name === 'course' && a.required === true)) return `prompts/list should offer study_plan with a required "course" argument, got ${show(p)}.`;
     const g = await c.request('prompts/get', { name: 'study_plan', arguments: { course: 'DB220', weeks: '4' } });
     const msg = g?.result?.messages?.[0];
-    if (msg?.role !== 'user' || msg?.content?.type !== 'text' || !/Databases/.test(msg.content.text ?? '') || !/4/.test(msg.content.text)) return `prompts/get study_plan { course: "DB220", weeks: "4" } → { messages: [{ role: "user", content: { type: "text", text } }] } naming the course and the weeks, got ${show(g?.result ?? g?.error)}.`;
+    if (msg?.role !== 'user' || msg?.content?.type !== 'text') return `prompts/get study_plan { course: "DB220", weeks: "4" } → { messages: [{ role: "user", content: { type: "text", text } }] }, got ${show(g?.result ?? g?.error)}.`;
+    const text = String(msg.content.text ?? '');
+    // The course by its code or its title, either is fine; and the weeks the client asked for (arguments are strings).
+    if (!/DB220|Databases/.test(text) || !/\b4\b/.test(text)) return `The prompt's text should name the course (DB220 or "Databases") and the 4 weeks asked for, got ${show(text)}.`;
     return errorCode(await c.request('prompts/get', { name: 'study_plan', arguments: {} }), -32602, 'A missing required argument')
       ?? errorCode(await c.request('prompts/get', { name: 'no_such_prompt', arguments: {} }), -32602, 'An unknown prompt')
       ?? true;
@@ -148,7 +137,8 @@ export default (t) => [
     const total = library(t).length;
     const a = await walk(c);
     if (a.problem) return a.problem;
-    if (a.pages.length < 3) return `${total} courses in ${a.pages.length} page(s): serve at most 20 per page, with a nextCursor until the last one.`;
+    const big = a.pages.find((p) => (p.resources ?? []).length > PAGE_SIZE);
+    if (big || a.pages.length < Math.ceil(total / PAGE_SIZE)) return `${total} courses in ${a.pages.length} page(s)${big ? `, one with ${big.resources.length}` : ''}: serve at most ${PAGE_SIZE} per page, with a nextCursor until the last one.`;
     const unique = new Set(a.uris);
     if (a.uris.length !== total || unique.size !== total) return `Following nextCursor gave ${a.uris.length} resources (${unique.size} different); the library has ${total}, each exactly once.`;
     const b = await walk(c);
@@ -253,14 +243,15 @@ export default (t) => [
     const q = await c.request('tools/call', { name: 'search_courses', arguments: { q: 'database' } });
     return (q?.result?.isError && /query/.test(textOf(q))) || `search_courses (v2) doesn't take q: an isError result that points to "query", got ${show(q?.result ?? q?.error)}.`;
   }), { milestone: 'M6' }),
-  t.check('Your conformance suite passes on your server, over stdio and HTTP', () => {
+  t.check('Your conformance suite passes on your server, over stdio and HTTP', async () => {
     if (!t.exists(SUITE)) return `${SUITE} is missing.`;
-    const r = t.unitTests({ files: [SUITE] });
+    const r = await suiteRun(t, t.dir, SUITE);
+    noCopilotIn(t, r);
     if (r.fail) return `node --test ${SUITE}: ${r.fail} of ${r.total} failing: ${r.failing.slice(0, 2).join(' | ')}`;
     if (r.pass < 12) return `node --test ${SUITE} has ${r.pass} passing test(s); write at least 12 (todos don't count).`;
     const both = ['stdio', 'http'].filter((x) => !r.passing.some((n) => n.toLowerCase().includes(x)));
     return !both.length || `Run your suite over both transports: no passing test name mentions ${both.join(' or ')}.`;
-  }, { milestone: 'M6', timeout: 120000 }),
+  }, { milestone: 'M6', timeout: 150000 }),
   t.check('Your suite passes on the reference server and catches all 6 broken ones', async () => {
     if (!t.exists(SUITE)) return `${SUITE} is missing.`;
     const reference = t.sol(SERVER);
@@ -269,9 +260,11 @@ export default (t) => [
       const copy = t.copy(t.tmp());
       fs.writeFileSync(path.join(copy, SERVER), source);
       fs.copyFileSync(path.join(t.solDir, 'mcp', 'library-data.json'), path.join(copy, 'mcp', 'library-data.json'));
-      return suiteRun(copy, SUITE);
+      return suiteRun(t, copy, SUITE);
     };
+    // All seven at once (the reference, then the six broken servers); a run that hangs is stopped with its servers.
     const [control, ...broken] = await Promise.all([run(reference), ...MUTANTS.map((name) => run(mutant(name, reference)))]);
+    noCopilotIn(t, control, ...broken);
     if (control.fail || !control.pass) return `On the reference server your suite has ${control.fail} failing test(s): ${control.failing.slice(0, 2).join(' | ')}. Test what the protocol (and todo.md) promises, not your own wording.`;
     const survived = MUTANTS.filter((name, i) => broken[i].fail === 0);
     return !survived.length || `Your suite passes on broken servers: ${survived.join(', ')}. Add a test for each (todo.md, M6 lists what each one breaks).`;

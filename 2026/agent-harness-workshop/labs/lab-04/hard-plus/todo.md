@@ -30,7 +30,8 @@ text without hidden tricks, and nothing secret in anything the server returns.
 - With `STUDYBUDDY_BOARD_TOKEN` set, it returns the course's posts; unset, it is an `isError` result that names the
   variable; with a wrong token, it is an `isError` result that does **not** contain the token
 - `.mcp.json` maps `"STUDYBUDDY_BOARD_TOKEN": "${STUDYBUDDY_BOARD_TOKEN:-}"`; no file holds the token itself
-- Your hard contract suite still passes
+- The board is loaded with a guarded `import()`: without `mcp/board.mjs`, the portal still starts and its other tools
+  work; your hard contract suite still passes
 
 ### M2 · Say where it comes from
 - The result is `{ source: "studybuddy-board", trust: "untrusted", notice, course, posts: [...] }`, where `notice`
@@ -83,8 +84,20 @@ $env:STUDYBUDDY_BOARD_TOKEN = 'sb_demo_7f3a9c51e2d84b06'     # PowerShell
 Anything the model passes as an argument, it has seen: it's in the context, the transcript, the logs, and in reach of
 every injection. The server holds the token: `process.env.STUDYBUDDY_BOARD_TOKEN`. Copilot gives a local server only
 `PATH` from your environment, so `.mcp.json` has to hand the variable over: `"env": { "STUDYBUDDY_BOARD_TOKEN":
-"${STUDYBUDDY_BOARD_TOKEN:-}" }`. The `:-` gives an empty default, so the server still starts (with the board off)
-when nobody set it.
+"${STUDYBUDDY_BOARD_TOKEN:-}" }`. With `:-` the variable is always defined (empty when unset): the server starts,
+treats an empty token as "not set up", and the board answers with an error that says so.
+
+</details>
+
+<details><summary>A board that can be missing</summary>
+
+Load the module with a guarded import, so the portal starts even where `mcp/board.mjs` isn't there (Lab 06 packages
+this server on its own):
+```js
+const board = await import('./board.mjs')
+  .then((m) => m.boardTool, () => null);
+// … in the tools list:  ...(board ? [board] : []),
+```
 
 </details>
 

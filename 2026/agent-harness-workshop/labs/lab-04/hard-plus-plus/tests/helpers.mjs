@@ -3,6 +3,7 @@
 // Every server they start is stopped in a finally, with timeouts, so nothing hangs.
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
+import { noCopilot } from './common.mjs';
 
 export const SERVER = 'mcp/library-server.mjs';
 export const VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26'];
@@ -11,13 +12,18 @@ export const TOKEN = `lib_${crypto.randomBytes(12).toString('hex')}`;
 
 function start(t, args, env) {
   if (!t.exists(SERVER)) t.fail(`${SERVER} is missing.`);
-  return spawn(process.execPath, [t.path(SERVER), ...args], { cwd: t.dir, env: { ...process.env, LIBRARY_TOKEN: '', ...env }, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+  const guard = noCopilot(t); // free checks never start Copilot, even if the server tries
+  const child = spawn(process.execPath, [t.path(SERVER), ...args], { cwd: t.dir, env: { ...process.env, LIBRARY_TOKEN: '', ...env, ...guard.env }, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+  child.guard = guard;
+  return child;
 }
 async function stop(child) {
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  const gone = new Promise((resolve) => child.once('exit', resolve));
-  child.kill();
-  await Promise.race([gone, new Promise((resolve) => setTimeout(resolve, 2000))]);
+  if (child.exitCode === null && child.signalCode === null) {
+    const gone = new Promise((resolve) => child.once('exit', resolve));
+    child.kill();
+    await Promise.race([gone, new Promise((resolve) => setTimeout(resolve, 2000))]);
+  }
+  child.guard.assert();
 }
 
 /**
@@ -83,8 +89,10 @@ export async function withStdio(t, fn, { env = {} } = {}) {
 }
 
 /** fetch with a deadline; reads a JSON body, or the last JSON-RPC message of an SSE body. */
-async function call(url, { method = 'POST', body, headers = {} } = {}) {
-  const res = await fetch(url, { method, headers, body, signal: AbortSignal.timeout(4000) });
+async function call(url, { method = 'POST', body, headers = {} } = {}, session = {}) {
+  // The library needs no sessions, but if a server hands out an Mcp-Session-Id, send it back like a client would.
+  const res = await fetch(url, { method, headers: { ...(session.id ? { 'mcp-session-id': session.id } : {}), ...headers }, body, signal: AbortSignal.timeout(4000) });
+  session.id = res.headers.get('mcp-session-id') ?? session.id;
   const text = await res.text();
   let json = null;
   if (/text\/event-stream/.test(res.headers.get('content-type') ?? '')) {
@@ -121,13 +129,15 @@ export async function withHttp(t, fn, { token = TOKEN, env = {} } = {}) {
     if (port.host !== '127.0.0.1') t.fail(`It listens on ${port.host}: bind to 127.0.0.1 only, so nothing outside this computer can reach it.`);
     const url = `http://127.0.0.1:${port.port}/mcp`;
     const auth = (token2) => (token2 === null ? {} : { authorization: `Bearer ${token2 ?? token}` });
+    const session = {};
+    const callS = (u, init) => call(u, init, session);
     const h = {
       url,
       port: port.port,
       get stderr() { return stderr; },
-      post: (message, { token: tk, headers = {} } = {}) => call(url, { body: typeof message === 'string' ? message : JSON.stringify(message), headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...auth(tk), ...headers } }),
-      get: (headers = {}) => call(url, { method: 'GET', headers: { accept: 'text/event-stream', ...auth(), ...headers } }),
-      raw: (p, init = {}) => call(`http://127.0.0.1:${port.port}${p}`, { ...init, headers: { ...auth(), ...(init.headers ?? {}) } }),
+      post: (message, { token: tk, headers = {} } = {}) => callS(url, { body: typeof message === 'string' ? message : JSON.stringify(message), headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...auth(tk), ...headers } }),
+      get: (headers = {}) => callS(url, { method: 'GET', headers: { accept: 'text/event-stream', ...auth(), ...headers } }),
+      raw: (p, init = {}) => callS(`http://127.0.0.1:${port.port}${p}`, { ...init, headers: { ...auth(), ...(init.headers ?? {}) } }),
     };
     return await fn(h);
   } finally {

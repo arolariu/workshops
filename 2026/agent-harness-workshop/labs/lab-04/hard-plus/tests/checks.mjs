@@ -2,10 +2,11 @@
 // hostile on purpose) through STUDYBUDDY_BOARD_DATA, and give the server its token through STUDYBUDDY_BOARD_TOKEN.
 import fs from 'node:fs';
 import path from 'node:path';
-import { serverConfig } from './common.mjs';
+import { serverConfig, noCopilot, suiteRun, noCopilotIn } from './common.mjs';
 import { TOKEN, WRONG, TOKEN_VAR, SECRETS, PRIVATE, boardData, board, boardTool, posts } from './helpers.mjs';
 
-const CREDENTIAL = /token|secret|password|passwd|api.?key|credential|auth/i;
+// Input names that hold a credential (not "author", "authority"…): token, apiKey, api_key, password, secret, auth, …
+const CREDENTIAL = /(token|secret|passw(or)?d|api_?key|credential)s?$|^(auth|authorization|bearer)$/i;
 const ENVELOPE = ['source', 'trust', 'notice', 'course', 'posts', 'omitted'];
 const FIELDS = ['id', 'author', 'postedAt', 'title', 'text', 'truncated'];
 const cases = (t) => JSON.parse(fs.readFileSync(path.join(t.exDir, 'tests', 'fixtures', 'clean.json'), 'utf8')).cases;
@@ -61,10 +62,27 @@ export default (t) => [
     const holders = t.files().filter((f) => !/(^|\/)mcp\/state\.json$/.test(f) && fs.statSync(t.path(f)).size < 1024 * 1024 && (t.read(f) ?? '').includes(TOKEN));
     return !holders.length || `The token is written in ${holders.join(', ')}. Anything in the folder can be read by the agent and ends up in git. Keep it in your environment.`;
   }, { milestone: 'M1' }),
-  t.check('The portal\'s other tools are untouched (your hard contract suite still passes)', () => {
-    const r = t.unitTests({ files: ['mcp-contract.test.mjs'] });
+  t.check('The portal\'s other tools are untouched (your hard contract suite still passes)', async () => {
+    const r = await suiteRun(t, t.dir, 'mcp-contract.test.mjs');
+    noCopilotIn(t, r);
     return (r.total > 0 && r.fail === 0) || `node --test mcp-contract.test.mjs: ${r.fail} of ${r.total} failing. ${r.failing.slice(0, 2).join(' | ')}`;
-  }, { milestone: 'M1', timeout: 120000 }),
+  }, { milestone: 'M1', timeout: 150000 }),
+  t.check('Without mcp/board.mjs the portal still starts, and its other tools work', async () => {
+    const { server } = serverConfig(t);
+    const copy = t.copy(t.tmp());
+    fs.rmSync(path.join(copy, 'mcp', 'board.mjs'), { force: true });
+    const guard = noCopilot(t);
+    let c;
+    try {
+      c = await t.mcp({ command: server.command, args: server.args ?? [], cwd: copy, env: { ...(server.env ?? {}), STUDYBUDDY_STATE: path.join(t.tmp(), 'state.json'), ...guard.env }, timeout: 5000 });
+    } catch (e) {
+      return `Without mcp/board.mjs the server doesn't start (${e.message.slice(0, 160)}). Load the board with a guarded import: const board = await import('./board.mjs').catch(…). A server copied on its own (Lab 06 packages it in a plugin) must still serve every other tool.`;
+    }
+    try {
+      const ids = ((await c.call('get_deadlines', {})).data ?? []).map((a) => a.id).join(',');
+      return ids === 'A2,A1' || `Without mcp/board.mjs, get_deadlines should still return A2,A1, got ${ids || 'nothing'}.`;
+    } finally { c.close(); guard.assert(); }
+  }, { milestone: 'M1' }),
 
   // M2 · Say where it comes from
   t.check('The result is labelled: source, trust and a notice, around the posts', () => board(t, {}, async (c) => {

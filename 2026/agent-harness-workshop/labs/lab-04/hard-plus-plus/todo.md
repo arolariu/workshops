@@ -47,7 +47,7 @@ that breaks the rules.
   a missing `course` or an unknown prompt is `-32602`
 
 ### M3 · Pages
-- `resources/list` serves at most 20 courses per page (3 pages or more for the 45), with `nextCursor` until the last;
+- `resources/list` serves at most 10 courses per page (5 pages for the 45), with `nextCursor` until the last;
   following the cursors gives every course exactly once, the same way twice
 - The cursor is opaque (not a page number), and `garbage`, a changed cursor or a made-up one is `-32602`
 
@@ -64,6 +64,7 @@ that breaks the rules.
   https://evil.example.invalid` → 403; `Origin: http://localhost:3000` is served
 - `POST` initialize → 200 with JSON; a notification → 202 with no body; `MCP-Protocol-Version: 1999-01-01` → 400; a
   path other than `/mcp` → 404; broken JSON → 400 with `-32700`
+- No sessions: the server hands out no `Mcp-Session-Id` (2025-11-25 makes them optional), so every POST stands alone
 
 ### M6 · A versioned schema and a conformance suite
 - `search_courses` has `_meta["dev.studybuddy/schema-version"]: 2`; `find_courses({ q })` is listed with a
@@ -72,8 +73,8 @@ that breaks the rules.
   deprecated in every result; `search_courses` refuses `q` (an `isError` result that points to `query`)
 - `node --test mcp-conformance.test.mjs` passes with 12 or more tests, named `stdio: …` and `http: …`
 - It passes on the reference server and fails on each of six broken ones: one that echoes any version, one whose pages
-  overlap, one that answers cancelled calls, one that serves HTTP without a token, one that stops marking
-  `find_courses` as deprecated, and one that serves `tools/list` before `initialize`
+  overlap, one that answers cancelled calls, one that serves HTTP without a token, one whose `tools/list` drops
+  `_meta["dev.studybuddy/deprecated"]` from `find_courses`, and one that serves `tools/list` before `initialize`
 
 ## 📂 Work here
 ```bash
@@ -93,7 +94,8 @@ node mcp/library-server.mjs <<'EOF'
 EOF
 ```
 The library is **not** in `.mcp.json`: the checks and your suite start it themselves. The agent check gives it to
-Copilot for one session with `--additional-mcp-config`.
+Copilot for one session with `--additional-mcp-config`, records the JSON-RPC messages it gets (it passes only when your
+server answered a `tools/call`), and hides the file tools, so the answer can't come from reading the data file.
 
 ## 💡 Hints
 ### M1

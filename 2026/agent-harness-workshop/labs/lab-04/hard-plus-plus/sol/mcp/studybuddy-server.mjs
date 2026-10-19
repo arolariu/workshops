@@ -8,9 +8,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { boardTool } from './board.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+// The study board lives in its own module. If it can't be loaded (say, the server was copied without it), the portal
+// still starts, and every other tool works.
+const boardTool = await import('./board.mjs').then((m) => m.boardTool ?? null, (e) => {
+  console.error(`🎓 The study board is off: ./board.mjs could not be loaded (${String(e?.message ?? e).split('\n')[0]}).`);
+  return null;
+});
 const DATA = JSON.parse(fs.readFileSync(path.join(HERE, 'portal-data.json'), 'utf8'));
 const DAY = 24 * 60 * 60 * 1000;
 const daysLeft = (date) => Math.round((Date.parse(date) - Date.parse(DATA.today)) / DAY);
@@ -33,10 +38,26 @@ function readState() {
 }
 /** Write the whole file at once: a temp file next to it, then a rename (atomic on one file system). */
 function writeState(state) {
-  fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
+  const dir = path.dirname(STATE_FILE);
+  fs.mkdirSync(dir, { recursive: true });
+  removeStaleTemps(dir);
   const temp = `${STATE_FILE}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(temp, `${JSON.stringify(state, null, 2)}\n`);
-  fs.renameSync(temp, STATE_FILE);
+  try {
+    fs.writeFileSync(temp, `${JSON.stringify(state, null, 2)}\n`);
+    fs.renameSync(temp, STATE_FILE);
+  } finally {
+    fs.rmSync(temp, { force: true }); // gone after the rename; still there only if a step failed
+  }
+}
+/** Temp files a crashed server left behind: older than a minute, so never another server's write in progress. */
+function removeStaleTemps(dir) {
+  const prefix = `${path.basename(STATE_FILE)}.`;
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.startsWith(prefix) || !name.endsWith('.tmp')) continue;
+    try {
+      if (Date.now() - fs.statSync(path.join(dir, name)).mtimeMs > 60_000) fs.rmSync(path.join(dir, name), { force: true });
+    } catch { /* already gone */ }
+  }
 }
 const isDone = (a, state = readState()) => a.done || (state.ok && state.done.includes(a.id));
 
@@ -121,7 +142,7 @@ const tools = [
       return { ok: true, id: wanted, title, changed: true, message: `Marked ${wanted} ("${title}") as done. Well done! 🎉` };
     },
   },
-  boardTool, // the study board: posts written by other students (mcp/board.mjs)
+  ...(boardTool ? [boardTool] : []), // the study board: posts written by other students (mcp/board.mjs)
 ];
 
 // ---------- argument checks: every call is checked against its tool's inputSchema before the handler runs ----------

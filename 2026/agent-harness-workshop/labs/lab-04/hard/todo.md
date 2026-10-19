@@ -49,7 +49,7 @@ progress. Then prove the contract with tests that talk to the server through a r
   for byte the same, and `get_deadlines` still answers
 
 ### M5 · A contract suite
-- `node --test mcp-contract.test.mjs` passes with at least 6 tests of your own
+- `node --test mcp-contract.test.mjs` passes with at least 6 tests (the given example counts; `test.todo` doesn't)
 - It passes on the reference server, and fails on each of six broken servers: one that marks an unknown id, one that
   errors on a repeat, one that forgets after a restart, one whose `get_deadlines` still lists done work, one that
   says `mark_done` is read-only, and one that reports bad input as a JSON-RPC error
