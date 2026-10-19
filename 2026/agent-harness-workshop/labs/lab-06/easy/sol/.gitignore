@@ -1,1 +1,4 @@
+# The guard's audit logs can hold secrets: never commit them.
+.agent-logs/
+# The portal's saved state (Lab 04).
 mcp/state.json

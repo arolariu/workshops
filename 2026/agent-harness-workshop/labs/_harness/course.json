@@ -24,8 +24,8 @@
       "_why": "The README gets a Modules list: the new-module recipe adds a line to it."
     },
     "lab-05/easy": {
-      "overrides": ["AGENTS.md"],
-      "_why": "AGENTS.md gains the boundary \"Never change the guardrails in .github/hooks/\", which this lab introduces."
+      "overrides": [".gitignore", "AGENTS.md"],
+      "_why": "From this lab on, the guard writes audit logs to .agent-logs/, which can hold secrets: .gitignore keeps them out of commits (and still ignores mcp/state.json), so the line belongs to the harness the learner owns. AGENTS.md gains the boundary \"Never change the guardrails in .github/hooks/\"."
     },
     "lab-06/easy": { "local": ["SOLUTION-NOTES.md"] },
     "lab-07/medium": { "local": ["NOTES.md"] }
