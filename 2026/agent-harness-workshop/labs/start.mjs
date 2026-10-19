@@ -108,9 +108,9 @@ function usage() {
   row('node labs/start.mjs', 'interactive app');
   row('node labs/start.mjs open lab-01 easy', 'interactive app, straight into one exercise');
   row('node labs/start.mjs list', 'exercises and your progress');
-  row('   --path=builder --status=unfinished', `filters (also --level= --query= --max-minutes= --bookmarked --json)`);
+  row('   --path=deeper --status=unfinished', `filters (also --level= --query= --max-minutes= --bookmarked --json)`);
   row('node labs/start.mjs next [--path=security]', 'the next unfinished exercise on a path');
-  row('node labs/start.mjs path [foundations]', 'show or choose your learning path');
+  row('node labs/start.mjs path [security]', 'show or choose your learning path');
   row('node labs/start.mjs test lab-01 easy', 'run the free checks on src/');
   row('node labs/start.mjs test lab-01 easy --watch', 'run them again every time you save');
   row('node labs/start.mjs test lab-01 easy --agent', 'also run the 🤖 agent checks (AI credits)');
@@ -139,7 +139,7 @@ function usage() {
   row('node labs/start.mjs verify --bring', '…and bringing work forward never breaks a level');
   row('node labs/start.mjs sync-seeds [--dry-run]', 'rebuild every level\'s src/ and sol/ from the chain');
   row('node labs/start.mjs starters [--write]', 'check (or rebuild) the published starter manifest');
-  row('node labs/start.mjs --path=builder --no-intro', 'start the app on a path, without the welcome screen');
+  row('node labs/start.mjs --path=deeper --no-intro', 'start the app on a path, without the welcome screen');
   row('node labs/start.mjs --exercise=lab-03/easy', 'start the app on one exercise');
   say();
   say(`  ${dim('Difficulties:')} ${levelChoices()}`);
@@ -335,7 +335,7 @@ if (cmd === '' || cmd === 'open') {
   }
   const current = progress.get('_ui').path ?? 'all';
   say();
-  for (const p of L.PATHS) say(`  ${p.id === current ? bright('❯') : ' '} ${p.id === current ? bold(bright(p.label)) : white(p.label)} ${dim(`(${p.id}) — ${p.description}`)}`);
+  for (const p of L.PATHS) say(`  ${p.id === current ? bright('❯') : ' '} ${p.id === current ? bold(bright(p.label)) : white(p.label)} ${dim(`(${p.id}${L.pathTime(catalog, p.id) ? `, ${L.pathTime(catalog, p.id)}` : ''}) — ${p.description}`)}`);
   say();
 } else if (cmd === 'glossary') {
   const { loadGlossary, glossaryLines } = await import('./_harness/glossary.mjs');

@@ -52,10 +52,10 @@ test('test records evidence-bound results that list reports, and an edit makes t
 test('list filters, paths and next', () => {
   const { labsDir } = fixtureWorkshop();
   const keys = (args) => JSON.parse(cli(labsDir, ['list', ...args, '--json']).out).map((x) => x.key);
-  assert.deepEqual(keys(['--path=builder', '--status=unfinished']), ['lab-04/medium', 'lab-04/hard', 'lab-06/medium']);
+  assert.deepEqual(keys(['--path=platform', '--status=unfinished']), ['lab-02/hard', 'lab-06/hard']);
   assert.deepEqual(keys(['--query=mcp', '--level=medium', '--max-minutes=15']), ['lab-04/medium']);
   assert.equal(JSON.parse(cli(labsDir, ['next', '--path=security', '--json']).out).key, 'lab-05/medium');
-  assert.equal(cli(labsDir, ['path', 'automation']).code, 0);
+  assert.equal(cli(labsDir, ['path', 'internals']).code, 0);
   assert.equal(JSON.parse(cli(labsDir, ['next', '--json']).out).key, 'lab-00/hard', 'the chosen path is remembered');
   assert.equal(cli(labsDir, ['bookmark', 'lab-04', 'hard']).code, 0);
   assert.deepEqual(keys(['--bookmarked']), ['lab-04/hard']);
@@ -129,7 +129,7 @@ test('without a terminal, the app explains itself; --linear works anywhere', () 
   assert.match(plain.out, /--linear works anywhere/);
   const r = spawnSync(process.execPath, [START, '--linear'], { input: 'list path=security\nquit\n', encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', WORKSHOP_LABS_DIR: labsDir }, timeout: 30000 });
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /3 exercise\(s\) on the Security path/);
+  assert.match(r.stdout, /2 exercise\(s\) on the Security path/);
   void json;
 });
 

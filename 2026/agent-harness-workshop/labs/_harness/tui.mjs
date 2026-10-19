@@ -17,7 +17,7 @@ import { BRAND, creditLine } from './brand.mjs';
 import { runInteractive as realRunInteractive, openFolder as realOpenFolder, copyToClipboard as realCopy } from './system.mjs';
 import { changes as gitChanges, changesDiff as realChangesDiff, ensureStarter, listRecovery, restoreStarter, restoreSnapshot, createCheckpoint, resetToCommit, compareTrees } from './workspace.mjs';
 import { inspectEnvironment as realInspect } from './doctor.mjs';
-import { PATHS, pathById, progressView, describeSelection, nextExercise, choosePath, learningReport, writeReport, STATUS_FILTERS } from './learning.mjs';
+import { PATHS, pathById, pathTime, progressView, describeSelection, nextExercise, choosePath, learningReport, writeReport, STATUS_FILTERS } from './learning.mjs';
 import { courseOrder, predecessorOf, loadManifest } from './chain.mjs';
 import { loadCourse } from './course.mjs';
 import { bringPlan, applyBring } from './bring.mjs';
@@ -1507,7 +1507,7 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
     const i = PATHS.findIndex((p) => p.id === S.path);
     S.path = choosePath(store, PATHS[(i + 1) % PATHS.length].id);
     S.browse.idx = 0;
-    toast(`🧭 Path: ${pathLabel()} — ${pathById(S.path).description}`);
+    toast(`🧭 Path: ${pathLabel()}${pathTime(catalog, S.path) ? ` (${pathTime(catalog, S.path)})` : ''} — ${pathById(S.path).description}`);
   }
 
   function toggleBookmark() {

@@ -7,13 +7,16 @@ import { deriveStatus, evidenceTracker } from './progress.mjs';
 
 export class SelectionError extends Error {}
 
-/** The workshop's suggested paths for lab time, in their explicit order (see readme.md). */
+/**
+ * The homework paths (spec §5.1), in their explicit order. Only levels that exist are listed; the deeper tiers join their
+ * paths as they are written, and the Capstone path arrives with Lab 08.
+ */
 export const PATHS = [
-  { id: 'all', label: 'All exercises', description: 'Every exercise: all easy levels first, then medium, then hard.', keys: null },
-  { id: 'foundations', label: 'Foundations', description: 'Instructions, skills, agents and guardrails.', keys: ['lab-01/medium', 'lab-02/medium', 'lab-03/medium', 'lab-05/medium'] },
-  { id: 'security', label: 'Security', description: 'Hooks and least privilege (free checks, few credits).', keys: ['lab-05/medium', 'lab-05/hard', 'lab-03/medium'] },
-  { id: 'builder', label: 'Builder', description: 'MCP servers and plugins.', keys: ['lab-04/medium', 'lab-04/hard', 'lab-06/medium'] },
-  { id: 'automation', label: 'Automation', description: 'Agents in scripts and in CI.', keys: ['lab-00/hard', 'lab-07/medium', 'lab-07/hard'] },
+  { id: 'all', label: 'All exercises', description: 'Every exercise: the live track (every easy level) first, then the homework tiers.', keys: null },
+  { id: 'deeper', label: 'One level deeper', description: 'Every 🟡 medium level: shape each layer for a real need.', keys: ['lab-00/medium', 'lab-01/medium', 'lab-02/medium', 'lab-03/medium', 'lab-04/medium', 'lab-05/medium', 'lab-06/medium', 'lab-07/medium'] },
+  { id: 'security', label: 'Security', description: 'Guardrails that hold, and how agents get attacked.', keys: ['lab-05/medium', 'lab-05/hard'] },
+  { id: 'platform', label: 'Platform', description: 'Skills and plugins a whole team installs.', keys: ['lab-02/hard', 'lab-06/hard'] },
+  { id: 'internals', label: 'Internals', description: 'The agent loop from the inside: scripted runs, JSON events and permission flags.', keys: ['lab-00/hard'] },
 ];
 export const STATUS_FILTERS = ['unfinished', 'pass', 'fail', 'stale', 'not-run', 'blocked', 'skipped', 'interrupted'];
 export const pathById = (id) => PATHS.find((p) => p.id === id) ?? null;
@@ -63,6 +66,21 @@ function ordered(catalog, pathId) {
 }
 
 const haystack = (lab, ex) => [lab.id, `lab ${lab.num}`, lab.title, lab.tagline, ex.title, ex.label, ex.level, ex.mission].join(' ').toLowerCase();
+
+/** [lo, hi] minutes for a homework path's levels (from their 🕐), or null for "all" and when no level says. */
+export function pathMinutes(catalog, id) {
+  if (!pathById(id)?.keys) return null;
+  const ranges = ordered(catalog, id).map(({ ex }) => ex.minutesRange).filter(Boolean);
+  return ranges.length ? ranges.reduce(([a, b], [x, y]) => [a + x, b + y], [0, 0]) : null;
+}
+/** "about 5 h" (the middle of the range, to the half hour), "about 25 min" under an hour, or '' when unknown. */
+export function pathTime(catalog, id) {
+  const r = pathMinutes(catalog, id);
+  if (!r) return '';
+  const mid = (r[0] + r[1]) / 2;
+  if (mid < 60) return `about ${Math.max(5, Math.round(mid / 5) * 5)} min`;
+  return `about ${String(Math.round((mid / 60) * 2) / 2).replace('.5', '½')} h`;
+}
 
 /** { matches: [{ key, lab, ex, progress }], notes: [string] } */
 export function describeSelection(catalog, view, opts = {}) {

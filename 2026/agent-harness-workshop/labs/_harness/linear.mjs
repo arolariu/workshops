@@ -8,7 +8,7 @@ import { runChecks as realRunChecks } from './checks.mjs';
 import { runAgentChecks as realRunAgentChecks, loadAgentChecks as realLoadAgentChecks, listRuns as realListRuns, budgetPreview, specCommand } from './agent.mjs';
 import { inspectEnvironment as realInspect, reportLines } from './doctor.mjs';
 import { ensureStarter, listRecovery, restoreStarter, restoreSnapshot, createCheckpoint, resetToCommit, compareTrees, changesDiff as realChangesDiff } from './workspace.mjs';
-import { PATHS, pathById, progressView, describeSelection, nextExercise, choosePath, learningReport, writeReport } from './learning.mjs';
+import { PATHS, pathById, pathTime, progressView, describeSelection, nextExercise, choosePath, learningReport, writeReport } from './learning.mjs';
 import { statusWord, stripAnsi, inline, isAscii, asciiFold } from './ui.mjs';
 import { runInteractive as realRunInteractive } from './system.mjs';
 import { copilotBin } from './kit.mjs';
@@ -409,7 +409,7 @@ export function runLinear({
       }
       case 'path': {
         if (!args[0]) { say(`Path: ${pathById(pathId).label}. Choose with: path ID (${PATHS.map((p) => p.id).join(', ')}).`); return; }
-        try { pathId = choosePath(store, args[0]); say(`Path: ${pathById(pathId).label}. ${pathById(pathId).description}`); } catch (e) { say(e.message); }
+        try { pathId = choosePath(store, args[0]); say(`Path: ${pathById(pathId).label}${pathTime(catalog, pathId) ? ` (${pathTime(catalog, pathId)})` : ''}. ${pathById(pathId).description}`); } catch (e) { say(e.message); }
         return;
       }
       case 'doctor': {

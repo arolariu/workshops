@@ -31,7 +31,7 @@ test('a whole exercise can be worked line by line, with no escape codes', async 
   const { labsDir } = fixtureWorkshop();
   const file = path.join(labsDir, 'lab-04', 'medium', 'src', 'README.md');
   const { code, text } = await session([
-    'list path=builder',
+    'list path=deeper mcp',
     'open 1',
     'checks',
     'details 1',

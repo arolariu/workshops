@@ -4,7 +4,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { loadCatalog, exerciseByKey } from '../catalog.mjs';
 import { progressStore, captureEvidence } from '../progress.mjs';
-import { PATHS, progressView, selectExercises, describeSelection, nextExercise, learningReport, reportMarkdown, writeReport, SelectionError, choosePath } from '../learning.mjs';
+import { PATHS, progressView, selectExercises, describeSelection, nextExercise, learningReport, reportMarkdown, writeReport, SelectionError, choosePath, pathMinutes, pathTime } from '../learning.mjs';
 import { fixtureWorkshop, tmpdir } from './helpers.mjs';
 
 function setup(opts) {
@@ -31,9 +31,15 @@ test('search, difficulty, status and time budget combine', () => {
 
 test('learning paths keep their explicit order', () => {
   const { catalog, view } = setup();
-  assert.deepEqual(PATHS.map((p) => p.id), ['all', 'foundations', 'security', 'builder', 'automation']);
-  assert.deepEqual(selectExercises(catalog, view, { path: 'security' }).map((x) => x.key), ['lab-05/medium', 'lab-05/hard', 'lab-03/medium']);
-  assert.deepEqual(selectExercises(catalog, view, { path: 'automation' }).map((x) => x.key), ['lab-00/hard', 'lab-07/medium', 'lab-07/hard']);
+  assert.deepEqual(PATHS.map((p) => p.id), ['all', 'deeper', 'security', 'platform', 'internals']);
+  assert.deepEqual(selectExercises(catalog, view, { path: 'deeper' }).map((x) => x.key), ['lab-00/medium', 'lab-01/medium', 'lab-02/medium', 'lab-03/medium', 'lab-04/medium', 'lab-05/medium', 'lab-06/medium', 'lab-07/medium']);
+  assert.deepEqual(selectExercises(catalog, view, { path: 'security' }).map((x) => x.key), ['lab-05/medium', 'lab-05/hard']);
+  assert.deepEqual(selectExercises(catalog, view, { path: 'platform' }).map((x) => x.key), ['lab-02/hard', 'lab-06/hard']);
+  assert.deepEqual(selectExercises(catalog, view, { path: 'internals' }).map((x) => x.key), ['lab-00/hard']);
+  assert.deepEqual(pathMinutes(catalog, 'deeper'), [120, 120], 'eight 15-minute fixture levels');
+  assert.equal(pathMinutes(catalog, 'all'), null, 'all is not a path you finish in an evening');
+  assert.equal(pathTime(catalog, 'deeper'), 'about 2 h');
+  assert.equal(pathTime(catalog, 'internals'), 'about 25 min');
   const all = selectExercises(catalog, view, { path: 'all' }).map((x) => x.key);
   assert.equal(all.length, 24);
   assert.deepEqual(all.slice(0, 3), ['lab-00/easy', 'lab-01/easy', 'lab-02/easy']);
@@ -56,17 +62,17 @@ test('invalid selections fail with a clear message', () => {
 
 test('Next is the first unfinished exercise of the selection, using fresh evidence', () => {
   const { catalog, view, pass } = setup();
-  for (const key of ['lab-01/medium', 'lab-02/medium', 'lab-03/medium']) pass(key);
-  const next = nextExercise(catalog, view, { path: 'foundations' });
+  for (const key of ['lab-00/medium', 'lab-01/medium', 'lab-02/medium', 'lab-03/medium', 'lab-04/medium']) pass(key);
+  const next = nextExercise(catalog, view, { path: 'deeper' });
   assert.equal(next.key, 'lab-05/medium');
   fs.appendFileSync(path.join(exerciseByKey(catalog, 'lab-02/medium').ex.src, 'README.md'), 'edited in another window\n');
   view.refresh();
-  assert.equal(nextExercise(catalog, view, { path: 'foundations' }).key, 'lab-02/medium');
+  assert.equal(nextExercise(catalog, view, { path: 'deeper' }).key, 'lab-02/medium');
 });
 
 test('a finished selection says so instead of claiming the whole workshop is done', () => {
   const { catalog, view, pass } = setup();
-  for (const key of ['lab-05/medium', 'lab-05/hard', 'lab-03/medium']) pass(key);
+  for (const key of ['lab-05/medium', 'lab-05/hard']) pass(key);
   assert.equal(nextExercise(catalog, view, { path: 'security' }), null);
   assert.notEqual(nextExercise(catalog, view, { path: 'all' }), null);
 });
@@ -75,8 +81,8 @@ test('bookmarks filter the list and the chosen path is remembered', () => {
   const { catalog, store, view } = setup();
   store.set('lab-04/hard', { bookmarked: true });
   assert.deepEqual(selectExercises(catalog, view, { bookmarked: true }).map((x) => x.key), ['lab-04/hard']);
-  choosePath(store, 'builder');
-  assert.equal(store.get('_ui').path, 'builder');
+  choosePath(store, 'platform');
+  assert.equal(store.get('_ui').path, 'platform');
   assert.throws(() => choosePath(store, 'nope'), SelectionError);
 });
 
@@ -146,4 +152,13 @@ test('the learning summary includes each check-yourself answer', () => {
   assert.match(md, /\| Check yourself \|/);
   assert.match(md, /\| lab-03\/easy \|[^\n]*\| ✅ \|/);
   assert.match(md, /\| lab-04\/easy \|[^\n]*\| 💡 \|/);
+});
+
+test('the homework paths only name levels that exist (Phases 4 and 5 add the deeper ones)', () => {
+  const real = loadCatalog(path.join(import.meta.dirname, '..', '..'));
+  const keys = new Set(real.flatMap((l) => l.levels.map((e) => e.key)));
+  for (const p of PATHS.filter((x) => x.keys)) {
+    assert.ok(p.keys.length, `${p.id} has levels`);
+    for (const k of p.keys) assert.ok(keys.has(k), `${p.id}: ${k} does not exist`);
+  }
 });
