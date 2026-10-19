@@ -1382,7 +1382,7 @@ Every level starts from the reference result of the level before it (down the ea
     const ex = exObj();
     refresh();
     const target = order.find((n) => n.key === ex.key);
-    S.bring = { plan: bringPlan({ catalog, course: loadCourse(labsDir), manifest: loadManifest(labsDir), view, target }), target, result: null };
+    S.bring = { plan: bringPlan({ catalog, course: loadCourse(labsDir, { strict: false }), manifest: loadManifest(labsDir), view, target }), target, result: null };
     go('bring');
   }
   function doBring() {

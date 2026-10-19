@@ -318,6 +318,7 @@ test('home: two counts, 👥/🏠 over the tiers, readable at 80 and 120 columns
     assert.match(s, /👥/);
     assert.match(s, /🏠/);
     assert.match(s, /07 {2}🚀 {2}Agentic workflows/, 'lab names are not cut off');
+    assert.match(s, /q quit/, 'the footer keeps its last key');
     assert.ok(widest(t.output) <= columns, `${columns} columns`);
     t.quit();
   }

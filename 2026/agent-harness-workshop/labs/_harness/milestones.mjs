@@ -5,10 +5,22 @@
 const rank = (id) => (id ? Number(String(id).replace(/\D/g, '')) || 0 : Number.POSITIVE_INFINITY);
 const done = (status) => status === 'pass' || status === 'skip';
 
-/** { M1: 'pass' | 'fail' }: a milestone passes when every one of its checks passed or was skipped. */
-export function milestoneStatus(results) {
+/**
+ * { M1: 'pass' | 'fail' }: a milestone passes when every one of its checks passed or was skipped. With the run's plan
+ * (one milestone per planned check), a check that never reported (an interrupted run) counts as not done.
+ */
+export function milestoneStatus(results, plan = null) {
   const out = {};
-  for (const r of results ?? []) {
+  const list = results ?? [];
+  if (Array.isArray(plan)) {
+    const byIdx = new Map(list.filter(Boolean).map((r) => [r.idx, r]));
+    plan.forEach((m, idx) => {
+      if (!m) return;
+      out[m] = out[m] !== 'fail' && done(byIdx.get(idx)?.status) ? 'pass' : 'fail';
+    });
+    return out;
+  }
+  for (const r of list) {
     if (!r?.milestone) continue;
     out[r.milestone] = out[r.milestone] !== 'fail' && done(r.status) ? 'pass' : 'fail';
   }

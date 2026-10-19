@@ -199,3 +199,19 @@ test('bring shows the plan, --dry-run changes nothing, and bringing records it',
   const saved = JSON.parse(fs.readFileSync(path.join(labsDir, '.progress.json'), 'utf8')).entries['lab-01/easy'];
   assert.deepEqual(saved.brought.files, [{ file: 'AGENTS.md', from: 'lab-00/easy' }]);
 });
+
+test('starters --write refuses once the seeded chain manages starters.json', () => {
+  const labsDir = chainCourse(CHAIN_BASE);
+  assert.equal(cli(labsDir, ['sync-seeds', '--bootstrap']).code, 0);
+  const r = cli(labsDir, ['starters', '--write']);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /managed by the seeded chain.*sync-seeds/s);
+});
+
+test('sync-seeds refuses a course.json with a typo', () => {
+  const labsDir = chainCourse(CHAIN_BASE, { 'lab-00/medum': { overrides: ['app.js'] } });
+  const r = cli(labsDir, ['sync-seeds', '--bootstrap']);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /"lab-00\/medum", which is not a level/);
+  assert.ok(!fs.existsSync(path.join(labsDir, 'lab-01/easy/src/FINDINGS.md')), 'nothing was written');
+});

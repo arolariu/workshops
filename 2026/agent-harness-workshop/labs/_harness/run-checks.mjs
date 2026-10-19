@@ -76,7 +76,9 @@ try {
   process.exit(0);
 }
 
-emit({ type: 'plan', total: checks.length, names: checks.map((c) => String(c.name)), milestones: checks.map((c) => (typeof c.milestone === 'string' && c.milestone ? c.milestone : null)) });
+// A check's milestone: "M2" (case and spaces don't matter), or null for anything else.
+const milestoneOf = (c) => (typeof c.milestone === 'string' && /^m\d+$/i.test(c.milestone.trim()) ? c.milestone.trim().toUpperCase() : null);
+emit({ type: 'plan', total: checks.length, names: checks.map((c) => String(c.name)), milestones: checks.map(milestoneOf) });
 for (const [idx, c] of checks.entries()) {
   const limit = c.timeout ?? 60000;
   emit({ type: 'start', idx, name: String(c.name), timeout: limit });
@@ -117,7 +119,7 @@ for (const [idx, c] of checks.entries()) {
       clearTimeout(timer);
     }
   }
-  emit({ type: 'result', idx, name: String(c.name), status, message, optional: Boolean(c.optional), milestone: typeof c.milestone === 'string' && c.milestone ? c.milestone : null, ...(needs ? { needs } : {}), detail, files: status === 'pass' ? [] : filesFor(c, message, supplied) });
+  emit({ type: 'result', idx, name: String(c.name), status, message, optional: Boolean(c.optional), milestone: milestoneOf(c), ...(needs ? { needs } : {}), detail, files: status === 'pass' ? [] : filesFor(c, message, supplied) });
 }
 emit({ type: 'done' });
 process.exit(0);

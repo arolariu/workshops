@@ -268,3 +268,17 @@ test('a milestone that is not text is ignored rather than trusted', async () => 
   assert.equal(res.state, 'pass');
   assert.equal(res.results[0].milestone, null);
 });
+
+test('milestone IDs are normalised, and anything that is not Mn is ignored', async () => {
+  const { exDir, target } = fixture("export default (t) => [t.check('a', () => true, { milestone: 'm2' }), t.check('b', () => true, { milestone: '__proto__' }), t.check('c', () => true, { milestone: 'Step 3' })];\n");
+  const res = await runChecks({ exDir, target });
+  assert.deepEqual(res.planMilestones, ['M2', null, null]);
+  assert.deepEqual(res.milestones, { M2: 'pass' });
+});
+
+test('an interrupted run never marks a milestone as passed', async () => {
+  const { exDir, target } = fixture("export default (t) => [t.check('a', () => true, { milestone: 'M1' }), t.check('b', () => process.exit(1), { milestone: 'M1' })];\n");
+  const res = await runChecks({ exDir, target });
+  assert.equal(res.state, 'interrupted');
+  assert.deepEqual(res.milestones, { M1: 'fail' });
+});

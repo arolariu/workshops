@@ -48,8 +48,8 @@ test('bootstrap: inherits the predecessor result and records overrides', () => {
   assert.deepEqual(med.starter, ['app.js']);
   assert.deepEqual(level(r, 'lab-01/easy').src.write, ['FINDINGS.md'], 'Lab 01 easy starts from Lab 00 easy');
   assert.deepEqual(level(r, 'lab-01/hard').src.write, ['FINDINGS.md'], 'and Lab 01 hard from Lab 01 easy');
-  assert.deepEqual(r.manifest.chain['lab-01/easy'], { from: 'lab-00/easy', starter: [] });
-  assert.deepEqual(r.manifest.chain['lab-00/easy'], { from: null, starter: ['app.js'] });
+  assert.deepEqual(r.manifest.chain['lab-01/easy'], { from: 'lab-00/easy', starter: {}, inherited: { 'FINDINGS.md': blobId(Buffer.from('found\n')), 'app.js': blobId(Buffer.from('v1\n')) } });
+  assert.deepEqual(r.manifest.chain['lab-00/easy'], { from: null, starter: { 'app.js': blobId(Buffer.from('v1\n')) }, inherited: {} });
   assert.equal(r.manifest.exercises['lab-01/easy']['app.js'], blobId(Buffer.from('v1\n')));
   assert.equal(r.manifest.format, 2);
 });
@@ -140,4 +140,68 @@ test('writeChain refuses folders outside the labs folder', () => {
   const r = run(labsDir);
   level(r, 'lab-01/easy').node.ex.src = path.join(path.dirname(labsDir), 'elsewhere');
   assert.throws(() => writeChain({ labsDir, result: r }), /outside the labs folder/);
+});
+
+// ---------- review fixes: the chain keeps its own baseline ----------
+test('rebuilding starters.json from git cannot change what the chain treats as inherited', () => {
+  const labsDir = chainCourse(BASE, OVERRIDE);
+  writeChain({ labsDir, result: run(labsDir) });
+  fs.writeFileSync(path.join(labsDir, 'lab-00/medium/src/NEW.md'), 'new starter\n');
+  fs.writeFileSync(path.join(labsDir, 'lab-00/medium/sol/NEW.md'), 'new starter\n');
+  const manifest = loadManifest(labsDir);
+  manifest.exercises['lab-00/medium']['NEW.md'] = blobId(Buffer.from('new starter\n')); // what `starters --write` would record
+  const r = computeChain({ catalog: loadCatalog(labsDir), course: loadCourse(labsDir), manifest });
+  assert.deepEqual(r.problems, []);
+  assert.ok(level(r, 'lab-00/medium').newSrc.has('NEW.md'), 'the new starter file is kept');
+  assert.ok(level(r, 'lab-00/medium').newSol.has('NEW.md'));
+  fs.writeFileSync(path.join(labsDir, 'lab-01/easy/src/FINDINGS.md'), 'oops\n');
+  manifest.exercises['lab-01/easy']['FINDINGS.md'] = blobId(Buffer.from('oops\n'));
+  const edited = computeChain({ catalog: loadCatalog(labsDir), course: loadCourse(labsDir), manifest });
+  assert.deepEqual(edited.problems.map((p) => [p.key, p.kind]), [['lab-01/easy', 'edited']], 'an edited inherited file is still caught');
+});
+
+test('an edit made only in src/ reaches sol/ and the levels after it', () => {
+  const labsDir = chainCourse(BASE, OVERRIDE);
+  writeChain({ labsDir, result: run(labsDir) });
+  fs.writeFileSync(path.join(labsDir, 'lab-00/easy/src/app.js'), 'v1, typo fixed\n');
+  const r = run(labsDir);
+  assert.deepEqual(r.problems, []);
+  assert.deepEqual(level(r, 'lab-00/easy').sol.write, ['app.js'], "the solution never touched app.js, so it gets the fix");
+  assert.deepEqual(level(r, 'lab-01/easy').src.write, ['app.js']);
+  assert.equal(level(r, 'lab-01/hard').newSol.get('app.js').id, blobId(Buffer.from('v1, typo fixed\n')));
+});
+
+test('a starter file added only to src/ is added to sol/ too; one the solution deletes stays deleted', () => {
+  const labsDir = chainCourse(BASE, OVERRIDE);
+  writeChain({ labsDir, result: run(labsDir) });
+  fs.writeFileSync(path.join(labsDir, 'lab-00/easy/src/fixture.txt'), 'data\n');
+  const r = run(labsDir);
+  assert.deepEqual(level(r, 'lab-00/easy').sol.write, ['fixture.txt']);
+  assert.ok(level(r, 'lab-01/easy').newSrc.has('fixture.txt'));
+  writeChain({ labsDir, result: r });
+  fs.rmSync(path.join(labsDir, 'lab-00/easy/sol/fixture.txt'));
+  const gone = run(labsDir);
+  assert.ok(!level(gone, 'lab-00/easy').newSol.has('fixture.txt'), 'the solution removes it now');
+  assert.ok(!level(gone, 'lab-01/easy').newSrc.has('fixture.txt'));
+});
+
+test('a sync interrupted between sol/ and src/ recovers on the next run', () => {
+  const labsDir = chainCourse(BASE, OVERRIDE);
+  writeChain({ labsDir, result: run(labsDir) });
+  fs.writeFileSync(path.join(labsDir, 'lab-00/easy/sol/FINDINGS.md'), 'found more\n');
+  // writeChain writes sol/ before src/: simulate a crash right after lab-01/easy's sol/ was written.
+  for (const k of ['lab-00/medium', 'lab-01/easy']) fs.writeFileSync(path.join(labsDir, k, 'sol/FINDINGS.md'), 'found more\n');
+  fs.writeFileSync(path.join(labsDir, 'lab-00/medium/src/FINDINGS.md'), 'found more\n');
+  const r = run(labsDir);
+  assert.deepEqual(r.problems, []);
+  for (const k of ['lab-01/easy', 'lab-01/hard']) {
+    assert.equal(level(r, k).newSrc.get('FINDINGS.md').id, blobId(Buffer.from('found more\n')), k);
+    assert.equal(level(r, k).newSol.get('FINDINGS.md').id, blobId(Buffer.from('found more\n')), k);
+  }
+});
+
+test('writeChain refuses a chain with problems', () => {
+  const r = run(chainCourse(BASE));
+  assert.ok(r.problems.length);
+  assert.throws(() => writeChain({ labsDir: path.dirname(r.levels[0].node.lab.readmePath).replace(/[\\/]lab-00$/, ''), result: r }), /problem/);
 });

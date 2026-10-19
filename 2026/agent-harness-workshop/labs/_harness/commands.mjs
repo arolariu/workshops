@@ -169,7 +169,7 @@ export async function run(ctx) {
     const { loadCourse } = await import('./course.mjs');
     const { progressView } = await import('./learning.mjs');
     const target = ch.courseOrder(catalog).find((n) => n.key === ex.key);
-    const plan = B.bringPlan({ catalog, course: loadCourse(labsDir), manifest: ch.loadManifest(labsDir), view: progressView(progress, catalog), target });
+    const plan = B.bringPlan({ catalog, course: loadCourse(labsDir, { strict: false }), manifest: ch.loadManifest(labsDir), view: progressView(progress, catalog), target });
     say();
     say(`  🧳 ${bold(bright(`Bring your work into ${describeKey(ex.key)}`))} ${dim(`(${rel(ex.src)})`)}`);
     bringLines(plan, { W: 96, fmt: { dim, white, yellow, bright } }).forEach((l) => say(l));
@@ -192,8 +192,16 @@ export async function run(ctx) {
 
   if (cmd === 'sync-seeds') {
     const ch = await import('./chain.mjs');
-    const { loadCourse, saveCourse } = await import('./course.mjs');
-    const course = loadCourse(labsDir);
+    const { loadCourse, saveCourse, courseProblems } = await import('./course.mjs');
+    const course = loadCourse(labsDir, { strict: false });
+    const courseIssues = courseProblems(course, catalog.flatMap((l) => l.levels.map((e) => e.key)));
+    if (courseIssues.length) {
+      say();
+      say(`  ❌ ${red('Fix course.json first, so nothing was written:')}`);
+      courseIssues.forEach((m) => wrap(m, 96).forEach((l, i) => say(`     ${i ? '  ' : dim('• ')}${yellow(l)}`)));
+      say();
+      process.exit(1);
+    }
     const result = ch.computeChain({ catalog, course, manifest: ch.loadManifest(labsDir), bootstrap: Boolean(opt.bootstrap) });
     const dry = Boolean(opt['dry-run']);
     say();
@@ -236,11 +244,15 @@ export async function run(ctx) {
     say();
     if (opt.chain) {
       const ch = await import('./chain.mjs');
-      const { loadCourse } = await import('./course.mjs');
+      const { loadCourse, courseProblems } = await import('./course.mjs');
       const manifest = ch.loadManifest(labsDir);
-      const result = ch.computeChain({ catalog, course: loadCourse(labsDir), manifest });
+      const course = loadCourse(labsDir, { strict: false });
+      const result = ch.computeChain({ catalog, course, manifest });
       say(`  🔗 ${bold(bright('Checking the chain'))} ${dim(`— ${rel(ch.manifestFile(labsDir))} and every src/ and sol/ must match the computed chain`)}`);
       say();
+      const courseIssues = courseProblems(course, catalog.flatMap((l) => l.levels.map((e) => e.key)));
+      courseIssues.forEach((m) => wrap(m, 96).forEach((l, i) => say(`   ${i ? '   ' : '❌ '}${yellow(l)}`)));
+      problems += courseIssues.length;
       const report = ch.chainIssues({ result, manifest });
       for (const x of report) {
         say(`   ${x.issues.length ? '❌' : '✅'} ${white(x.key.padEnd(22))} ${dim(x.from ? `← ${x.from}` : 'start of the chain')}`);
@@ -280,13 +292,13 @@ export async function run(ctx) {
       }
     }
     const drift = starterDrift(ws, labsDir, catalog);
-    if (drift) say(`   ${drift.ok ? '✅' : '❌'} ${white('starter manifest')}  ${drift.ok ? green(drift.message) : red(`${drift.message} Rebuild it with: node labs/start.mjs starters --write`)}`);
+    if (drift) say(`   ${drift.ok ? '✅' : '❌'} ${white('starter manifest')}  ${drift.ok ? green(drift.message) : red(`${drift.message} ${drift.fix}`)}`);
     if (drift && !drift.ok) problems++;
     if (opt.bring) {
       const ch = await import('./chain.mjs');
       const B = await import('./bring.mjs');
       const { loadCourse } = await import('./course.mjs');
-      const course = loadCourse(labsDir);
+      const course = loadCourse(labsDir, { strict: false });
       const manifest = ch.loadManifest(labsDir);
       say();
       say(`  🧳 ${bold(bright('Bringing work forward'))} ${dim('— a learner who finished every earlier level like the reference brings it all in: src/ must still fail, sol/ must still pass')}`);
@@ -314,17 +326,19 @@ export async function run(ctx) {
   if (cmd === 'starters') {
     say();
     if (opt.write) {
+      let previous = null;
+      try { previous = JSON.parse(fs.readFileSync(path.join(labsDir, '_harness', 'starters.json'), 'utf8')); } catch { /* none yet */ }
+      // With the seeded chain, starters.json also records each level's inherited files; only sync-seeds may write it.
+      if (previous?.chain) fail(`${rel(ws.DEFAULT_MANIFEST)} is managed by the seeded chain. Run ${cyan('node labs/start.mjs sync-seeds')} instead (add --dry-run to preview).`, 1);
       try {
-        let previous = null;
-        try { previous = JSON.parse(fs.readFileSync(ws.DEFAULT_MANIFEST, 'utf8')); } catch { /* none yet */ }
-        const manifest = ws.buildStarterManifest(labsDir, catalog, { previous });
+        const manifest = ws.buildStarterManifest(labsDir, catalog);
         fs.writeFileSync(ws.DEFAULT_MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
         say(`  ✅ ${bright(`Wrote ${rel(ws.DEFAULT_MANIFEST)}`)} ${dim(`(${Object.keys(manifest.exercises).length} exercises from ${manifest.revision.slice(0, 12)}). Commit it with the starter changes.`)}`);
       } catch (e) { fail(e.message, 1); }
     } else {
       const drift = starterDrift(ws, labsDir, catalog);
       say(drift ? `  ${drift.ok ? '✅' : '⚠️ '} ${drift.ok ? green(drift.message) : yellow(drift.message)}` : `  ${yellow('Needs git to compare the manifest with the committed starters.')}`);
-      if (drift && !drift.ok) say(`  ${dim('Rebuild it with:')} ${cyan('node labs/start.mjs starters --write')}`);
+      if (drift && !drift.ok) say(`  ${dim(drift.fix)}`);
       say();
       process.exit(drift?.ok ? 0 : 1);
     }
@@ -357,9 +371,10 @@ function starterDrift(ws, labsDir, catalog) {
   try { current = ws.buildStarterManifest(labsDir, catalog); } catch { return null; }
   let saved = null;
   try { saved = JSON.parse(fs.readFileSync(ws.DEFAULT_MANIFEST, 'utf8')); } catch { /* missing */ }
-  if (!saved) return { ok: false, message: `${path.basename(ws.DEFAULT_MANIFEST)} is missing.` };
+  if (!saved) return { ok: false, message: `${path.basename(ws.DEFAULT_MANIFEST)} is missing.`, fix: 'Rebuild it with: node labs/start.mjs starters --write' };
+  const fix = saved.chain ? 'Commit the src/ folders that sync-seeds wrote, or run: node labs/start.mjs sync-seeds' : 'Rebuild it with: node labs/start.mjs starters --write';
   const keys = new Set([...Object.keys(current.exercises), ...Object.keys(saved.exercises ?? {})]);
   const entries = (o) => JSON.stringify(Object.entries(o ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
   const differ = [...keys].filter((k) => entries(current.exercises[k]) !== entries(saved.exercises?.[k]));
-  return differ.length ? { ok: false, message: `out of date for ${differ.length} exercise(s): ${differ.slice(0, 5).join(', ')}${differ.length > 5 ? ', …' : ''}` } : { ok: true, message: `matches the committed starters (${keys.size} exercises).` };
+  return differ.length ? { ok: false, fix, message: `out of date for ${differ.length} exercise(s): ${differ.slice(0, 5).join(', ')}${differ.length > 5 ? ', …' : ''}.` } : { ok: true, message: `matches the committed starters (${keys.size} exercises).` };
 }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { loadCourse, levelRules, matchPath, isHarnessPath, saveCourse, formatJson } from '../course.mjs';
+import { loadCourse, levelRules, matchPath, isHarnessPath, saveCourse, formatJson, courseProblems } from '../course.mjs';
 import { tmpdir, writeTree } from './helpers.mjs';
 
 test('defaults when there is no course.json', () => {
@@ -58,4 +58,23 @@ test('the real course.json is valid and uses the spec harness paths', () => {
   const c = loadCourse(labsDir);
   assert.equal(c.capstone, 'lab-08');
   for (const p of ['AGENTS.md', '.github/**', 'HARNESS.md']) assert.ok(c.harnessPaths.includes(p), p);
+});
+
+test('a broken course.json does not stop the learner app, but maintainers are told', () => {
+  const labsDir = tmpdir();
+  writeTree(labsDir, { '_harness/course.json': '{ nope' });
+  const c = loadCourse(labsDir, { strict: false });
+  assert.match(c.error, /not valid JSON/);
+  assert.equal(c.capstone, 'lab-08', 'defaults are used');
+  assert.deepEqual(courseProblems(c, ['lab-01/easy']), [c.error]);
+});
+
+test('typos in course.json are problems', () => {
+  const c = { levels: { 'lab-05/hard+': { keep: ['x'] }, 'lab-01/easy': { override: ['a'], local: 'NOTES.md' } }, harnessPaths: ['AGENTS.md'] };
+  assert.deepEqual(courseProblems(c, ['lab-01/easy', 'lab-05/hard-plus']), [
+    'course.json lists "lab-05/hard+", which is not a level (levels look like lab-05/hard-plus).',
+    'course.json: "override" for lab-01/easy is not a rule (use local, keep, overrides or drop).',
+    'course.json: "local" for lab-01/easy must be a list of paths.',
+  ]);
+  assert.deepEqual(courseProblems({ levels: { 'lab-01/easy': { local: ['A.md'] } } }, ['lab-01/easy']), []);
 });

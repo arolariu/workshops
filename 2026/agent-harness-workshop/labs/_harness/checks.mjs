@@ -193,7 +193,7 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
       blocked: count('blocked'),
       total,
       planMilestones: plan ? plan.milestones : [],
-      milestones: milestoneStatus(list),
+      milestones: milestoneStatus(list, plan?.milestones),
       fatal: reason,
       stdout,
       stderr: proc?.stderr ?? '',

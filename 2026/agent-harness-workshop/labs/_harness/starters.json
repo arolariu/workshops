@@ -1,6 +1,6 @@
 {
   "format": 2,
-  "revision": "b6f62507692bbbde3dee95e921edd1440009a2c1",
+  "revision": "86426d7266d438fc5e99c681243eeb29f510e58b",
   "note": "Every seed file of every exercise's src/ as a git blob ID (line endings normalised), and the chain: where each level starts from and which files are its own starter files. Regenerate with: node labs/start.mjs sync-seeds",
   "exercises": {
     "lab-00/easy": {
@@ -461,162 +461,570 @@
   "chain": {
     "lab-00/easy": {
       "from": null,
-      "starter": [
-        "README.md",
-        "deadlines.js",
-        "deadlines.test.js",
-        "grades.js",
-        "grades.test.js",
-        "index.js",
-        "package.json"
-      ]
+      "starter": {
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "53747bef5cc30e7ba0f7e6e678403d14d27a9ace",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      },
+      "inherited": {}
     },
     "lab-00/medium": {
       "from": "lab-00/easy",
-      "starter": [
-        "grades.js"
-      ]
+      "starter": {
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959"
+      },
+      "inherited": {
+        "FINDINGS.md": "d2e58f2c09544e57fd3d5409b3f8953a45df52b9",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-00/hard": {
       "from": "lab-00/medium",
-      "starter": [
-        "fixtures/sample-run.jsonl",
-        "grades.js",
-        "grades.test.js",
-        "scripts/run-stats.mjs"
-      ]
+      "starter": {
+        "fixtures/sample-run.jsonl": "0ab936d094d995d5cc9a4c60a2d36fff466753f5",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "scripts/run-stats.mjs": "c0d7edf62c5dfb4073fe94ea587e1e267fa257a7"
+      },
+      "inherited": {
+        "FINDINGS.md": "d2e58f2c09544e57fd3d5409b3f8953a45df52b9",
+        "PLAN.md": "17f620b2436aef7144ed193245ea20aa87e85902",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-01/easy": {
       "from": "lab-00/easy",
-      "starter": [
-        "team-notes.md"
-      ]
+      "starter": {
+        "team-notes.md": "ad9a3195c555a2ccc1190a9ec53fd294f85b6a81"
+      },
+      "inherited": {
+        "FINDINGS.md": "d2e58f2c09544e57fd3d5409b3f8953a45df52b9",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "53747bef5cc30e7ba0f7e6e678403d14d27a9ace",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-01/medium": {
       "from": "lab-01/easy",
-      "starter": []
+      "starter": {},
+      "inherited": {
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-01/hard": {
       "from": "lab-01/medium",
-      "starter": [
-        "grades.test.js",
-        "scripts/ab.mjs"
-      ]
+      "starter": {
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "scripts/ab.mjs": "9057a48e0aa6fd1f110b8973a5090211c4228175"
+      },
+      "inherited": {
+        ".github/instructions/tests.instructions.md": "c566f2ccb2142e9bdbae300b708f5058ecebf6d6",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-02/easy": {
       "from": "lab-01/easy",
-      "starter": [
-        ".github/skills/new-module/templates/module.template.js",
-        ".github/skills/new-module/templates/module.test.template.js",
-        "README.md"
-      ]
+      "starter": {
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        "README.md": "007e97da906ef15b9be7806f408769d48fb2caa5"
+      },
+      "inherited": {
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-02/medium": {
       "from": "lab-02/easy",
-      "starter": [
-        "README.md",
-        "fixtures/crash.txt",
-        "index.js",
-        "report.js",
-        "report.test.js"
-      ]
+      "starter": {
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "fixtures/crash.txt": "e1ab7b22d65cdd464e2c9311dde6db0b1caa7c23",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "report.js": "e0659b754ca1dd5de99dfc5292d5208ba627eca0",
+        "report.test.js": "bf895989390541ca8cb137ea7d5782ffc228cbb9"
+      },
+      "inherited": {
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-02/hard": {
       "from": "lab-02/medium",
-      "starter": [
-        "fixtures/git-log.txt"
-      ]
+      "starter": {
+        "fixtures/git-log.txt": "ee66c3c3ed7f011b6f6408e04c776aa9afd3c863"
+      },
+      "inherited": {
+        ".github/skills/explain-error/SKILL.md": "21e6e2b24a10f6b4e3837b7ae847377c52be6911",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "fixtures/crash.txt": "e1ab7b22d65cdd464e2c9311dde6db0b1caa7c23",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
+        "report.js": "eba072d35ad10e10e650036641471dd2971755d0",
+        "report.test.js": "f0e7be301a4b15e93569fcd8bb85c8b1787f464b"
+      }
     },
     "lab-03/easy": {
       "from": "lab-02/easy",
-      "starter": [
-        "README.md",
-        "index.js"
-      ]
+      "starter": {
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2"
+      },
+      "inherited": {
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-03/medium": {
       "from": "lab-03/easy",
-      "starter": []
+      "starter": {},
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-03/hard": {
       "from": "lab-03/medium",
-      "starter": [
-        "deadlines.test.js",
-        "scripts/review-loop.mjs"
-      ]
+      "starter": {
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "scripts/review-loop.mjs": "d54505e0b2944bfc5262794ab0bd3901112b7de1"
+      },
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/agents/test-writer.agent.md": "15019a60b234631c437b422b8d315b302bcbb883",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "BUGS.md": "660b2ec92cfc5346b99d337ce8a3595321bf3e94",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-04/easy": {
       "from": "lab-03/easy",
-      "starter": [
-        ".gitignore",
-        "mcp/portal-data.json",
-        "mcp/studybuddy-server.mjs"
-      ]
+      "starter": {
+        ".gitignore": "efb81f4759a9e8581693c5184bbf08bc381c38d3",
+        "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563"
+      },
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-04/medium": {
       "from": "lab-04/easy",
-      "starter": []
+      "starter": {},
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        ".gitignore": "efb81f4759a9e8581693c5184bbf08bc381c38d3",
+        ".mcp.json": "7db343765085918ddabf82f7391f7aa750eb581e",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-04/hard": {
       "from": "lab-04/medium",
-      "starter": []
+      "starter": {},
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        ".gitignore": "efb81f4759a9e8581693c5184bbf08bc381c38d3",
+        ".mcp.json": "7db343765085918ddabf82f7391f7aa750eb581e",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "mcp/studybuddy-server.mjs": "95616dfb611ba55e0ba91ec01f4041e4cc84e0db",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-05/easy": {
       "from": "lab-04/easy",
-      "starter": [
-        ".github/hooks/guardrails.json",
-        ".github/hooks/scripts/guard.mjs",
-        ".gitignore",
-        "AGENTS.md"
-      ]
+      "starter": {
+        ".github/hooks/guardrails.json": "7957f56d18cc57c81d8fb4b174aa942e047b3739",
+        ".github/hooks/scripts/guard.mjs": "2d36cfbcef9f4fe9f5331522c184a4b85e8c19fd",
+        ".gitignore": "31fc555aaba08c4dd205510b5598c86fec479666",
+        "AGENTS.md": "e37b145e87eb8428419d1019d8701619e7055f30"
+      },
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        ".mcp.json": "7db343765085918ddabf82f7391f7aa750eb581e",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-05/medium": {
       "from": "lab-05/easy",
-      "starter": []
+      "starter": {},
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/hooks/guardrails.json": "7957f56d18cc57c81d8fb4b174aa942e047b3739",
+        ".github/hooks/scripts/guard.mjs": "ec6ef80ec80295e689bf1054a69dcc616528b06b",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        ".gitignore": "31fc555aaba08c4dd205510b5598c86fec479666",
+        ".mcp.json": "7db343765085918ddabf82f7391f7aa750eb581e",
+        "AGENTS.md": "e37b145e87eb8428419d1019d8701619e7055f30",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-05/hard": {
       "from": "lab-05/medium",
-      "starter": [
-        "scripts/leash.mjs"
-      ]
+      "starter": {
+        "scripts/leash.mjs": "1a843a25d6918e180110321003bdb5434e377d62"
+      },
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/hooks/guardrails.json": "89f0c204dc54b1a01f2ce7cd98ca387a41f40605",
+        ".github/hooks/scripts/audit.mjs": "70bf6f30a87e030df0fc51a1ab363c6555d6704d",
+        ".github/hooks/scripts/guard.mjs": "183ab4e7efb287c76461b276edae84df6ce453cc",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        ".gitignore": "31fc555aaba08c4dd205510b5598c86fec479666",
+        ".mcp.json": "7db343765085918ddabf82f7391f7aa750eb581e",
+        "AGENTS.md": "e37b145e87eb8428419d1019d8701619e7055f30",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-06/easy": {
       "from": "lab-05/easy",
-      "starter": [
-        "AGENTS.md"
-      ]
+      "starter": {
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858"
+      },
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/hooks/guardrails.json": "7957f56d18cc57c81d8fb4b174aa942e047b3739",
+        ".github/hooks/scripts/guard.mjs": "ec6ef80ec80295e689bf1054a69dcc616528b06b",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        ".gitignore": "31fc555aaba08c4dd205510b5598c86fec479666",
+        ".mcp.json": "7db343765085918ddabf82f7391f7aa750eb581e",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-06/medium": {
       "from": "lab-06/easy",
-      "starter": [
-        ".github/extensions/studybuddy/extension.mjs",
-        "data/portal-data.json"
-      ]
+      "starter": {
+        ".github/extensions/studybuddy/extension.mjs": "e5c10d427040949787be2eccfbf98064ff790d38",
+        "data/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb"
+      },
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/hooks/guardrails.json": "7957f56d18cc57c81d8fb4b174aa942e047b3739",
+        ".github/hooks/scripts/guard.mjs": "ec6ef80ec80295e689bf1054a69dcc616528b06b",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        ".gitignore": "31fc555aaba08c4dd205510b5598c86fec479666",
+        ".mcp.json": "7db343765085918ddabf82f7391f7aa750eb581e",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "apm.yml": "e2f9e778f50de90498a007e57d71cb9f1a4e83b8",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-06/hard": {
       "from": "lab-06/medium",
-      "starter": [
-        ".github/skills/explain-error/SKILL.md",
-        "fixtures/crash.txt",
-        "report.js",
-        "report.test.js"
-      ]
+      "starter": {
+        ".github/skills/explain-error/SKILL.md": "21e6e2b24a10f6b4e3837b7ae847377c52be6911",
+        "fixtures/crash.txt": "e1ab7b22d65cdd464e2c9311dde6db0b1caa7c23",
+        "report.js": "e0659b754ca1dd5de99dfc5292d5208ba627eca0",
+        "report.test.js": "bf895989390541ca8cb137ea7d5782ffc228cbb9"
+      },
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/extensions/studybuddy/extension.mjs": "b8995b5538529fe82510a6fb9b7d0129b9f03e31",
+        ".github/hooks/guardrails.json": "7957f56d18cc57c81d8fb4b174aa942e047b3739",
+        ".github/hooks/scripts/guard.mjs": "ec6ef80ec80295e689bf1054a69dcc616528b06b",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        ".gitignore": "31fc555aaba08c4dd205510b5598c86fec479666",
+        ".mcp.json": "7db343765085918ddabf82f7391f7aa750eb581e",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "apm.yml": "e2f9e778f50de90498a007e57d71cb9f1a4e83b8",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "data/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-07/easy": {
       "from": "lab-06/easy",
-      "starter": [
-        ".github/workflows/issue-triage.md"
-      ]
+      "starter": {
+        ".github/workflows/issue-triage.md": "0c79919319b5557c670637f3730566b2969af14e"
+      },
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/hooks/guardrails.json": "7957f56d18cc57c81d8fb4b174aa942e047b3739",
+        ".github/hooks/scripts/guard.mjs": "ec6ef80ec80295e689bf1054a69dcc616528b06b",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        ".gitignore": "31fc555aaba08c4dd205510b5598c86fec479666",
+        ".mcp.json": "7db343765085918ddabf82f7391f7aa750eb581e",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "apm.yml": "e2f9e778f50de90498a007e57d71cb9f1a4e83b8",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-07/medium": {
       "from": "lab-07/easy",
-      "starter": []
+      "starter": {},
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/hooks/guardrails.json": "7957f56d18cc57c81d8fb4b174aa942e047b3739",
+        ".github/hooks/scripts/guard.mjs": "ec6ef80ec80295e689bf1054a69dcc616528b06b",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        ".github/workflows/issue-triage.md": "7d6a028f0cb11981820b3492e299b7c0066ad37b",
+        ".gitignore": "31fc555aaba08c4dd205510b5598c86fec479666",
+        ".mcp.json": "7db343765085918ddabf82f7391f7aa750eb581e",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "apm.yml": "e2f9e778f50de90498a007e57d71cb9f1a4e83b8",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     },
     "lab-07/hard": {
       "from": "lab-07/medium",
-      "starter": [
-        ".github/workflows/issue-triage.md"
-      ]
+      "starter": {
+        ".github/workflows/issue-triage.md": "7d6a028f0cb11981820b3492e299b7c0066ad37b"
+      },
+      "inherited": {
+        ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
+        ".github/hooks/guardrails.json": "7957f56d18cc57c81d8fb4b174aa942e047b3739",
+        ".github/hooks/scripts/guard.mjs": "ec6ef80ec80295e689bf1054a69dcc616528b06b",
+        ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
+        ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
+        ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
+        ".gitignore": "31fc555aaba08c4dd205510b5598c86fec479666",
+        ".mcp.json": "7db343765085918ddabf82f7391f7aa750eb581e",
+        "AGENTS.md": "6bb6808f19aaa24da05d2c6fef619bb26d4f9858",
+        "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
+        "REVIEW.md": "9ff759c1554780104b7e2dfa4ffb333016f3d11e",
+        "apm.yml": "e2f9e778f50de90498a007e57d71cb9f1a4e83b8",
+        "attendance.js": "e32660715066786b6700beb55b22952500870617",
+        "attendance.test.js": "80f22063dedf89b353ec38111ce6a524d0f6aefa",
+        "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
+        "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
+        "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959",
+        "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
+        "index.js": "afd1426d43b41f2e2ef3e29a6ea8d1d868faf3d2",
+        "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
+        "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
+        "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
+      }
     }
   }
 }

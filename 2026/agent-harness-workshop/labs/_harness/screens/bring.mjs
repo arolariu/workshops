@@ -27,6 +27,6 @@ export function bringLines(plan, { W = 96, fmt }) {
     put(`${fmt.white(pad(it.file, fileW))} ${fmt.bright(`← ${describeKey(it.from)}`)}  ${fmt.dim(`${ACTION[it.action]}${also}`)}`, '   ', `   ${' '.repeat(Math.min(fileW + 1, 24))}`);
   }
   for (const s of plan.skipped) put(`⏩ ${fmt.yellow(`${describeKey(s.key)} skipped:`)} ${fmt.dim(s.reason)}`);
-  for (const k of plan.kept) put(`🔒 ${fmt.white(`kept: ${k.file}`)} ${fmt.dim(`(${k.reason === 'keep' ? 'this level needs its own version' : "this level's starter"}; yours is in ${describeKey(k.from)})`)}`);
+  for (const k of plan.kept) put(`🔒 ${fmt.white(`kept: ${k.file}`)} ${fmt.dim(`(${k.reason === 'drop' ? 'this level asks you to create it yourself' : k.reason === 'keep' ? 'this level needs its own version' : "this level's starter"}; yours is in ${describeKey(k.from)})`)}`);
   return L;
 }

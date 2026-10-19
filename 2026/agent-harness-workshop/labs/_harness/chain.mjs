@@ -55,6 +55,21 @@ export function predecessorOf(order, key) {
 }
 
 const sorted = (m) => [...m.keys()].sort();
+const ids = (m, keys) => Object.fromEntries(keys.map((f) => [f, m.get(f).id]));
+
+/**
+ * The chain's record for one level: { from, starter: { rel: blobId }, inherited: { rel: blobId } }, or null.
+ * Only sync-seeds writes it, so rebuilding `exercises` from git can never change what counts as inherited.
+ * (Accepts the first format, where `starter` was a list and the IDs came from `exercises`.)
+ */
+export function chainEntry(manifest, key) {
+  const c = manifest?.chain?.[key];
+  if (!c) return null;
+  const all = manifest.exercises?.[key] ?? {};
+  const starter = Array.isArray(c.starter) ? Object.fromEntries(c.starter.filter((f) => f in all).map((f) => [f, all[f]])) : c.starter ?? {};
+  const inherited = c.inherited ?? Object.fromEntries(Object.entries(all).filter(([f]) => !(f in starter)));
+  return { from: c.from ?? null, starter, inherited };
+}
 
 /**
  * Work out every level's new src/ and sol/ in course order. Reads only: writeChain() writes.
@@ -73,8 +88,8 @@ export function computeChain({ catalog, course, manifest = null, bootstrap = fal
     const rules = levelRules(course, key);
     const pred = predecessorOf(order, key);
     const from = pred?.key ?? 'nowhere';
-    const say = (file, kind, message) => { flagged.add(file); problems.push({ key, file, kind, message }); };
     const flagged = new Set();
+    const say = (file, kind, message) => { flagged.add(file); problems.push({ key, file, kind, message }); };
     const src = snapshot(ex.src);
     const sol = snapshot(ex.sol);
 
@@ -84,16 +99,16 @@ export function computeChain({ catalog, course, manifest = null, bootstrap = fal
       const local = levelRules(course, pred.key).local;
       for (const [f, e] of results.get(pred.key).sol) if (!matchAny(local, f) && !matchAny(rules.drop, f)) base.set(f, e);
     }
-    // 2. Which files of the current src/ are this level's own (starter files)?
-    const seed = manifest?.chain?.[key] ? manifest.exercises?.[key] ?? {} : null;
-    const ownBefore = new Set(manifest?.chain?.[key]?.starter ?? []);
-    const wasInherited = (f) => seed && f in seed && !ownBefore.has(f);
+    // 2. Which files of the current src/ are this level's own (starter files)? The last sync's record is the baseline.
+    const rec = chainEntry(manifest, key);
+    const seed = rec ? { ...rec.inherited, ...rec.starter } : null;
+    const wasInherited = (f) => Boolean(rec && f in rec.inherited);
     const starter = new Map();
     for (const [f, e] of src) {
       const up = base.get(f);
       const override = matchAny(rules.overrides, f);
       if (wasInherited(f)) {
-        if (e.id === seed[f] || (up && e.id === up.id)) continue;
+        if (e.id === rec.inherited[f] || (up && e.id === up.id)) continue;
         if (override) { starter.set(f, e); continue; }
         say(f, 'edited', `${f} is inherited from ${from} but was changed in this level's src/. Add it to "overrides" for ${key} in course.json, or revert it.`);
         starter.set(f, e);
@@ -106,15 +121,23 @@ export function computeChain({ catalog, course, manifest = null, bootstrap = fal
       }
       starter.set(f, e);
     }
-    if (seed) for (const f of Object.keys(seed)) {
-      if (wasInherited(f) && !src.has(f) && base.has(f)) say(f, 'deleted', `${f} is inherited from ${from} but is missing from this level's src/. Add it to "drop" for ${key} in course.json, or restore it.`);
+    if (rec) for (const f of Object.keys(rec.inherited)) {
+      if (!src.has(f) && base.has(f)) say(f, 'deleted', `${f} is inherited from ${from} but is missing from this level's src/. Add it to "drop" for ${key} in course.json, or restore it.`);
     }
     // 3. The new src/ is the inherited base with the starter files on top.
     const newSrc = new Map([...base, ...starter]);
-    // 4. The solution delta: what sol/ changes compared with the current src/. If the inherited version of one of those
-    //    files changed upstream, that is a conflict, unless upstream now has exactly the solution's version.
-    const delta = new Map([...sol].filter(([f, e]) => src.get(f)?.id !== e.id));
-    const removed = [...src.keys()].filter((f) => !sol.has(f)).sort();
+    // 4. The solution delta: what sol/ changes compared with the current src/. Measured against the last sync, a starter
+    //    file changed (or added) only in src/ is a starter change, not something the solution undoes: it goes to sol/ too.
+    const delta = new Map();
+    for (const [f, e] of sol) {
+      const s = src.get(f);
+      if (s?.id === e.id) continue;
+      if (seed && starter.has(f) && s && seed[f] === e.id) continue;
+      delta.set(f, e);
+    }
+    const removed = [...src.keys()].filter((f) => !sol.has(f) && !(seed && starter.has(f) && !(f in seed))).sort();
+    // If the inherited version of a delta file changed upstream, that is a conflict, unless upstream now has exactly
+    // the solution's version.
     for (const f of [...delta.keys(), ...removed]) {
       if (flagged.has(f)) continue;
       const now = newSrc.get(f)?.id;
@@ -126,16 +149,20 @@ export function computeChain({ catalog, course, manifest = null, bootstrap = fal
     for (const f of removed) newSol.delete(f);
     results.set(key, { sol: newSol });
 
-    out.exercises[key] = Object.fromEntries(sorted(newSrc).map((f) => [f, newSrc.get(f).id]));
-    out.chain[key] = { from: pred?.key ?? null, starter: sorted(starter) };
+    const inherited = sorted(newSrc).filter((f) => !starter.has(f));
+    out.exercises[key] = ids(newSrc, sorted(newSrc));
+    out.chain[key] = { from: pred?.key ?? null, starter: ids(starter, sorted(starter)), inherited: ids(newSrc, inherited) };
     const plan = (disk, want) => ({ write: sorted(want).filter((f) => disk.get(f)?.id !== want.get(f).id), remove: sorted(disk).filter((f) => !want.has(f)) });
-    levels.push({ key, node, pred, src: plan(src, newSrc), sol: plan(sol, newSol), newSrc, newSol, starter: sorted(starter), inherited: sorted(newSrc).filter((f) => !starter.has(f)), delta: sorted(delta), removed });
+    levels.push({ key, node, pred, src: plan(src, newSrc), sol: plan(sol, newSol), newSrc, newSol, starter: sorted(starter), inherited, delta: sorted(delta), removed });
   }
   return { levels, problems, manifest: out, overridesFound };
 }
 
 const sameEntries = (a, b) => JSON.stringify(Object.entries(a ?? {}).sort()) === JSON.stringify(Object.entries(b ?? {}).sort());
-const sameChain = (a, b) => (a?.from ?? null) === (b?.from ?? null) && JSON.stringify([...(a?.starter ?? [])].sort()) === JSON.stringify([...(b?.starter ?? [])].sort());
+const sameChain = (manifest, key, want) => {
+  const have = chainEntry(manifest, key);
+  return Boolean(have) && have.from === want.from && sameEntries(have.starter, want.starter) && sameEntries(have.inherited, want.inherited);
+};
 
 /** Per level, what is out of sync between the files on disk, starters.json and the computed chain. */
 export function chainIssues({ result, manifest }) {
@@ -146,7 +173,7 @@ export function chainIssues({ result, manifest }) {
       if (l[side].write.length) issues.push(`${side}/ out of date: ${list(l[side].write)}`);
       if (l[side].remove.length) issues.push(`${side}/ has files the chain doesn't: ${list(l[side].remove)}`);
     }
-    if (!sameEntries(manifest?.exercises?.[l.key], result.manifest.exercises[l.key]) || !sameChain(manifest?.chain?.[l.key], result.manifest.chain[l.key])) issues.push('starters.json is out of date for this level');
+    if (!sameEntries(manifest?.exercises?.[l.key], result.manifest.exercises[l.key]) || !sameChain(manifest, l.key, result.manifest.chain[l.key])) issues.push('starters.json is out of date for this level');
     for (const p of result.problems.filter((x) => x.key === l.key)) issues.push(p.message);
     return { key: l.key, from: l.pred?.key ?? null, issues };
   });
@@ -166,10 +193,11 @@ function prune(root, rel) {
 }
 
 /**
- * Write a computed chain: every file that changes is backed up to labs/.backups/sync-seeds-<stamp>/ first, then src/ and
- * sol/ are updated byte for byte and starters.json is rewritten. The caller must refuse to write when there are problems.
+ * Write a computed chain: every file that changes is backed up to labs/.backups/sync-seeds-<stamp>/ first, then sol/ and
+ * src/ are updated byte for byte and starters.json is rewritten. A chain with problems is refused.
  */
 export function writeChain({ labsDir, result }) {
+  if (result.problems?.length) throw new Error(`The chain has ${result.problems.length} problem(s), so nothing was written. Fix them first (see sync-seeds).`);
   const root = path.resolve(labsDir);
   const inside = (p) => {
     const r = path.relative(root, path.resolve(p));
@@ -180,7 +208,9 @@ export function writeChain({ labsDir, result }) {
   let written = 0;
   let removed = 0;
   for (const l of result.levels) {
-    for (const side of ['src', 'sol']) {
+    // sol/ before src/: if a write fails half-way, the next run sees a solution file that equals the new inherited
+    // version (absorbed), never a stale inherited file posing as a solution change.
+    for (const side of ['sol', 'src']) {
       const dir = l.node.ex[side];
       const want = side === 'src' ? l.newSrc : l.newSol;
       const { write, remove } = l[side];

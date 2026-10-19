@@ -80,7 +80,7 @@ export function runLinear({
     const { ex } = current;
     view.refresh();
     const target = order.find((n) => n.key === ex.key);
-    const plan = bringPlan({ catalog, course: loadCourse(labsDir), manifest: loadManifest(labsDir), view, target });
+    const plan = bringPlan({ catalog, course: loadCourse(labsDir, { strict: false }), manifest: loadManifest(labsDir), view, target });
     say(`Bring your work into ${label(current.lab, ex)}:`);
     bringLines(plan, { W: 100, fmt: PLAIN }).forEach((l) => say(l));
     if (plan.error || !plan.items.length) return;

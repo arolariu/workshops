@@ -75,3 +75,8 @@ test('milestone bars', () => {
   assert.equal(milestoneBar(0, 0), '');
   assert.equal([...milestoneBar(7, 20)].length, 10, 'at most ten cells');
 });
+
+test('a milestone whose checks did not all run is not passed', () => {
+  assert.deepEqual(milestoneStatus([r(0, 'a', 'pass', 'M1')], ['M1', 'M1']), { M1: 'fail' });
+  assert.deepEqual(milestoneStatus([r(0, 'a', 'pass', 'M1'), r(1, 'b', 'skip', 'M1')], ['M1', 'M1']), { M1: 'pass' });
+});

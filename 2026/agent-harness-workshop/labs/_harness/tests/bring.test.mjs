@@ -115,3 +115,42 @@ test('the perfect learner brings every earlier solution delta under the harness 
   assert.equal(fs.readFileSync(path.join(sim.sol, 'AGENTS.md'), 'utf8'), 'easy ref\n', "this level's own solution file is kept");
   assert.ok(!fs.existsSync(path.join(sim.src, 'notes.md')));
 });
+
+test('bring never pre-fills a file the target level drops, nor a source level\'s local files', async () => {
+  const labsDir = synced({
+    'lab-00/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+    'lab-01/easy': { src: {}, sol: { 'done.txt': 'x\n', '.github/hooks/guard.mjs': 'the deliverable\n' } },
+  }, { 'lab-00/easy': { local: ['.github/notes.md'] }, 'lab-01/easy': { drop: ['.github/hooks/guard.mjs'] } });
+  const c = ctx(labsDir);
+  write(labsDir, 'lab-00/easy/src/done.txt', 'x\n');
+  write(labsDir, 'lab-00/easy/src/.github/hooks/guard.mjs', 'my guard\n');
+  write(labsDir, 'lab-00/easy/src/.github/notes.md', 'notes\n');
+  write(labsDir, 'lab-00/easy/src/AGENTS.md', 'mine\n');
+  await pass(c.store, c.ex('lab-00/easy'));
+  c.view.refresh();
+  const plan = bringPlan({ ...c, target: c.node('lab-01/easy') });
+  assert.deepEqual(plan.items.map((i) => i.file), ['AGENTS.md']);
+  assert.deepEqual(plan.kept.map((k) => [k.file, k.reason]), [['.github/hooks/guard.mjs', 'drop']]);
+  const sim = perfectLearnerPlan({ ...c, target: c.node('lab-01/easy') });
+  assert.ok(!sim.items.some((i) => i.file === '.github/hooks/guard.mjs'));
+});
+
+test('levels with your work that do not pass are listed with the reason', async () => {
+  const labsDir = synced({
+    'lab-00/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+    'lab-00/medium': { src: {}, sol: { 'done.txt': 'x\n' } },
+    'lab-00/hard': { src: {}, sol: { 'done.txt': 'x\n' } },
+    'lab-01/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+  });
+  const c = ctx(labsDir);
+  for (const k of ['lab-00/medium', 'lab-00/hard']) fs.rmSync(path.join(labsDir, k, 'src', 'done.txt'), { force: true });
+  write(labsDir, 'lab-00/medium/src/AGENTS.md', 'medium work\n');
+  write(labsDir, 'lab-00/hard/src/AGENTS.md', 'hard work\n');
+  const ex = c.ex('lab-00/medium');
+  const evidence = captureEvidence(ex);
+  c.store.recordChecks(ex.key, await runChecks({ exDir: ex.dir, target: ex.src }), evidence);
+  c.view.refresh();
+  const plan = bringPlan({ ...c, target: c.node('lab-01/easy') });
+  assert.deepEqual(plan.skipped.map((s) => [s.key, s.reason]), [['lab-00/medium', 'its checks fail now'], ['lab-00/hard', 'its checks have not been run yet']]);
+  assert.deepEqual(plan.items, []);
+});

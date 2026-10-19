@@ -160,8 +160,8 @@ export function progressStore(labsDir, { fileName = '.progress.json' } = {}) {
     for (;;) {
       try { fs.writeFileSync(lockFile, `${process.pid}\n`, { flag: 'wx' }); held = true; break; } catch (e) {
         // Windows reports a lock file that another process is deleting as EPERM/EACCES/EBUSY for a few milliseconds:
-        // retry briefly, like for EEXIST. A folder that is really read-only keeps failing and gives up quickly.
-        if (['EPERM', 'EACCES', 'EBUSY'].includes(e.code) && ++transient <= 40 && Date.now() <= until) {
+        // retry briefly, like for EEXIST. (Elsewhere these codes mean the folder really is not writable.)
+        if (process.platform === 'win32' && ['EPERM', 'EACCES', 'EBUSY'].includes(e.code) && ++transient <= 40 && Date.now() <= until) {
           pause(5 + Math.floor(Math.random() * 20));
           continue;
         }
@@ -274,7 +274,7 @@ export function progressStore(labsDir, { fileName = '.progress.json' } = {}) {
         passed: result.passed ?? 0,
         total: result.total ?? 0,
         nextFix: nextFixName(result.results),
-        milestones: milestoneStatus(result.results),
+        milestones: result.milestones ?? milestoneStatus(result.results),
         checksEvidence: evidence,
         lastAttempt: attempt,
         legacy: false,

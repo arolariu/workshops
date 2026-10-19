@@ -8,14 +8,36 @@ export const DEFAULT_HARNESS_PATHS = ['AGENTS.md', '*.instructions.md', '.github
 const RULES = ['local', 'keep', 'overrides', 'drop'];
 export const courseFile = (labsDir) => path.join(labsDir, '_harness', 'course.json');
 
-/** The course rules, with defaults when the file is missing (test fixtures, older checkouts). */
-export function loadCourse(labsDir) {
+/**
+ * The course rules, with defaults when the file is missing (test fixtures, older checkouts). An unreadable file throws,
+ * unless `strict` is false: then the defaults are used and `error` says what is wrong (the learner app keeps working).
+ */
+export function loadCourse(labsDir, { strict = true } = {}) {
   const file = courseFile(labsDir);
   let raw = {};
+  let error = null;
   try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) {
-    if (e.code !== 'ENOENT') throw new Error(`${file} is not valid JSON: ${e.message}`);
+    if (e.code !== 'ENOENT') {
+      error = `${file} is not valid JSON: ${e.message}`;
+      if (strict) throw new Error(error);
+      raw = {};
+    }
   }
-  return { ...raw, file, capstone: raw.capstone ?? 'lab-08', harnessPaths: raw.harnessPaths ?? DEFAULT_HARNESS_PATHS, levels: raw.levels ?? {} };
+  return { ...raw, file, error, capstone: raw.capstone ?? 'lab-08', harnessPaths: raw.harnessPaths ?? DEFAULT_HARNESS_PATHS, levels: raw.levels ?? {} };
+}
+
+/** Mistakes in course.json that would otherwise be ignored silently. `keys`: every level key ("lab-05/hard-plus"). */
+export function courseProblems(course, keys) {
+  if (course.error) return [course.error];
+  const out = [];
+  for (const [key, rules] of Object.entries(course.levels ?? {})) {
+    if (!keys.includes(key)) { out.push(`course.json lists "${key}", which is not a level (levels look like lab-05/hard-plus).`); continue; }
+    for (const [name, value] of Object.entries(rules ?? {})) {
+      if (!RULES.includes(name)) out.push(`course.json: "${name}" for ${key} is not a rule (use ${RULES.slice(0, -1).join(', ')} or ${RULES.at(-1)}).`);
+      else if (!Array.isArray(value)) out.push(`course.json: "${name}" for ${key} must be a list of paths.`);
+    }
+  }
+  return out;
 }
 
 /** { local, keep, overrides, drop } for a level key like "lab-05/hard-plus": lists of path patterns. */
@@ -57,7 +79,7 @@ export function formatJson(v, indent = '', width = 110) {
 /** Write course.json (the raw object, without the `file` field loadCourse adds). */
 export function saveCourse(labsDir, raw) {
   const file = courseFile(labsDir);
-  const { file: _drop, ...data } = raw;
+  const { file: _drop, error: _error, ...data } = raw;
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${formatJson(data)}\n`);
   return file;
