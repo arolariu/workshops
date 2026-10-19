@@ -1,0 +1,14 @@
+{
+  "names": ["alpha", "beta", "gamma"],
+  "results": [
+    { "id": "r1", "request": "one", "expect": "alpha", "got": ["alpha"] },
+    { "id": "r2", "request": "two", "expect": "alpha", "got": ["beta"] },
+    { "id": "r3", "request": "three", "expect": "alpha", "got": [] },
+    { "id": "r4", "request": "four", "expect": "beta", "got": ["beta"] },
+    { "id": "r5", "request": "five", "expect": "beta", "got": ["beta", "gamma"] },
+    { "id": "r6", "request": "six", "expect": "gamma", "got": ["gamma"] },
+    { "id": "r7", "request": "seven", "expect": null, "got": [] },
+    { "id": "r8", "request": "eight", "expect": null, "got": ["alpha"] },
+    { "id": "r9", "request": "nine", "expect": "gamma", "got": ["gamma"] }
+  ]
+}

@@ -1,6 +1,6 @@
 # Lab 02 · 🧩 Skills — Know-how on demand
 
-> **Harness layer:** Capabilities · **Maturity:** L2 Equipped · 🟢 together · 🟡 🔴 homework
+> **Harness layer:** Capabilities · **Maturity:** L2 Equipped · 🟢 together · 🟡 🔴 🟣 💎 homework
 >
 > **Threads:** 📏 Measurement · 🪙 Tokens and budget
 
@@ -49,15 +49,27 @@ argument-hint: "[version]"
 - `description`: **what it does + when to use it**. This is the only part the agent sees before choosing a skill.
 - `argument-hint` (optional): shown when you type `/name`.
 - `disable-model-invocation: true` (optional): the agent never picks it on its own; only you call it.
+- `allowed-tools` (optional): tools the skill may use **without asking you**. Pre-approving `shell` means every
+  command the skill asks for runs unprompted: only do it for a skill you have read and trust.
 
 ## Where skills live
 | Location | Who gets it |
 |---|---|
 | `.github/skills/<name>/` (also `.agents/skills/`, `.claude/skills/`) | everyone working on this project |
 | `~/.copilot/skills/<name>/` | you, in every project |
+| a folder you register with `copilot skill add <folder>` | you, in every project (it's saved in your settings) |
 | inside a plugin | everyone who installs the plugin (Lab 06) |
 
 Inspect with `/skills` in a session or `copilot skill list` in the terminal.
+
+Good to know:
+- A folder that isn't one of these (like `vendor/`) is never loaded, which makes it a safe place for skills under review.
+- `copilot skill add --project path/to/SKILL.md` copies **only** `SKILL.md` into `.github/skills/<name>/`: a skill with
+  scripts must be copied as a whole folder.
+- Personal and plugin skills compete for the same requests as the project's. In `--output-format json`, every skill
+  that loads shows up as a `skill` tool call, whoever installed it.
+- Copilot can also pick skills with embeddings (`--dynamic-retrieval skills=on|off`). That flag **saves** the choice
+  in your settings, so don't put it in scripts.
 
 ## 🏛️ In the enterprise
 - **At scale:** a shared skill library (in a plugin or an APM package, Lab 06) gives every team the same recipes:
@@ -71,13 +83,17 @@ Inspect with `/skills` in a session or `copilot skill list` in the terminal.
 | Level | Mission | You practise |
 |---|---|---|
 | 🟢 easy | **Teach a recipe once**: a skill that creates modules the team's way | SKILL.md, descriptions, templates |
-| 🟡 medium | **A command you call by name**: `/explain-error` for stack traces | `argument-hint`, output formats |
-| 🔴 hard | **A skill with a script**: release notes from git history, never invented | bundled scripts, deterministic tools |
+| 🟡 medium | **A command you call by name**: `/explain-error` with an output contract and a justified invocation choice, on three crashes | `argument-hint`, output contracts |
+| 🔴 hard | **A skill with a script**: release notes from git history (scopes, breaking changes, reverts), tested against mutants, proven by a golden | bundled scripts, deterministic tools |
+| 🟣 hard+ | **Vet before you trust**: `vet-skill.mjs` reviews three third-party skills (one malicious), then `VERDICT.md` and an install | skills as a supply chain |
+| 💎 hard++ | **A library that routes**: six overlapping skills, canaries, a routing eval with precision and recall, and a split with `references/` | routing, progressive disclosure |
 
 ## Common pitfalls
 - **A vague description** ("helps with modules"): the agent won't know when to use it. Say *when*.
+- **A description that claims everything**: it competes with every other skill and wins nothing. One job per skill.
 - **Doing in prose what a script does better**: parsing git logs is a job for code, not for the model.
 - **Absolute paths**: reference bundled files relative to the project, e.g. `.github/skills/<name>/templates/...`.
+- **Installing before reading**: a downloaded skill runs code and gives orders with your permissions. Vet it first.
 
 ## Learn more
 - [Creating agent skills for Copilot CLI](https://docs.github.com/copilot/how-tos/copilot-cli/customize-copilot/create-skills)

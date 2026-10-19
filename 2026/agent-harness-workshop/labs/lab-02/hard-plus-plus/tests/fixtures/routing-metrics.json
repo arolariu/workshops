@@ -1,0 +1,11 @@
+{
+  "_how": "Worked out by hand. alpha: expected r1 r2 r3, routed r1 r8, right r1. beta: expected r4 r5, routed r2 r4 r5, right r4 r5. gamma: expected r6 r9, routed r5 r6 r9, right r6 r9. Misses: got is not exactly [expect] (or [] for no skill).",
+  "perSkill": [
+    { "skill": "alpha", "expected": 3, "routed": 2, "tp": 1, "fp": 1, "fn": 2, "precision": 0.5, "recall": 0.3333 },
+    { "skill": "beta", "expected": 2, "routed": 3, "tp": 2, "fp": 1, "fn": 0, "precision": 0.6667, "recall": 1 },
+    { "skill": "gamma", "expected": 2, "routed": 3, "tp": 2, "fp": 1, "fn": 0, "precision": 0.6667, "recall": 1 }
+  ],
+  "macro": { "precision": 0.6111, "recall": 0.7778 },
+  "none": { "total": 2, "left": 1 },
+  "misses": ["r2", "r3", "r5", "r8"]
+}
