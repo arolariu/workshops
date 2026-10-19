@@ -135,7 +135,9 @@ Agent checks run on a throwaway copy in `labs/.runs/`, with explicit `--allow-to
 and a credit cap, so they never touch your `src/`. Only one suite runs at a time, and cancelling stops it before the
 next check starts. Every run keeps its own folder (what the agent wrote and said) so you can look back with **H** or
 `history`; those folders stay on your computer and can contain generated or sensitive output, so they are never
-uploaded or attached to exports.
+uploaded or attached to exports. The 🧭 timeline shows every tool call of the run, including skills and plugins from
+your **personal** Copilot setup (a `skill` step you installed yourself, for example): learners without them won't see
+those steps.
 
 Without the app:
 ```bash
@@ -208,7 +210,7 @@ times; each level's own 🕐 says how long it takes today. Suggested paths (pres
 | Path | Levels |
 |---|---|
 | **One level deeper** (`deeper`) | every 🟡 medium level, Lab 00 to Lab 07 |
-| **Security** (`security`) | 🟡 🔴 Lab 05 (guardrails); the attack levels join it as they ship |
+| **Security** (`security`) | 🟡 🔴 🟣 Lab 05 (guardrails, then policy as code); the other attack levels join it as they ship |
 | **Platform** (`platform`) | 🔴 Lab 02 (a skill with a script) and 🔴 Lab 06 (ship it as a plugin) |
 | **Internals** (`internals`) | 🔴 Lab 00 (the agent in a script); the build-the-loop levels join it as they ship |
 

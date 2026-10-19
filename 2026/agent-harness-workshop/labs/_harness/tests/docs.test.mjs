@@ -47,3 +47,9 @@ test('the readme and the Lab 00 guide point to the replay and the X-ray, on the 
   assert.match(hood, /press \*\*u\*\* on the home screen \(or run `node labs\/start\.mjs replay`\)/);
   assert.match(hood, /\*\*tab\*\*/);
 });
+
+test('the agent-check section says personal plugins and skills can show up in the timeline', () => {
+  const checks = section('🧪 Two kinds of checks');
+  assert.match(checks, /🧭 timeline/);
+  assert.match(checks, /\*\*personal\*\* Copilot setup/);
+});

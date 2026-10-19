@@ -7,6 +7,8 @@ import { loadCatalog } from '../catalog.mjs';
 import { courseOrder, predecessorOf } from '../chain.mjs';
 import { quizProblems } from '../quiz.mjs';
 import { LAYERS, scanHarness, scorecard, maturity } from '../scorecard.mjs';
+import { DIFFICULTIES } from '../catalog.mjs';
+import { loadAgentChecks } from '../agent.mjs';
 
 const labsDir = path.resolve(import.meta.dirname, '..', '..');
 const catalog = loadCatalog(labsDir);
@@ -96,5 +98,41 @@ test('every reference solution passes the scorecard rules of the layers earlier 
     const bad = rules.filter((r) => earlier.has(r.layer) && r.ok === false);
     assert.deepEqual(bad.map((r) => `${r.id}: ${r.message}`), [], `${ex.key}: the inherited checks fail on the reference`);
     if (expected[ex.labId]) assert.equal(maturity(rules, scan).level, expected[ex.labId], `${ex.key} maturity`);
+  }
+});
+
+// Labs whose homework ladder is complete (Phase 4). Their levels above easy follow the ticket format of spec §5.3.
+const GROWN = new Set(['lab-05']);
+const tierRange = (d) => {
+  const [lo, hi = lo] = d.time.match(/[\d.]+/g).map(Number);
+  const unit = /\bh\b/.test(d.time) ? 60 : 1;
+  return [lo * unit, hi * unit];
+};
+test('every homework level of a grown lab follows the ticket format, fits its tier, and keeps agent checks cheap', async () => {
+  for (const lab of catalog.filter((l) => GROWN.has(l.id))) {
+    assert.deepEqual(lab.levels.map((e) => e.level), DIFFICULTIES.map((d) => d.id), `${lab.id}: all five tiers`);
+    for (const ex of lab.levels.filter((e) => e.level !== 'easy')) {
+      const d = DIFFICULTIES.find((x) => x.id === ex.level);
+      const [lo, hi] = tierRange(d);
+      const [a, b] = ex.minutesRange ?? [];
+      assert.ok(a >= lo && b <= hi, `${ex.key}: 🕐 ${ex.time} is outside ${d.time}`);
+      assert.match(ex.meta, /🏠 homework/, ex.key);
+      assert.equal(ex.buildsOn, predecessorOf(order, ex.key).key, `${ex.key}: 🧱 builds on`);
+      assert.ok(ex.mission.split('\n').length >= 3, `${ex.key}: 🎯 a story of 3-6 lines`);
+      assert.ok((ex.requirements.match(/^\d+\.\s/gm) ?? []).length >= 2, `${ex.key}: 📋 numbered requirements`);
+      assert.ok(ex.milestones.length >= 2 && ex.milestones.length <= 6, `${ex.key}: 2-6 milestones`);
+      for (const m of ex.milestones) {
+        const n = ex.hints.filter((h) => h.milestone === m.id).length;
+        assert.ok(n >= 1 && n <= 3, `${ex.key}: ${m.id} has ${n} hints (1-3)`);
+      }
+      assert.ok(ex.takeaway && !ex.takeaway.includes('\n'), `${ex.key}: 🧠 a one-line takeaway`);
+      assert.ok(ex.quiz, `${ex.key}: ❓ Check yourself`);
+      assert.ok(ex.further, `${ex.key}: 🚀 Going further`);
+      if (ex.hasAgent) {
+        const specs = await loadAgentChecks(ex.dir);
+        const prompts = specs.reduce((n, s) => n + (s.command ? (s.prompts ?? 1) : 1), 0);
+        assert.ok(prompts <= 2, `${ex.key}: agent checks use at most 2 prompts (${prompts})`);
+      }
+    }
   }
 });

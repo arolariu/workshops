@@ -14,7 +14,7 @@ export class SelectionError extends Error {}
 export const PATHS = [
   { id: 'all', label: 'All exercises', description: 'Every exercise: the live track (every easy level) first, then the homework tiers.', keys: null },
   { id: 'deeper', label: 'One level deeper', description: 'Every 🟡 medium level: shape each layer for a real need.', keys: ['lab-00/medium', 'lab-01/medium', 'lab-02/medium', 'lab-03/medium', 'lab-04/medium', 'lab-05/medium', 'lab-06/medium', 'lab-07/medium'] },
-  { id: 'security', label: 'Security', description: 'Guardrails that hold, and how agents get attacked.', keys: ['lab-05/medium', 'lab-05/hard'] },
+  { id: 'security', label: 'Security', description: 'Guardrails that hold, and how agents get attacked.', keys: ['lab-05/medium', 'lab-05/hard', 'lab-05/hard-plus'] },
   { id: 'platform', label: 'Platform', description: 'Skills and plugins a whole team installs.', keys: ['lab-02/hard', 'lab-06/hard'] },
   { id: 'internals', label: 'Internals', description: 'The agent loop from the inside: scripted runs, JSON events and permission flags.', keys: ['lab-00/hard'] },
 ];
