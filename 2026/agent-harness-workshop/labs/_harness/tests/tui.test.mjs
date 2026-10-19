@@ -515,3 +515,15 @@ test('after the first pass: the takeaway and the question; 1-3 answer; the first
   assert.equal(t.catalog[t.state.lab].levels[t.state.level].level, 'medium', 'digits still switch tiers on the mission screen');
   t.quit();
 });
+test('the lab screen shows the layer map with this lab marked and its threads', async () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.writeFileSync(path.join(labsDir, 'lab-01/readme.md'), '# Lab 01 · 📜 Instructions — What the agent knows\n\n> **Harness layer:** Context · **Maturity:** L1 Instructed\n>\n> **Threads:** 🔴 The red build\n\n## 💡 In one minute\nRules.\n');
+  const t = await app({ labsDir, open: 'lab-01/easy', size: { columns: 80, rows: 60 } });
+  press(t.input, 'b');
+  const s = text(t.output);
+  assert.match(s, /YOUR HARNESS · this lab reaches L1 Instructed/);
+  assert.match(s, /📜 Instructions\s+01 {2}◀ this lab/);
+  assert.match(s, /🧵 Threads: 🔴 The red build/);
+  assert.ok(s.indexOf('YOUR HARNESS') < s.indexOf('CHOOSE YOUR LEVEL'));
+  t.quit();
+});

@@ -25,6 +25,7 @@ import { revealNextHint, revealedHints, nextFixName, groupChecks } from './miles
 import { bringLines } from './screens/bring.mjs';
 import { changesLines } from './screens/changes.mjs';
 import { answerQuiz, quizLines, takeawayLines, quizUnlocked } from './screens/learn.mjs';
+import { layerMapLines } from './screens/layers.mjs';
 import { KEYMAP, MENU_KEYS, binding } from './keys.mjs';
 import { checkGroupLines, milestoneListLines, hintDots } from './screens/milestones.mjs';
 
@@ -457,6 +458,7 @@ export async function startTui({
     L.push('');
     for (const l of renderMarkdown(lab.intro, W())) L.push(l);
     L.push('');
+    if (catalog.some((l) => l.layer)) L.push(...layerMapLines(catalog, lab, { W: W(), fmt }), '');
     L.push(`  ${white(bold('CHOOSE YOUR LEVEL'))}`);
     L.push('');
     const pulse = ANIM && Math.floor(now() / 600) % 2 === 0;

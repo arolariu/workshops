@@ -138,6 +138,7 @@ export function runLinear({
     say(`Open: ${label(lab, ex)}.`);
     if (ex.meta) say(`  ${stripAnsi(ex.meta)}`);
     say(`${ex.theme}. ${ex.mode === 'together' ? 'Done together in the workshop.' : 'Optional homework.'}`);
+    if (lab.layer) say(`Harness layer: ${lab.layer} (Lab ${lab.num}).${lab.maturity ? ` Maturity: ${lab.maturity.level} ${lab.maturity.name}.` : ''}${lab.threads.length ? ` Threads: ${lab.threads.join(', ')}.` : ''}`);
     const pred = predecessorOf(order, ex.key);
     say(pred ? `Starts from: Lab ${pred.lab.num}, ${pred.ex.label} (${entry.brought ? `the reference, plus your work brought in on ${String(entry.brought.at).slice(0, 10)}` : 'reference'}).` : 'Starts from: the plain app, the start of the chain.');
     say(`Status: checks ${statusWord(view.checks(ex))}; agent check ${statusWord(view.agent(ex))}.`);
