@@ -568,3 +568,11 @@ test('the help screen ends with the glossary', async () => {
   assert.match(text(t.output), /GLOSSARY[\s\S]*Hook: your code that runs before a tool call\. \(Lab 05\)/);
   t.quit();
 });
+test('the help screen labels tier times as targets, like the readme', async () => {
+  const t = await app({ size: { columns: 120, rows: 200 } });
+  press(t.input, '?');
+  const s = text(t.output);
+  assert.match(s, /Medium · Shape it · target 30–45 min/);
+  assert.match(s, /a level's own 🕐 says how long it takes\s+today/);
+  t.quit();
+});
