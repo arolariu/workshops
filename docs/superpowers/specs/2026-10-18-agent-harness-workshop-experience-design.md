@@ -245,11 +245,12 @@ mission screen, or run `node labs/start.mjs bring lab-05 hard+ [--dry-run]`.
 With 45 levels, nobody can copy inherited files by hand.
 
 - **`labs/_course/course.json`** is written by hand. It holds:
-  - the list of tiers and the harness paths;
+  - the list of tiers, the capstone lab, the harness paths, and the runtime files that are never part of a seed (such as `mcp/state.json`);
   - per-level exceptions:
     - `local`: files that don't pass to the next level, such as `SOLUTION-NOTES.md`;
     - `keep`: starter files that `bring` never overwrites;
-    - `overrides`: inherited files that this level's starter changes on purpose, such as a guard turned back into a stub.
+    - `overrides`: inherited files that this level's starter changes on purpose, such as a guard turned back into a stub;
+    - `drop`: inherited files this level must not have, such as a file its own mission asks you to create.
 - **`node labs/start.mjs sync-seeds`** walks the chain in order. For each level, it:
   1. copies the predecessor's `sol/` (minus `local`) into this level's `src/` (minus `overrides`);
   2. reapplies this level's *solution delta*, meaning the files where its `sol/` differs from its `src/`,
@@ -661,7 +662,7 @@ SHA-256 hash, split into inherited files and starter files.
 **Catalog (`catalog.mjs`).**
 
 - For each lab: `layer`, `maturity`, `threads`, `underTheHood` and `enterprise`.
-- For each level: `tier`, `theme`, `minutes: [min, max]`, `where: 'together' | 'homework'`, `buildsOn`,
+- For each level: `tier`, `theme`, `minutes: [min, max]`, `mode: 'together' | 'homework'`, `buildsOn`,
   `takeaway`, `quiz: { question, options[], answer, why } | null`, `milestones: [{ id, title }]`, and the
   hints, each with an optional `milestone`.
 
