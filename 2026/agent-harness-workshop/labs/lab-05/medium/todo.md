@@ -127,3 +127,6 @@ attempt a good one instead of a workaround.
 - Add a `--json` flag to the report, and a "denials per rule" count by grouping on the reason.
 - Your guard reads `JSON.stringify(args)`: what would a tool with a base64-encoded argument get past it? (Lab 05 hard+
   normalises calls before deciding.)
+- In a real run, the agent listed the folder with `Get-ChildItem | Where-Object { $_ -ne '.env' }`, carefully *avoiding*
+  `.env`, and your text rule denied it anyway. Is that the right call? What would a rule that looks at paths instead of
+  text allow, and what would it miss?
