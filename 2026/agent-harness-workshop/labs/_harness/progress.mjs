@@ -151,9 +151,16 @@ export function progressStore(labsDir, { fileName = '.progress.json' } = {}) {
   /** Run `fn` while holding a cross-process lock, so reload-merge-save never interleaves with another app or command. */
   function locked(fn) {
     let held = false;
+    let transient = 0;
     const until = Date.now() + LOCK_WAIT_MS;
     for (;;) {
       try { fs.writeFileSync(lockFile, `${process.pid}\n`, { flag: 'wx' }); held = true; break; } catch (e) {
+        // Windows reports a lock file that another process is deleting as EPERM/EACCES/EBUSY for a few milliseconds:
+        // retry briefly, like for EEXIST. A folder that is really read-only keeps failing and gives up quickly.
+        if (['EPERM', 'EACCES', 'EBUSY'].includes(e.code) && ++transient <= 40 && Date.now() <= until) {
+          pause(5 + Math.floor(Math.random() * 20));
+          continue;
+        }
         if (e.code !== 'EEXIST') break; // no lock possible here (read-only folder…): save() reports the real problem
         try {
           const st = fs.statSync(lockFile);
