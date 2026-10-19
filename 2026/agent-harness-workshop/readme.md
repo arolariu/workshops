@@ -44,17 +44,29 @@ A green-on-dark terminal app that guides you through every level. On a level you
 | **h** | reveal the next hint (on long levels: a hint for the milestone you are on) |
 | **a** | 🤖 agent check: the real Copilot on a copy of your folder (uses AI credits; shows the credit cap, or says when it cannot be known; **c** cancels) |
 | **i** | 🧳 bring your own harness forward: the harness files you changed in earlier levels that pass (your files are backed up first) |
-| **m** | more: watch, guide, compare, bring, bookmark, start over, run history, doctor, export |
+| **v** | 📝 view your changes since your latest commit, file by file (needs git) |
+| **l** | 🧠 learn: the level's takeaway and a check-yourself question, once your checks pass (answer with **1**–**4**) |
+| **m** | more: watch, guide, compare, bring, your changes, bookmark, start over, run history, doctor, export |
 | **w** | watch: the checks run again every time you save a file |
-| **g** | read the lab guide: concepts, examples, links |
+| **g** / **r** | read the lab guide: concepts, under the hood, in the enterprise, examples, links |
 | **s** | compare your work with the reference solution (a real diff; the reference is one possible answer) |
 | **x** | start over: restore the original starter, a checkpoint or a backup, or discard changes since your latest commit |
 | **f** / **H** | bookmark the level / agent run history |
 | **o** / **y** | open the folder (VS Code or your file manager) / copy its `cd` command |
-| **1 2 3 4 5** | switch tier: easy, medium, hard, hard+, hard++ · **n** next up (on an easy level: the next lab's easy level) · **?** all keys |
+| **1 2 3 4 5** | switch tier: easy, medium, hard, hard+, hard++ |
+| **n** | next up: on an easy level, the next lab's easy level (finished or not, so you keep up with the room); elsewhere your next unfinished level |
+| **?** | every key, and the glossary |
 
 Everywhere: **/** searches every exercise (and filters by level, status, time and bookmarks), **p** picks a learning
-path, **d** opens the setup doctor and **e** exports a learning summary.
+path, **d** opens the setup doctor, **e** exports a learning summary and **?** shows every key and the glossary.
+
+On a level, ⏱ shows how long you have been on it against the suggested time (time away from the keyboard counts at
+most 45 minutes at a stretch); past one and a half times the suggestion, the app offers a hint once. After your checks
+pass, the level's 🧠 takeaway and a ❓ check-yourself question appear: the point is learning, not grading, so a wrong
+answer shows the explanation too. The lab screen shows a 🗺️ map of the harness with that lab's layer marked, and the
+home screen shows 💳 how many agent-check runs you started this month and the most their credit caps allowed (never an
+estimate: `/usage` in Copilot has the real number). The words the workshop uses are in [labs/glossary.md](labs/glossary.md)
+(or `node labs/start.mjs glossary`).
 
 Statuses are honest: ✅ means the checks passed **on your current files**. 🕓 means you (or the checks) changed
 something since, 🚧 means a tool is missing (not your fault), ⏩ means required checks were skipped, ⚠️ means a run
@@ -128,7 +140,8 @@ node labs/start.mjs checkpoint lab-01 easy NAME   # save a checkpoint
 node labs/start.mjs recovery lab-01 easy          # starter, checkpoints and backups
 node labs/start.mjs restore lab-01 easy --starter --yes        # back to the original starter (or --checkpoint=NAME)
 node labs/start.mjs reset lab-01 easy --yes       # discard changes since your latest commit (git)
-node labs/start.mjs history lab-01 easy           # agent check runs kept for this level
+node labs/start.mjs history lab-01 easy           # agent check runs kept for this level, and this month's 💳 line
+node labs/start.mjs glossary hook                 # the words the workshop uses (all of them without a word)
 node labs/start.mjs bookmark lab-01 easy          # bookmark a level
 node labs/start.mjs export --format=json          # a learning summary in labs/.reports/ (stays local)
 node labs/start.mjs doctor                        # what is installed, what is missing (read-only)
@@ -152,26 +165,48 @@ Difficulty names: `easy`, `medium`, `hard` (or `e`, `m`, `h`), and `hard+` / `ha
 | [07](labs/lab-07/readme.md) | 🚀 **Agentic workflows**<br>Agents in CI | Make it safe | Two kinds of change | A reviewer in CI |
 
 ## 🕐 The workshop (110 minutes)
+Only the 🟢 easy levels are done live, together. Everything above easy is optional homework.
+
 | Time | What |
 |---|---|
-| 0–10 | Welcome, why a harness, and setup together: clone, trust the folder, `node labs/start.mjs` |
-| 10–50 | Eight labs, 5 minutes each: the idea in one slide, then the 🟢 easy level together |
-| 50–110 | Lab time: pick 🟡 medium and 🔴 hard levels; the facilitator walks around and helps |
+| 0–10 | Welcome and why a harness matters, then clone the repo, trust the folder and start the app |
+| 10–98 | Labs 00–07, 11 minutes each: the idea (2), under the hood (2), the easy level together (6), and the takeaway with its check-yourself question (1) |
+| 98–110 | Lab 08 kickoff (when it ships): bring a finished harness together and look at its maturity. Then walk through the homework map: tiers, times and paths |
 
-Suggested paths for lab time (about an hour each; press **p** in the app or use `--path=` to follow one, and **n**
-always goes to its next unfinished exercise):
-- **Foundations**: 🟡 01 → 🟡 02 → 🟡 03 → 🟡 05
-- **Security**: 🟡 05 → 🔴 05 → 🟡 03 (free checks, few credits)
-- **Builder**: 🟡 04 → 🔴 04 → 🟡 06
-- **Automation**: 🔴 00 → 🟡 07 → 🔴 07
-- **Done early?** Harness your own project with what you built, and finish the other levels at home.
+Anyone who falls behind presses **n**: on an easy level it moves to the next lab's easy level, which starts from the
+reference result, so they keep up with the room.
+
+## 🏠 Homework
+Every level above easy is optional and goes deeper. Doing all of them takes many hours, so the homework is a menu, not
+a mandate: every level starts from its own reference starting point, so you can skip levels or start anywhere.
+
+| Tier | Theme | Time | Where |
+|---|---|---|---|
+| 🟢 easy | **Use it.** Apply the layer once, with guidance. | 8–10 min | 👥 together, live |
+| 🟡 medium | **Shape it.** Design the layer well for a real need. | 30–45 min | 🏠 homework |
+| 🔴 hard | **Prove it.** Automate it, test it and measure it. | 1–1.5 h | 🏠 homework |
+| 🟣 hard-plus (hard+) | **Break it.** Attacks, failure modes and edge cases. | 1.5–2 h | 🏠 homework |
+| 💎 hard-plus-plus (hard++) | **Scale it.** Make it work at org scale, or build the mechanism yourself. | 2–3 h | 🏠 homework |
+
+The 🟣 and 💎 tiers appear in a lab as soon as they are written. Suggested paths (press **p** in the app, or use
+`--path=`; **n** always goes to the path's next unfinished level, and `node labs/start.mjs path` shows each path's time):
+
+| Path | Levels |
+|---|---|
+| **One level deeper** (`deeper`) | every 🟡 medium level, Lab 00 to Lab 07 |
+| **Security** (`security`) | 🟡 🔴 Lab 05 (guardrails); the attack levels join it as they ship |
+| **Platform** (`platform`) | 🔴 Lab 02 (a skill with a script) and 🔴 Lab 06 (ship it as a plugin) |
+| **Internals** (`internals`) | 🔴 Lab 00 (the agent in a script); the build-the-loop levels join it as they ship |
+
+**Done early?** Harness your own project with what you built.
 
 ## 💳 AI credits
 Every prompt costs AI credits, and student plans have a monthly budget. The free checks never spend any.
 In Copilot, use `!command` for things that don't need AI, keep prompts focused, check `/usage`, and cap
 scripted runs with `--max-ai-credits` (minimum 30). Before an agent check runs, the app shows the cap passed to
 Copilot, or says plainly that the bound is unknown when a check runs a script that may call Copilot several times.
-It never guesses what you actually spent: `/usage` and your GitHub billing page know that.
+It never guesses what you actually spent: `/usage` and your GitHub billing page know that. The home screen's 💳 line
+counts the agent-check runs you started this month and adds up their caps, as an upper bound.
 
 ## 🧑‍🏫 For facilitators
 ```bash
@@ -180,11 +215,13 @@ node labs/start.mjs verify --chain --bring   # …and the seeded chain is in syn
 node labs/start.mjs sync-seeds --dry-run     # after changing a level: what the chain would update in every later level
 node labs/start.mjs test lab-03 easy --sol --agent   # try a reference solution with the real agent
 node labs/start.mjs open lab-03 easy --no-intro      # jump straight to a level during the live demo
-node labs/start.mjs --path=builder --no-intro        # start everyone on a learning path
+node labs/start.mjs --path=deeper --no-intro         # start everyone on a learning path
 node labs/start.mjs starters        # is labs/_harness/starters.json (the published starters) up to date?
 start.cmd --full --setup-only       # prepare a classroom machine (see SETUP.md for shared offline caches)
 ```
-Each lab's `readme.md` is the script for its 5-minute slot: the concept, a demo, the easy level. After changing a
+Each lab's `readme.md` is the script for its 11-minute slot: *In one minute* is the idea, *🔬 Under the hood* shows
+what the layer does to the model's context or loop, then the 🟢 easy level together, and its takeaway and question
+to close. *🏛️ In the enterprise* is there for the questions. After changing a
 level's `src/` or `sol/`, run `node labs/start.mjs sync-seeds`: it carries the change down the chain (every later
 level that starts from it), refuses to overwrite anything it can't merge safely, backs up what it replaces, and
 updates `labs/_harness/starters.json`. Commit everything together, so "restore the starter" keeps giving students
