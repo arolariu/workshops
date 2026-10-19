@@ -11,6 +11,7 @@ import { progressStore, captureEvidence } from '../progress.mjs';
 import { inline, stripAnsi, renderMarkdown, setAscii, width } from '../ui.mjs';
 import { loadCourse } from '../course.mjs';
 import { computeChain, writeChain } from '../chain.mjs';
+import { KEYMAP } from '../keys.mjs';
 import { fixtureWorkshop, waitFor, chainCourse } from './helpers.mjs';
 
 function terminal({ columns = 80, rows = 24 } = {}) {
@@ -438,4 +439,20 @@ test('NO_COLOR and --no-anim: plain frames that fit 80 columns', () => {
   for (const f of out.frames) for (const line of stripAnsi(f).split('\r\n')) assert.ok(width(line) <= 80, line);
   const all = out.frames.map((f) => stripAnsi(f)).join('\n');
   for (const want of [/Workshop 0\/8/, /CHOOSE YOUR LEVEL/, /Starts from/, /HOW THE LABS WORK/, /BRING YOUR WORK FORWARD/]) assert.match(all, want);
+});
+
+test('every key in the table reaches a handler, and the more menu lists exactly its keys', async () => {
+  const t = await app({ open: 'lab-00/easy' });
+  assert.deepEqual(t.unhandled(), [], 'bindings without a handler');
+  t.quit();
+});
+
+test('the help screen lists every level key from the key table', async () => {
+  const t = await app({ open: 'lab-00/easy', size: { columns: 120, rows: 200 } });
+  press(t.input, '?');
+  const s = text(t.output);
+  for (const b of KEYMAP.exercise.filter((x) => !['scroll', 'back', 'tier', 'search', 'doctor', 'export'].includes(x.id))) {
+    assert.match(s, new RegExp(`${b.keys.map((k) => k.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')).join(' / ')}\\s+│ ${b.does.slice(0, 20).replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}`), b.id);
+  }
+  t.quit();
 });

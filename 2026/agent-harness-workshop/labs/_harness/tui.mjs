@@ -23,6 +23,7 @@ import { loadCourse } from './course.mjs';
 import { bringPlan, applyBring } from './bring.mjs';
 import { revealNextHint, revealedHints, nextFixName, groupChecks } from './milestones.mjs';
 import { bringLines } from './screens/bring.mjs';
+import { KEYMAP, MENU_KEYS, binding } from './keys.mjs';
 import { checkGroupLines, milestoneListLines, hintDots } from './screens/milestones.mjs';
 
 const CONFETTI = ['🎉', '✨', '🎊', '⭐', '🥳', '💚', '🚀'];
@@ -1058,6 +1059,12 @@ export async function startTui({
     return { lines: L, footer: footer([['m', 'Markdown'], ['j', 'JSON'], ['b', 'back'], ['q', 'quit']]) };
   }
 
+  /** The help screen's level keys, straight from keys.mjs (the "Everywhere" keys and navigation are listed apart). */
+  const levelKeyRows = () => KEYMAP.exercise
+    .filter((b) => !['scroll', 'back', 'tier', 'search', 'doctor', 'export'].includes(b.id))
+    .map((b) => `| ${b.keys.map((k) => `**${k}**`).join(' / ')} | ${b.does.replace(/\|/g, '\\|')} |`)
+    .join('\n');
+
   function helpScreen() {
     const L = [''];
     L.push(...header(`❓ ${bold(bright('HOW THE LABS WORK'))}`, dim(`${BRAND.title} · lab companion`)));
@@ -1075,21 +1082,8 @@ Every level starts from the reference result of the level before it (down the ea
 ## Keys on a level
 | Key | What it does |
 |---|---|
-| **t** | run the free checks; select one and press ⏎ for the requirement, the files and the full output |
-| **c** | start Copilot in this level's folder; type /exit to come back (your checks run automatically) |
-| **h** | reveal the next hint (for the milestone you are on) |
-| **a** | 🤖 agent check: the real Copilot on a copy of your folder (uses AI credits; c cancels) |
-| **i** | 🧳 bring your own harness forward from the earlier levels you passed (your files are backed up first) |
-| **m** | more: watch, guide, compare, bookmark, start over, history, doctor, export |
-| **w** | watch: run the checks again every time you save a file |
-| **g** | read the lab guide: concepts, examples, links |
-| **s** | compare your work with the reference solution |
-| **x** | start over: restore the starter, a checkpoint or a backup, or discard changes since your latest commit |
-| **f** | bookmark this exercise |
-| **H** | agent run history |
-| **o** / **y** | open the folder / copy its cd command |
+${levelKeyRows()}
 | **${DIFFICULTIES.map((d) => d.key).join(' ')}** | switch tier: ${DIFFICULTIES.map((d) => `${d.key} ${d.label.toLowerCase()}`).join(', ')} |
-| **n** | next up: on an easy level, the next lab's easy level; elsewhere your next unfinished level |
 
 ## Everywhere
 | Key | What it does |
@@ -1554,30 +1548,182 @@ Every level starts from the reference result of the level before it (down the ea
   }
 
   // ---------- keyboard ----------
-  function exerciseAction(name, str) {
-    if (str === 'H') { openHistory(); return true; }
-    switch (name) {
-      case 't': runFreeChecks(); return true;
-      case 'w': toggleWatch(); return true;
-      case 'a': openAgent(); return true;
-      case 'h': revealHint(); return true;
-      case 's': go('confirmSolution'); return true;
-      case 'c': launchCopilot(); return true;
-      case 'o': openFolderAction(); return true;
-      case 'y': copyCd(); return true;
-      case 'g': case 'r': go('readme'); return true;
-      case 'x': openRecovery(); return true;
-      case 'f': toggleBookmark(); return true;
-      case 'm': S.menu.idx = 0; go('menu'); return true;
-      case 'd': go('doctor'); runDoctor(); return true;
-      case 'e': S.exported = null; go('export'); return true;
-      case 'n': jumpNext(); return true;
-      case 'i': openBring(); return true;
-      default: return false;
-    }
-  }
-  const isBack = (name) => ['b', 'escape', 'left', 'backspace'].includes(name);
+  // keys.mjs says what every key means on every screen; HANDLERS says what each meaning does.
   const printable = (str, k) => typeof str === 'string' && str.length === 1 && str >= ' ' && !k.ctrl && !k.meta;
+  const page = () => Math.max(1, rows() - 4);
+  function scrollKey(name) {
+    if (name === 'up' || name === 'k') S.scroll--;
+    else if (name === 'down' || name === 'j') S.scroll++;
+    else if (name === 'pageup') S.scroll -= page();
+    else if (name === 'pagedown' || name === 'space') S.scroll += page();
+    else if (name === 'home') S.scroll = 0;
+    else if (name === 'end') S.scroll = 99999;
+    else return;
+    render();
+  }
+  const select = (obj, key, delta, count) => { obj[key] = Math.min(Math.max(0, count - 1), Math.max(0, obj[key] + delta)); S.follow = true; render(); };
+  const toBrowse = () => { S.browse.editing = true; S.browse.idx = 0; go('browse'); };
+  const toDoctor = () => { go('doctor'); runDoctor(); };
+  const toExport = () => { S.exported = null; go('export'); };
+  const scroll = ({ name }) => scrollKey(name);
+  const leaveAgent = () => { S.agent = null; S.agentToken++; go('exercise'); };
+  const runMenuItem = (item) => {
+    if (!item) return;
+    S.screen = 'exercise';
+    const b = binding('exercise', item.key, item.key);
+    if (b) HANDLERS.exercise[b.id]({ name: item.key, str: item.key });
+  };
+  const moveLab = (delta) => { S.lab = (S.lab + catalog.length + delta) % catalog.length; moveSel(); render(); };
+  const moveLevel = (delta) => { const n = labObj().levels.length; S.level = (S.level + n + delta) % n; moveSel(); render(); };
+  const moveMenu = (delta) => { S.menu.idx = (S.menu.idx + MENU.length + delta) % MENU.length; S.follow = true; render(); };
+  const cycle = (list, value) => list[(list.indexOf(value) + 1) % list.length];
+  const browseFilter = (key, list) => { S.browse[key] = cycle(list, S.browse[key]); S.browse.idx = 0; render(); };
+  const moveCheck = (delta) => { const n = Math.max(1, S.run?.results.length ?? 0); S.detail.idx = (S.detail.idx + n + delta) % n; S.scroll = 0; render(); };
+  const moveFile = (delta) => { const Sol = S.sol; if (!Sol.files.length) return; Sol.idx = (Sol.idx + Sol.files.length + delta) % Sol.files.length; S.scroll = 0; render(); };
+
+  const HANDLERS = {
+    home: {
+      prev: () => moveLab(-1),
+      nextItem: () => moveLab(1),
+      jump: ({ str }) => { const i = catalog.findIndex((l) => Number(l.num) === Number(str)); if (i >= 0) { S.lab = i; moveSel(); } render(); },
+      open: () => { if (labObj().id !== store.get('_ui').lab) S.level = 0; go('lab'); },
+      next: () => jumpNext(),
+      search: toBrowse,
+      path: () => cyclePath(),
+      doctor: toDoctor,
+      export: toExport,
+      page: scroll,
+    },
+    lab: {
+      prev: () => moveLevel(-1),
+      nextItem: () => moveLevel(1),
+      tier: ({ str }) => { if (!pickTier(str)) render(); },
+      open: () => go('exercise'),
+      guide: () => go('readme'),
+      search: () => { S.browse.editing = true; go('browse'); },
+      back: () => go('home'),
+      page: scroll,
+    },
+    browse: {
+      prev: () => select(S.browse, 'idx', -1, browseSelection().matches.length),
+      nextItem: () => select(S.browse, 'idx', 1, browseSelection().matches.length),
+      open: () => { const m = browseSelection().matches[S.browse.idx]; if (m) openExercise(m.lab, m.ex); else render(); },
+      search: () => { S.browse.editing = true; render(); },
+      level: () => browseFilter('level', LEVEL_FILTERS),
+      status: () => browseFilter('status', STATUS_STEPS),
+      time: () => browseFilter('maxMinutes', MINUTE_STEPS),
+      path: () => cyclePath(),
+      bookmarked: () => { S.browse.bookmarked = !S.browse.bookmarked; S.browse.idx = 0; render(); },
+      next: () => jumpNext(),
+      back: () => goBack('home'),
+      page: scroll,
+    },
+    scroll: { scroll, back: () => goBack(S.screen === 'readme' ? 'lab' : 'home') },
+    doctor: { scroll, again: () => runDoctor(), back: () => goBack('home') },
+    export: { markdown: () => doExport('md'), json: () => doExport('json'), back: () => goBack('home') },
+    exercise: {
+      scroll,
+      checks: () => runFreeChecks(),
+      copilot: () => launchCopilot(),
+      hint: () => revealHint(),
+      agent: () => openAgent(),
+      bring: () => openBring(),
+      more: () => { S.menu.idx = 0; go('menu'); },
+      watch: () => toggleWatch(),
+      guide: () => go('readme'),
+      solution: () => go('confirmSolution'),
+      recovery: () => openRecovery(),
+      bookmark: () => toggleBookmark(),
+      history: () => openHistory(),
+      open: () => openFolderAction(),
+      copy: () => copyCd(),
+      doctor: toDoctor,
+      export: toExport,
+      next: () => jumpNext(),
+      tier: ({ str }) => pickTier(str),
+      search: () => { S.browse.editing = true; go('browse'); },
+      back: () => { stopWatch(); go('lab'); },
+    },
+    menu: {
+      prev: () => moveMenu(-1),
+      nextItem: () => moveMenu(1),
+      doIt: () => runMenuItem(MENU[S.menu.idx]),
+      item: ({ name, str }) => runMenuItem(MENU.find((m) => m.key === str) ?? MENU.find((m) => m.key === name)),
+      back: () => go('exercise'),
+    },
+    checks: {
+      prev: () => select(S.detail, 'idx', -1, S.run.results.length),
+      nextItem: () => select(S.detail, 'idx', 1, S.run.results.length),
+      page: scroll,
+      details: () => { if (S.run.results[S.detail.idx]) go('checkDetail'); },
+      again: () => runFreeChecks(),
+      output: () => go('output'),
+      watch: () => toggleWatch(),
+      copilot: () => launchCopilot(),
+      agent: () => openAgent(),
+      next: () => jumpNext(),
+      doctor: toDoctor,
+      back: () => go('exercise'),
+    },
+    checksRunning: { cancel: () => cancelChecks() },
+    checkDetail: {
+      scroll,
+      nextCheck: () => moveCheck(1),
+      prevCheck: () => moveCheck(-1),
+      hint: () => revealHint(),
+      output: () => go('output'),
+      copilot: () => launchCopilot(),
+      doctor: toDoctor,
+      back: () => go('checks'),
+    },
+    agent: { scroll, again: () => openAgent(), history: () => openHistory(), back: () => go('exercise') },
+    agentConfirm: { yes: () => admitAgent(), no: leaveAgent },
+    agentLoading: { no: leaveAgent },
+    agentRunning: { cancel: () => cancelAgent() },
+    history: {
+      prev: () => select(S.history, 'idx', -1, S.history.runs.length),
+      nextItem: () => select(S.history, 'idx', 1, S.history.runs.length),
+      page: scroll,
+      toggle: () => { S.history.open = !S.history.open; render(); },
+      back: () => goBack('exercise'),
+    },
+    confirmSolution: { show: () => openSolution(), hint: () => revealHint(), back: () => go('exercise') },
+    bring: {
+      scroll,
+      yes: () => { if (S.bring?.plan.items.length && !S.bring.result) doBring(); },
+      back: () => go('exercise'),
+    },
+    solution: {
+      nextFile: () => moveFile(1),
+      prevFile: () => moveFile(-1),
+      toggle: () => { S.sol.full = !S.sol.full; S.scroll = 0; render(); },
+      scroll,
+      back: () => go('exercise'),
+    },
+    recovery: {
+      prev: () => select(S.recovery, 'idx', -1, recoveryEntries().length),
+      nextItem: () => select(S.recovery, 'idx', 1, recoveryEntries().length),
+      page: scroll,
+      restore: () => { const e = recoveryEntries()[S.recovery.idx]; if (e?.restorable) { S.recovery.confirm = e; render(); } },
+      save: () => { S.recovery.naming = { text: '' }; render(); },
+      back: () => go('exercise'),
+    },
+    // Only an explicit "y" restores; every other key keeps the work as it is.
+    recoveryConfirm: { yes: () => doRestore(S.recovery.confirm), keep: () => { S.recovery.confirm = null; toast('👍 Nothing changed.'); } },
+    recoveryResult: { back: () => { S.recovery.result = null; go('exercise'); } },
+  };
+  /** Bindings in keys.mjs without a handler here ([] when complete). */
+  const unhandled = () => Object.entries(KEYMAP).flatMap(([state, list]) => list.filter((b) => typeof HANDLERS[state]?.[b.id] !== 'function').map((b) => `${state}.${b.id}`));
+  if (MENU.map((m) => m.key).join() !== MENU_KEYS.join()) throw new Error(`The "more" menu (${MENU.map((m) => m.key).join(' ')}) must list keys.mjs MENU_KEYS (${MENU_KEYS.join(' ')}).`);
+
+  /** The key state of the current screen: the name of its row in keys.mjs. */
+  function keyState() {
+    if (S.screen === 'checks') return S.run?.running ? 'checksRunning' : 'checks';
+    if (S.screen === 'agent') return { confirm: 'agentConfirm', loading: 'agentLoading', running: 'agentRunning' }[S.agent?.phase] ?? 'agent';
+    if (S.screen === 'recovery') return S.recovery.result ? 'recoveryResult' : S.recovery.confirm ? 'recoveryConfirm' : 'recovery';
+    if (['readme', 'help', 'output'].includes(S.screen)) return 'scroll';
+    return S.screen;
+  }
 
   function onKey(str, k = {}) {
     if (S.suspended || quitting) return;
@@ -1608,199 +1754,13 @@ Every level starts from the reference result of the level before it (down the ea
       else if (printable(str, k) && Nm.text.length < 64) { Nm.text += str; render(); }
       return;
     }
-    const page = Math.max(1, rows() - 4);
-    const scrollKeys = () => {
-      if (name === 'up' || name === 'k') { S.scroll--; render(); return true; }
-      if (name === 'down' || name === 'j') { S.scroll++; render(); return true; }
-      if (name === 'pageup') { S.scroll -= page; render(); return true; }
-      if (name === 'pagedown' || name === 'space') { S.scroll += page; render(); return true; }
-      if (name === 'home') { S.scroll = 0; render(); return true; }
-      if (name === 'end') { S.scroll = 99999; render(); return true; }
-      return false;
-    };
-    const pageKeys = () => {
-      if (name === 'pageup') { S.scroll -= page; render(); return true; }
-      if (name === 'pagedown' || name === 'space') { S.scroll += page; render(); return true; }
-      return false;
-    };
     const busy = Boolean(S.agentRun) || (S.run?.running && S.screen === 'checks');
     if (name === 'q' && !busy) { quit(0); return; }
     if (str === '?' && !busy && S.screen !== 'help') { go('help'); return; }
-    switch (S.screen) {
-      case 'home': {
-        if (name === 'up' || name === 'k') { S.lab = (S.lab + catalog.length - 1) % catalog.length; moveSel(); }
-        else if (name === 'down' || name === 'j') { S.lab = (S.lab + 1) % catalog.length; moveSel(); }
-        else if (/^[0-9]$/.test(str ?? '') && catalog.findIndex((l) => Number(l.num) === Number(str)) >= 0) { S.lab = catalog.findIndex((l) => Number(l.num) === Number(str)); moveSel(); }
-        else if (name === 'return' || name === 'right' || name === 'l') { if (labObj().id !== store.get('_ui').lab) S.level = 0; go('lab'); return; }
-        else if (name === 'n') { jumpNext(); return; }
-        else if (str === '/') { S.browse.editing = true; S.browse.idx = 0; go('browse'); return; }
-        else if (name === 'p') { cyclePath(); return; }
-        else if (name === 'd') { go('doctor'); runDoctor(); return; }
-        else if (name === 'e') { S.exported = null; go('export'); return; }
-        else if (pageKeys()) return;
-        render();
-        return;
-      }
-      case 'lab': {
-        const lab = labObj();
-        if (name === 'up' || name === 'k') { S.level = (S.level + lab.levels.length - 1) % lab.levels.length; moveSel(); }
-        else if (name === 'down' || name === 'j') { S.level = (S.level + 1) % lab.levels.length; moveSel(); }
-        else if (/^[1-9]$/.test(str ?? '') && pickTier(str)) return;
-        else if (name === 'return' || name === 'right' || name === 'l') { go('exercise'); return; }
-        else if (name === 'r' || name === 'g') { go('readme'); return; }
-        else if (str === '/') { S.browse.editing = true; go('browse'); return; }
-        else if (isBack(name)) { go('home'); return; }
-        else if (pageKeys()) return;
-        render();
-        return;
-      }
-      case 'browse': {
-        const B = S.browse;
-        const { matches } = browseSelection();
-        if (name === 'up' || name === 'k') { B.idx = Math.max(0, B.idx - 1); S.follow = true; }
-        else if (name === 'down' || name === 'j') { B.idx = Math.min(Math.max(0, matches.length - 1), B.idx + 1); S.follow = true; }
-        else if (name === 'return' && matches[B.idx]) { openExercise(matches[B.idx].lab, matches[B.idx].ex); return; }
-        else if (str === '/') B.editing = true;
-        else if (name === 'v') { B.level = LEVEL_FILTERS[(LEVEL_FILTERS.indexOf(B.level) + 1) % LEVEL_FILTERS.length]; B.idx = 0; }
-        else if (name === 'f') { B.status = STATUS_STEPS[(STATUS_STEPS.indexOf(B.status) + 1) % STATUS_STEPS.length]; B.idx = 0; }
-        else if (name === 'm') { B.maxMinutes = MINUTE_STEPS[(MINUTE_STEPS.indexOf(B.maxMinutes) + 1) % MINUTE_STEPS.length]; B.idx = 0; }
-        else if (name === 'p') { cyclePath(); return; }
-        else if (str === '*') { B.bookmarked = !B.bookmarked; B.idx = 0; }
-        else if (name === 'n') { jumpNext(); return; }
-        else if (isBack(name)) { goBack('home'); return; }
-        else if (pageKeys()) return;
-        render();
-        return;
-      }
-      case 'readme':
-      case 'help':
-      case 'output': {
-        if (scrollKeys()) return;
-        if ([...['b', 'escape', 'left', 'backspace'], 'return'].includes(name)) goBack(S.screen === 'readme' ? 'lab' : 'home');
-        return;
-      }
-      case 'doctor': {
-        if (scrollKeys()) return;
-        if (name === 'r') runDoctor();
-        else if (isBack(name) || name === 'return') goBack('home');
-        return;
-      }
-      case 'export': {
-        if (name === 'm') doExport('md');
-        else if (name === 'j') doExport('json');
-        else if (isBack(name) || name === 'return') goBack('home');
-        return;
-      }
-      case 'exercise': {
-        if (scrollKeys()) return;
-        if (exerciseAction(name, str)) return;
-        if (/^[1-9]$/.test(str ?? '')) pickTier(str);
-        else if (str === '/') { S.browse.editing = true; go('browse'); }
-        else if (isBack(name)) { stopWatch(); go('lab'); }
-        return;
-      }
-      case 'menu': {
-        if (name === 'up' || name === 'k') { S.menu.idx = (S.menu.idx + MENU.length - 1) % MENU.length; S.follow = true; render(); return; }
-        if (name === 'down' || name === 'j') { S.menu.idx = (S.menu.idx + 1) % MENU.length; S.follow = true; render(); return; }
-        if (isBack(name)) { go('exercise'); return; }
-        const item = name === 'return' ? MENU[S.menu.idx] : MENU.find((m) => m.key === str);
-        if (item) { S.screen = 'exercise'; exerciseAction(item.key === 'H' ? 'h' : item.key, item.key); }
-        return;
-      }
-      case 'checks': {
-        const R = S.run;
-        if (R?.running) { if (name === 'c' || name === 'escape') cancelChecks(); return; }
-        if (name === 'up' || name === 'k') { S.detail.idx = Math.max(0, S.detail.idx - 1); S.follow = true; render(); return; }
-        if (name === 'down' || name === 'j') { S.detail.idx = Math.min(R.results.length - 1, S.detail.idx + 1); S.follow = true; render(); return; }
-        if (pageKeys()) return;
-        if (name === 'return' && R.results[S.detail.idx]) go('checkDetail');
-        else if (name === 't') runFreeChecks();
-        else if (name === 'o') go('output');
-        else if (name === 'w') toggleWatch();
-        else if (name === 'c') launchCopilot();
-        else if (name === 'a') openAgent();
-        else if (name === 'n') jumpNext();
-        else if (name === 'd') { go('doctor'); runDoctor(); }
-        else if (isBack(name)) go('exercise');
-        return;
-      }
-      case 'checkDetail': {
-        if (scrollKeys()) return;
-        const n = S.run?.results.length ?? 0;
-        if (name === 'right' || name === 'tab') { S.detail.idx = (S.detail.idx + 1) % Math.max(1, n); S.scroll = 0; render(); }
-        else if (name === 'left') { S.detail.idx = (S.detail.idx + Math.max(1, n) - 1) % Math.max(1, n); S.scroll = 0; render(); }
-        else if (name === 'h') revealHint();
-        else if (name === 'o') go('output');
-        else if (name === 'c') launchCopilot();
-        else if (name === 'd') { go('doctor'); runDoctor(); }
-        else if (['b', 'escape', 'backspace'].includes(name)) go('checks');
-        return;
-      }
-      case 'agent': {
-        const A = S.agent;
-        if (A.phase === 'running') { if (name === 'c' || name === 'escape') cancelAgent(); return; }
-        if (A.phase === 'confirm') {
-          if (name === 'y') admitAgent();
-          else if (['n', 'b', 'escape', 'left', 'backspace'].includes(name)) { S.agent = null; S.agentToken++; go('exercise'); }
-          return;
-        }
-        if (A.phase === 'loading') { if (isBack(name) || name === 'n') { S.agent = null; S.agentToken++; go('exercise'); } return; }
-        if (scrollKeys()) return;
-        if (name === 'a') openAgent();
-        else if (str === 'H') openHistory();
-        else if (isBack(name) || name === 'return') go('exercise');
-        return;
-      }
-      case 'history': {
-        const Hs = S.history;
-        if (name === 'up' || name === 'k') { Hs.idx = Math.max(0, Hs.idx - 1); S.follow = true; render(); return; }
-        if (name === 'down' || name === 'j') { Hs.idx = Math.min(Math.max(0, Hs.runs.length - 1), Hs.idx + 1); S.follow = true; render(); return; }
-        if (pageKeys()) return;
-        if (name === 'return') { Hs.open = !Hs.open; render(); }
-        else if (isBack(name)) goBack('exercise');
-        return;
-      }
-      case 'confirmSolution': {
-        if (name === 'y') openSolution();
-        else if (name === 'h') revealHint();
-        else go('exercise');
-        return;
-      }
-      case 'bring': {
-        if (scrollKeys()) return;
-        if (name === 'y' && str === 'y' && S.bring?.plan.items.length && !S.bring.result) doBring();
-        else if (isBack(name) || name === 'n' || name === 'return') go('exercise');
-        return;
-      }
-      case 'solution': {
-        const Sol = S.sol;
-        if (Sol.files.length && (name === 'right' || name === 'tab')) { Sol.idx = (Sol.idx + 1) % Sol.files.length; S.scroll = 0; render(); return; }
-        if (Sol.files.length && name === 'left') { Sol.idx = (Sol.idx + Sol.files.length - 1) % Sol.files.length; S.scroll = 0; render(); return; }
-        if (name === 'r') { Sol.full = !Sol.full; S.scroll = 0; render(); return; }
-        if (scrollKeys()) return;
-        if (['b', 'escape', 'backspace'].includes(name)) go('exercise');
-        return;
-      }
-      case 'recovery': {
-        const Rc = S.recovery;
-        if (Rc.result) { if (isBack(name) || name === 'return') { Rc.result = null; go('exercise'); } return; }
-        if (Rc.confirm) {
-          // Only an explicit "y" restores; every other key keeps the work as it is.
-          if (name === 'y' && str === 'y') doRestore(Rc.confirm);
-          else { Rc.confirm = null; toast('👍 Nothing changed.'); }
-          return;
-        }
-        const entries = recoveryEntries();
-        if (name === 'up' || name === 'k') { Rc.idx = Math.max(0, Rc.idx - 1); S.follow = true; render(); return; }
-        if (name === 'down' || name === 'j') { Rc.idx = Math.min(entries.length - 1, Rc.idx + 1); S.follow = true; render(); return; }
-        if (pageKeys()) return;
-        if (name === 'return' && entries[Rc.idx]?.restorable) { Rc.confirm = entries[Rc.idx]; render(); }
-        else if (name === 's') { Rc.naming = { text: '' }; render(); }
-        else if (isBack(name)) go('exercise');
-        return;
-      }
-      default:
-    }
+    const state = keyState();
+    const b = binding(state, name, str);
+    if (b) HANDLERS[state][b.id]({ name, str });
+    else if (['home', 'lab', 'browse'].includes(state)) render();
   }
 
   // ---------- start ----------
@@ -1832,5 +1792,5 @@ Every level starts from the reference result of the level before it (down the ea
     .then(() => deps.inspectEnvironment({ rootDir }))
     .then((report) => { S.env = report; }, () => { S.env = { ready: false, coreReady: true, items: [] }; })
     .then(() => { if (!quitting) render(); });
-  return { state: S, closed, render, quit };
+  return { state: S, closed, render, quit, unhandled };
 }
