@@ -14,6 +14,7 @@ test('one bullet per term, with the lab that teaches it', () => {
   assert.deepEqual(glossaryLines(g, { query: 'hook' }), ['Hook: your code that runs before a tool call. (Lab 05)']);
   assert.deepEqual(glossaryLines(g, { query: 'around' }), ['Harness: everything around the model.']);
   assert.equal(glossaryLines(g).length, 2);
+  assert.deepEqual(glossaryLines(parseGlossary('- **Hook**: a `preToolUse` hook can **block** it.')), ['Hook: a preToolUse hook can block it.'], 'plain text');
   assert.deepEqual(loadGlossary(tmpdir()), [], 'no file, no glossary');
 });
 

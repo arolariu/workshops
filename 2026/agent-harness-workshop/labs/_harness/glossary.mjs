@@ -20,9 +20,10 @@ export function loadGlossary(labsDir) {
   try { return parseGlossary(fs.readFileSync(glossaryFile(labsDir), 'utf8')); } catch { return []; }
 }
 
-/** "Term: text (Lab NN)" per term, optionally only those whose term or text contains `query`. */
+/** "Term: text (Lab NN)" per term, as plain text, optionally only those whose term or text contains `query`. */
 export function glossaryLines(entries, { query = '' } = {}) {
   const q = String(query).trim().toLowerCase();
+  const plain = (s) => s.replace(/`([^`]+)`/g, '$1').replace(/\*\*([^*]+)\*\*/g, '$1');
   return entries.filter((e) => !q || `${e.term} ${e.text}`.toLowerCase().includes(q))
-    .map((e) => `${e.term}: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(4)})` : ''}`);
+    .map((e) => plain(`${e.term}: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(4)})` : ''}`));
 }

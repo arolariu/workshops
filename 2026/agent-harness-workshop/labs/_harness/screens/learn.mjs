@@ -28,7 +28,7 @@ export function quizLines(ex, { W, fmt, recorded = null, chosen = null, prompt =
   q.options.forEach((o, i) => {
     const n = i + 1;
     const mark = chosen === null ? '  ' : n === q.answer ? '✅' : n === chosen ? '❌' : '  ';
-    L.push(...para(`${n}. ${o}`, W, `   ${mark} `, '        '));
+    L.push(...para(`${n}. ${o}`, W, `   ${mark} `, ' '.repeat(9)));
   });
   const explain = () => L.push(...para(fmt.dim(q.why), W, '      '));
   if (chosen !== null) {

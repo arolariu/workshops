@@ -426,7 +426,7 @@ test('NO_COLOR and --no-anim: plain frames that fit 80 columns', () => {
       deps: { inspectEnvironment: async () => ({ ready: true, coreReady: true, items: [] }) } });
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     await wait(50);
-    for (const [s, name] of [['', 'return'], ['1', '1'], ['?', '?'], ['b', 'b'], ['i', 'i'], ['b', 'b'], ['b', 'b'], ['b', 'b']]) { input.emit('keypress', s, { name }); await wait(20); }
+    for (const [s, name] of [['', 'return'], ['1', '1'], ['v', 'v'], ['b', 'b'], ['l', 'l'], ['?', '?'], ['b', 'b'], ['i', 'i'], ['b', 'b'], ['b', 'b'], ['b', 'b']]) { input.emit('keypress', s, { name }); await wait(20); }
     const frames = writes.filter((w) => w.startsWith('\\x1b[H'));
     process.stdout.write(JSON.stringify({ screens: frames.length, colour: writes.some((w) => /\\x1b\\[(38|48);5;/.test(w)), frames }));
     app.quit();
@@ -438,7 +438,7 @@ test('NO_COLOR and --no-anim: plain frames that fit 80 columns', () => {
   assert.equal(out.colour, false, 'NO_COLOR means no colour codes');
   for (const f of out.frames) for (const line of stripAnsi(f).split('\r\n')) assert.ok(width(line) <= 80, line);
   const all = out.frames.map((f) => stripAnsi(f)).join('\n');
-  for (const want of [/Workshop 0\/8/, /CHOOSE YOUR LEVEL/, /Starts from/, /HOW THE LABS WORK/, /BRING YOUR WORK FORWARD/]) assert.match(all, want);
+  for (const want of [/Workshop 0\/8/, /💳 No agent-check runs/, /CHOOSE YOUR LEVEL/, /Starts from/, /⏱ under a minute here/, /YOUR CHANGES SINCE YOUR LATEST COMMIT/, /unlock when your checks pass/, /HOW THE LABS WORK/, /BRING YOUR WORK FORWARD/]) assert.match(all, want);
 });
 
 test('every key in the table reaches a handler, and the more menu lists exactly its keys', async () => {

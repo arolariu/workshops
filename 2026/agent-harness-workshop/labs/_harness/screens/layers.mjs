@@ -1,16 +1,16 @@
 // The lab screen's map of the harness: the runtime at the root, one branch per layer (one per lab), this lab marked,
 // and the threads (stories that run through several labs) it continues. The capstone is every layer together.
-import { clip, pad } from '../ui.mjs';
+import { clip, pad, width } from '../ui.mjs';
 
 export function layerMapLines(catalog, lab, { W, fmt }) {
   const root = catalog.find((l) => !l.capstone);
   if (!root) return [];
   const layers = catalog.filter((l) => l !== root && !l.capstone);
-  const nameW = Math.max(10, Math.min(30, W - 26));
+  const nameW = Math.max(10, Math.min(36, W - 24));
   const row = (prefix, l) => {
     const here = l === lab;
     const name = `${prefix}${l.emoji} ${l.title}`;
-    const cell = clip(name, nameW);
+    const cell = width(name) > nameW ? `${clip(name, nameW - 1)}…` : name;
     const text = `${here ? fmt.bold(fmt.white(pad(cell, nameW))) : fmt.dim(pad(cell, nameW))} ${fmt.dim(l.num)}${here ? `  ${fmt.bright('◀ this lab')}` : ''}`;
     return `   ${text}`;
   };

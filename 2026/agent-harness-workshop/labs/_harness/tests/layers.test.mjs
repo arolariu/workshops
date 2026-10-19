@@ -35,3 +35,9 @@ test('it fits 40 columns and leaves out what it does not know', () => {
   for (const l of lines) assert.ok(width(stripAnsi(l)) <= 42, l);
   assert.doesNotMatch(stripAnsi(lines.join('\n')), /Threads|reaches/);
 });
+
+test('a long name is cut with an ellipsis, never run into the lab number', () => {
+  const long = [...catalog.slice(0, 2), lab('06', '📦', 'Plugins, extensions & APM, and a very long tail')];
+  const s = stripAnsi(layerMapLines(long, long[1], { W: 60, fmt }).join('\n'));
+  assert.match(s, /└─ 📦 Plugins, extensions[^\n]*… 06/);
+});
