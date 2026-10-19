@@ -78,3 +78,11 @@ test('typos in course.json are problems', () => {
   ]);
   assert.deepEqual(courseProblems({ levels: { 'lab-01/easy': { local: ['A.md'] } } }, ['lab-01/easy']), []);
 });
+
+test('a level may explain itself with _why; other unknown names are still mistakes', () => {
+  const course = { levels: { 'lab-00/medium': { overrides: ['grades.js'], _why: 'starts with the bug fixed' }, 'lab-00/hard': { _why: 3, overide: [] } } };
+  assert.deepEqual(courseProblems(course, ['lab-00/medium', 'lab-00/hard']), [
+    'course.json: "_why" for lab-00/hard must be a sentence (a string).',
+    'course.json: "overide" for lab-00/hard is not a rule (use local, keep, overrides or drop).',
+  ]);
+});

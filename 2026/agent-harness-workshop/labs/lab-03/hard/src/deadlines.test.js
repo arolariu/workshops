@@ -19,3 +19,8 @@ test('upcoming keeps items due within the window, soonest first', () => {
 test('upcoming skips items that are already overdue', () => {
   assert.deepEqual(upcoming(list, '2026-10-21', 7).map((a) => a.id), []);
 });
+
+test('upcoming leaves out assignments that are already done', () => {
+  const withDone = [...list, { id: 'A4', title: 'Quiz', due: '2026-10-16', done: true }];
+  assert.deepEqual(upcoming(withDone, '2026-10-15', 7).map((a) => a.id), ['A2', 'A1']);
+});

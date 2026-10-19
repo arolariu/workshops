@@ -1,5 +1,5 @@
 {
-  "_about": "Maintainers: the rules of the seeded chain (node labs/start.mjs sync-seeds). harnessPaths: what `bring` carries forward from earlier levels. Per level: local = files that don't pass to the next level; keep = starter files `bring` never overwrites; overrides = inherited files this level's starter changes on purpose; drop = inherited files this level must not have.",
+  "_about": "Maintainers: the rules of the seeded chain (node labs/start.mjs sync-seeds). harnessPaths: what `bring` carries forward from earlier levels. Per level: local = files that don't pass to the next level; keep = starter files `bring` never overwrites; overrides = inherited files this level's starter changes on purpose; drop = inherited files this level must not have; _why = a sentence explaining the level's rules.",
   "capstone": "lab-08",
   "harnessPaths": [
     "AGENTS.md",
@@ -14,17 +14,20 @@
     "HARNESS.md"
   ],
   "levels": {
-    "lab-00/hard": { "overrides": ["grades.js", "grades.test.js"] },
-    "lab-00/medium": { "overrides": ["grades.js"] },
-    "lab-01/hard": { "overrides": ["grades.test.js"] },
+    "lab-00/medium": {
+      "overrides": ["grades.js"],
+      "_why": "Think first plans a new feature, so it starts with the red build already fixed (hasPassed checks the exam grade too)."
+    },
     "lab-01/easy": { "local": ["FINDINGS.md", "team-notes.md"] },
-    "lab-02/easy": { "overrides": ["README.md"] },
-    "lab-02/medium": { "overrides": ["README.md", "index.js"] },
-    "lab-03/easy": { "overrides": ["README.md", "index.js"] },
-    "lab-03/hard": { "overrides": ["deadlines.test.js"] },
-    "lab-05/easy": { "overrides": [".gitignore", "AGENTS.md"] },
-    "lab-06/easy": { "local": ["SOLUTION-NOTES.md"], "overrides": ["AGENTS.md"] },
-    "lab-07/hard": { "overrides": [".github/workflows/issue-triage.md"] },
+    "lab-02/easy": {
+      "overrides": ["README.md"],
+      "_why": "The README gets a Modules list: the new-module recipe adds a line to it."
+    },
+    "lab-05/easy": {
+      "overrides": ["AGENTS.md"],
+      "_why": "AGENTS.md gains the boundary \"Never change the guardrails in .github/hooks/\", which this lab introduces."
+    },
+    "lab-06/easy": { "local": ["SOLUTION-NOTES.md"] },
     "lab-07/medium": { "local": ["NOTES.md"] }
   }
 }

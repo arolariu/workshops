@@ -20,6 +20,7 @@ Plain Node.js 22+, ES modules, zero dependencies.
 - Never add dependencies (no `npm install <package>`).
 - Never change a test just to make it pass - fix the code instead.
 - Never read or print `.env` files.
+- Never change the guardrails in `.github/hooks/`.
 
 ## Definition of done
 - `npm test` is green.

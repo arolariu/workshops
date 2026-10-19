@@ -26,13 +26,14 @@ export function loadCourse(labsDir, { strict = true } = {}) {
   return { ...raw, file, error, capstone: raw.capstone ?? 'lab-08', harnessPaths: raw.harnessPaths ?? DEFAULT_HARNESS_PATHS, levels: raw.levels ?? {} };
 }
 
-/** Mistakes in course.json that would otherwise be ignored silently. `keys`: every level key ("lab-05/hard-plus"). */
+/** Mistakes in course.json that would otherwise be ignored silently. `keys`: every level key ("lab-05/hard-plus"). A level's `_why` explains its rules. */
 export function courseProblems(course, keys) {
   if (course.error) return [course.error];
   const out = [];
   for (const [key, rules] of Object.entries(course.levels ?? {})) {
     if (!keys.includes(key)) { out.push(`course.json lists "${key}", which is not a level (levels look like lab-05/hard-plus).`); continue; }
     for (const [name, value] of Object.entries(rules ?? {})) {
+      if (name === '_why') { if (typeof value !== 'string') out.push(`course.json: "_why" for ${key} must be a sentence (a string).`); continue; }
       if (!RULES.includes(name)) out.push(`course.json: "${name}" for ${key} is not a rule (use ${RULES.slice(0, -1).join(', ')} or ${RULES.at(-1)}).`);
       else if (!Array.isArray(value)) out.push(`course.json: "${name}" for ${key} must be a list of paths.`);
     }
