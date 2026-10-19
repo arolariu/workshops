@@ -46,6 +46,7 @@ const COMMANDS = {
   path: { args: [0, 1], opts: { ascii: 'flag' } },
   glossary: { args: [0, 1], opts: { ascii: 'flag' } },
   xray: { args: [2, 2], opts: { sol: 'flag', json: 'flag', ascii: 'flag' } },
+  replay: { args: [0, 1], opts: { 'no-anim': 'flag', ascii: 'flag', linear: 'flag' } },
   export: { args: [0, 0], opts: { format: 'value', name: 'value', dir: 'value', path: 'value', ascii: 'flag' } },
   doctor: { args: [0, 0], opts: { full: 'flag', lab: 'value', json: 'flag', ascii: 'flag' } },
   verify: { args: [0, 1], opts: { chain: 'flag', bring: 'flag', verbose: 'flag', ascii: 'flag' } },
@@ -122,6 +123,7 @@ function usage() {
   row('node labs/start.mjs history lab-01 easy', 'agent check runs kept for this exercise');
   row('node labs/start.mjs glossary [word]', 'the words this workshop uses, in one line each');
   row('node labs/start.mjs xray lab-04 easy [--sol]', 'X-ray a harness: what it adds to every turn, its maturity');
+  row('node labs/start.mjs replay [harnessed|FILE.jsonl]', 'step through an agent run, turn by turn (no AI, no credits)');
   say();
   say(`  ${white('Start over (your current files are always backed up first)')}`);
   row('node labs/start.mjs recovery lab-01 easy', 'the starter, your checkpoints and backups');
@@ -351,6 +353,24 @@ if (cmd === '' || cmd === 'open') {
   say();
   for (const p of L.PATHS) say(`  ${p.id === current ? bright('❯') : ' '} ${p.id === current ? bold(bright(p.label)) : white(p.label)} ${dim(`(${p.id}${L.pathTime(catalog, p.id) ? `, ${L.pathTime(catalog, p.id)}` : ''}) — ${p.description}`)}`);
   say();
+} else if (cmd === 'replay') {
+  const { loadReplay, otherReplay } = await import('./_harness/replay.mjs');
+  const rec = loadReplay(pos[1] ?? 'bare');
+  if (rec.error) fail(rec.error);
+  if (interactive && !opt.linear) {
+    const { startTui } = await import('./_harness/tui.mjs');
+    const app = await startTui({ labsDir, replay: rec, intro: false, anim: !opt['no-anim'], ascii: Boolean(opt.ascii) });
+    await app.closed;
+  } else {
+    const { replayLines } = await import('./_harness/screens/replay.mjs');
+    const W = Math.min(96, (process.stdout.columns || 100) - 4);
+    say();
+    say(`  🎬 ${bold(bright(`THE AGENT LOOP · ${rec.title}`))} ${dim(`· ${rec.turns.length} turns. Each turn: the model reads its context, writes a tool call, the harness decides, the result joins the history.`)}`);
+    rec.turns.forEach((_, i) => { say(); for (const l of replayLines(rec, i, { W, fmt: { green, bright, dim, white, yellow, bold, cyan } })) say(l); });
+    say();
+    say(`  ${dim(rec.scripted ? 'Now compare it with the other run:' : 'Compare it with a scripted run:')} ${cyan(`node labs/start.mjs replay ${rec.scripted ? otherReplay(rec.id) : 'bare'}`)}`);
+    say();
+  }
 } else if (cmd === 'glossary') {
   const { loadGlossary, glossaryLines } = await import('./_harness/glossary.mjs');
   const lines = glossaryLines(loadGlossary(labsDir), { query: pos[1] ?? '' });

@@ -31,6 +31,8 @@ import { creditSummary, meterLine } from './credits.mjs';
 import { loadGlossary } from './glossary.mjs';
 import { xrayReport, inheritedChecks } from './xray.mjs';
 import { xrayLines, inheritedLines } from './screens/xray.mjs';
+import { loadReplay, otherReplay } from './replay.mjs';
+import { replayLines } from './screens/replay.mjs';
 import { KEYMAP, MENU_KEYS, binding } from './keys.mjs';
 import { checkGroupLines, milestoneListLines, hintDots } from './screens/milestones.mjs';
 
@@ -67,7 +69,7 @@ const color256 = (n, s) => (noColor ? s : `${ESC}38;5;${n}m${s}`);
  * Input/output and the side-effecting helpers can be replaced (tests drive the app with fake streams).
  */
 export async function startTui({
-  labsDir, open = null, intro = true, anim = true, ascii = false, path: startPath = null,
+  labsDir, open = null, replay = null, intro = true, anim = true, ascii = false, path: startPath = null,
   input = process.stdin, output = process.stdout, deps: overrides = {}, onExit = (code) => process.exit(code),
 }) {
   const deps = {
@@ -127,6 +129,7 @@ export async function startTui({
     diff: null,
     quizChoice: null,
     xray: null,
+    replay: null,
     tip: Math.floor(Math.random() * TIPS.length),
   };
 
@@ -142,6 +145,11 @@ export async function startTui({
     const oi = catalog.findIndex((l) => l.id === open.lab.id);
     const oj = oi >= 0 ? catalog[oi].levels.findIndex((e) => e.level === open.ex.level) : -1;
     if (oi >= 0 && oj >= 0) { S.lab = oi; S.level = oj; S.screen = 'exercise'; }
+  }
+  if (replay) {
+    // A recording (loaded and checked by the caller) to start on; b goes to the home screen.
+    S.replay = { rec: replay, idx: 0 };
+    S.screen = 'replay';
   }
 
   // ---------- terminal plumbing ----------
@@ -332,6 +340,22 @@ export async function startTui({
       .catch((e) => { if (token === xrayToken && S.xray) { S.xray.error = `The X-ray could not look at this folder: ${e.message}`; render(); } });
   }
 
+  // ---------- the agent-loop replay (replay.mjs) ----------
+  function openReplay(which) {
+    const rec = loadReplay(which);
+    if (rec.error) { toast(`⚠️  ${yellow(rec.error)}`); return; }
+    const idx = S.replay ? Math.min(S.replay.idx, rec.turns.length - 1) : 0;
+    S.replay = { rec, idx };
+    S.scroll = 0;
+    if (S.screen !== 'replay') go('replay'); else render();
+  }
+  const stepReplay = (delta) => {
+    const R = S.replay;
+    const next = Math.max(0, Math.min(R.rec.turns.length - 1, R.idx + delta));
+    if (next !== R.idx) { R.idx = next; S.scroll = 0; }
+    render();
+  };
+
   // ---------- the credit meter (credits.mjs): read from the run history on the home screen, never per frame ----------
   function loadCredits() {
     try { S.credits = creditSummary(deps.listRuns(labsDir), { now: new Date(deps.now()) }); } catch { S.credits = null; }
@@ -499,7 +523,7 @@ export async function startTui({
     wrap(`💡 ${inline(tip)}`, W() - 2).forEach((l) => L.push(`  ${dim(l)}`));
     L.push(...para(dim(`✨ ${creditLine()}`), '  ', '     '));
     L.push(...para(dim(`📧 Questions, ideas or feedback? ${BRAND.email}`), '  ', '     '));
-    return { lines: L, focus, footer: footer([['↑↓', 'choose'], ['⏎', 'open'], [`0-${Number(catalog.at(-1)?.num ?? 7)}`, 'jump'], ['n', 'next up'], ['/', 'search'], ['p', 'path'], ['d', 'doctor'], ['e', 'export'], ['?', 'help'], ['q', 'quit']]) };
+    return { lines: L, focus, footer: footer([['↑↓', 'choose'], ['⏎', 'open'], [`0-${Number(catalog.at(-1)?.num ?? 7)}`, 'jump'],     ['n', 'next up'], ['/', 'search'], ['p', 'path'], ['u', 'replay'], ['d', 'doctor'], ['e', 'export'], ['?', 'help'], ['q', 'quit']]) };
   }
 
   function labScreen() {
@@ -1025,6 +1049,17 @@ export async function startTui({
     return { lines: L, footer: footer([['s', X.side === 'sol' ? 'your src/' : 'the reference'], ['r', 'look again'], ['↑↓', 'scroll'], ['b', 'back'], ['q', 'quit']]) };
   }
 
+  function replayScreen() {
+    const { rec, idx } = S.replay;
+    const L = [''];
+    L.push(...header(`🎬 ${bold(bright(`THE AGENT LOOP · ${rec.title}`))}`, dim('Each turn: the model reads its context, writes a tool call, the harness decides, the result joins the history.')));
+    L.push('');
+    L.push(...replayLines(rec, idx, { W: W(), fmt }));
+    L.push('');
+    const other = rec.scripted ? (rec.id === 'bare' ? 'with a harness' : 'without one') : 'the scripted run';
+    return { lines: L, footer: footer([['←→', 'turn'], ['tab', other], ['↑↓', 'scroll'], ['b', 'back'], ['q', 'quit']]) };
+  }
+
   function learnScreen() {
     const lab = labObj();
     const ex = exObj();
@@ -1214,6 +1249,7 @@ ${levelKeyRows()}
 | **p** | choose a learning path: ${PATHS.map((p) => p.label).join(', ')} |
 | **d** | setup doctor: what is installed, what is missing and how to fix it |
 | **e** | export a learning summary (Markdown or JSON, stays on this computer) |
+| **u** | on the home screen: 🎬 replay an agent run turn by turn (**←** **→** step, **tab** switches between without and with a harness) |
 
 ## What the statuses mean
 - ✅ passes on your current files · ❌ not passing yet · 🕓 changed since it was checked (run it again)
@@ -1241,6 +1277,7 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
     checks: checksScreen, checkDetail: checkDetailScreen, output: outputScreen, agent: agentScreen, history: historyScreen,
     solution: solutionScreen, confirmSolution: confirmSolutionScreen, menu: menuScreen, recovery: recoveryScreen,
     doctor: doctorScreen, export: exportScreen, help: helpScreen, bring: bringScreen, changes: changesScreen, learn: learnScreen, xray: xrayScreen,
+    replay: replayScreen,
   };
   function render() {
     if (S.suspended || quitting) return;
@@ -1734,6 +1771,7 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
       path: () => cyclePath(),
       doctor: toDoctor,
       export: toExport,
+      replay: () => openReplay('bare'),
       page: scroll,
     },
     lab: {
@@ -1872,6 +1910,13 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
       again: () => openXray(S.xray?.side ?? 'src'),
       back: () => { S.xray = null; go('exercise'); },
     },
+    replay: {
+      nextTurn: () => stepReplay(1),
+      prevTurn: () => stepReplay(-1),
+      switch: () => openReplay(otherReplay(S.replay.rec.id)),
+      scroll,
+      back: () => { S.replay = null; go('home'); },
+    },
   };
   /** Bindings in keys.mjs without a handler here ([] when complete). */
   const unhandled = () => Object.entries(KEYMAP).flatMap(([state, list]) => list.filter((b) => typeof HANDLERS[state]?.[b.id] !== 'function').map((b) => `${state}.${b.id}`));
@@ -1940,6 +1985,8 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
     S.changes = gitChanges(exObj().src);
     firstVisit();
     tickClock();
+  } else if (S.screen === 'replay') {
+    // Straight into the replay (`node labs/start.mjs replay`): no welcome screen.
   } else if (intro && ANIM && !isAscii()) {
     S.screen = 'splash';
     S.t.splash = longAgo ? now() : now() - 2400;

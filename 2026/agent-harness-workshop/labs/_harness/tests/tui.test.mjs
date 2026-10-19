@@ -12,6 +12,7 @@ import { inline, stripAnsi, renderMarkdown, setAscii, width } from '../ui.mjs';
 import { loadCourse } from '../course.mjs';
 import { computeChain, writeChain } from '../chain.mjs';
 import { KEYMAP } from '../keys.mjs';
+import { loadReplay } from '../replay.mjs';
 import { fixtureWorkshop, waitFor, chainCourse } from './helpers.mjs';
 
 function terminal({ columns = 80, rows = 24 } = {}) {
@@ -41,7 +42,7 @@ async function app(opts = {}) {
   };
   const catalog = loadCatalog(labsDir);
   const open = opts.open ? exerciseByKey(catalog, opts.open) : null;
-  const a = await startTui({ labsDir, input: term.input, output: term.output, anim: false, intro: false, ascii: Boolean(opts.ascii), path: opts.path, open, deps, onExit: (c) => exits.push(c) });
+  const a = await startTui({ labsDir, input: term.input, output: term.output, anim: false, intro: false, ascii: Boolean(opts.ascii), path: opts.path, open, replay: opts.replay ?? null, deps, onExit: (c) => exits.push(c) });
   await waitFor(() => a.state.env);
   return { ...a, ...term, labsDir, catalog, exits };
 }
@@ -643,5 +644,40 @@ test('history details show each case timeline', async () => {
   await waitFor(() => t.state.screen === 'history');
   press(t.input, '\r', 'return');
   assert.match(text(t.output), /🧭 🔧 view a\.js ✓ · 💬 answer/);
+  t.quit();
+});
+test('u on home replays an agent run: → and ← step, tab switches recording on the same turn, b goes home', async () => {
+  const t = await app({ size: { columns: 100, rows: 60 } });
+  press(t.input, 'u');
+  assert.equal(t.state.screen, 'replay');
+  assert.equal(t.state.replay.rec.id, 'bare');
+  assert.match(text(t.output), /TURN 1 OF 6/);
+  assert.match(text(t.output), /CONTEXT WINDOW/);
+  press(t.input, '', 'left');
+  assert.equal(t.state.replay.idx, 0, 'left on the first turn stays put (it is not "back" here)');
+  assert.equal(t.state.screen, 'replay');
+  for (let i = 0; i < 3; i++) press(t.input, '', 'right');
+  assert.match(text(t.output), /TURN 4 OF 6 · No harness/);
+  assert.match(text(t.output), /grades\.test\.js/);
+  press(t.input, '\t', 'tab');
+  assert.equal(t.state.replay.rec.id, 'harnessed');
+  assert.equal(t.state.replay.idx, 3, 'the same turn in the other recording');
+  press(t.input, '', 'left');
+  assert.match(text(t.output), /⛔ denied by a hook/);
+  for (let i = 0; i < 9; i++) press(t.input, '', 'right');
+  assert.equal(t.state.replay.idx, 5, 'stops at the last turn');
+  assert.match(text(t.output), /THE ANSWER/);
+  press(t.input, 'b');
+  assert.equal(t.state.screen, 'home');
+  assert.equal(t.state.replay, null);
+  t.quit();
+});
+
+test('the app can start straight on a replay (node labs/start.mjs replay)', async () => {
+  const t = await app({ size: { columns: 80, rows: 40 }, replay: loadReplay('harnessed') });
+  assert.equal(t.state.screen, 'replay');
+  assert.match(text(t.output), /THE AGENT LOOP · With a harness/);
+  press(t.input, 'u');
+  assert.equal(t.state.screen, 'home');
   t.quit();
 });

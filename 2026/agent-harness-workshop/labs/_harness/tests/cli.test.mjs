@@ -268,3 +268,19 @@ test('test prints the inherited checks after the level passes, without changing 
   assert.doesNotMatch(v.out, /YOUR HARNESS SO FAR/);
   assert.match(v.out, /lab-05 easy\s+src fails 1\/1\s+sol passes 1\/1/);
 });
+test('replay prints every turn without a terminal; harnessed, a file of your own, and a clear error otherwise', () => {
+  const { labsDir } = fixtureWorkshop();
+  const bare = cli(labsDir, ['replay']);
+  assert.equal(bare.code, 0, bare.out);
+  assert.match(bare.out, /THE AGENT LOOP · No harness/);
+  for (let i = 1; i <= 6; i++) assert.match(bare.out, new RegExp(`TURN ${i} OF 6`));
+  assert.match(bare.out, /node labs\/start\.mjs replay harnessed/);
+  const harnessed = cli(labsDir, ['replay', 'harnessed']);
+  assert.match(harnessed.out, /⛔ denied by a hook/);
+  const own = cli(labsDir, ['replay', path.join(import.meta.dirname, 'fixtures', 'trace-hook-denial.jsonl')]);
+  assert.equal(own.code, 0, own.out);
+  assert.match(own.out, /This recording has no annotations/);
+  const nope = cli(labsDir, ['replay', 'hamster']);
+  assert.equal(nope.code, 2);
+  assert.match(nope.out, /There is no recording "hamster"/);
+});

@@ -1,0 +1,40 @@
+{"type":"user.message","data":{"content":"The build is red. Fix it."}}
+{"type":"harness.context","data":{"segments":[{"name":"system","tokens":9800},{"name":"instructions","tokens":410},{"name":"skills","tokens":60},{"name":"tools","tokens":10400},{"name":"history","tokens":0},{"name":"prompt","tokens":9}]}}
+{"type":"harness.note","data":{"text":"AGENTS.md rides along in every turn (≈400 tokens): 'The tests are the spec: fix the code, never the test.' Skills add only their name and description (≈60) until one is used."}}
+{"type":"assistant.turn_start","data":{"turnId":"0"}}
+{"type":"assistant.message","data":{"content":"","toolRequests":[{"toolCallId":"h1","name":"bash","arguments":{"command":"npm test","description":"Run the tests"}}]}}
+{"type":"tool.execution_start","data":{"toolCallId":"h1","toolName":"bash","arguments":{"command":"npm test","description":"Run the tests"}}}
+{"type":"tool.execution_complete","data":{"toolCallId":"h1","success":true,"result":{"content":"npm test\n✖ a student who failed the exam fails the course\n  AssertionError: Expected values to be strictly equal: true !== false\n    at grades.test.js:6:10\nℹ tests 3 · pass 2 · fail 1"}}}
+{"type":"assistant.turn_end","data":{"turnId":"0"}}
+{"type":"harness.context","data":{"segments":[{"name":"system","tokens":9800},{"name":"instructions","tokens":410},{"name":"skills","tokens":60},{"name":"tools","tokens":10400},{"name":"history","tokens":160},{"name":"prompt","tokens":9}]}}
+{"type":"assistant.turn_start","data":{"turnId":"1"}}
+{"type":"assistant.message","data":{"content":"","toolRequests":[{"toolCallId":"h2","name":"view","arguments":{"path":"grades.js"}}]}}
+{"type":"tool.execution_start","data":{"toolCallId":"h2","toolName":"view","arguments":{"path":"grades.js"}}}
+{"type":"tool.execution_complete","data":{"toolCallId":"h2","success":true,"result":{"content":"1. export function hasPassed({ finalGrade, examGrade }) {\n2.   return finalGrade >= 5;\n3. }"}}}
+{"type":"assistant.turn_end","data":{"turnId":"1"}}
+{"type":"harness.context","data":{"segments":[{"name":"system","tokens":9800},{"name":"instructions","tokens":410},{"name":"skills","tokens":60},{"name":"tools","tokens":10400},{"name":"history","tokens":350},{"name":"prompt","tokens":9}]}}
+{"type":"harness.note","data":{"text":"The hook runs outside the model, before the tool: no argument and no 'I confirm' gets past it. The model only sees the denial, as the tool's result, and has to find another way."}}
+{"type":"assistant.turn_start","data":{"turnId":"2"}}
+{"type":"assistant.message","data":{"content":"Before changing code, I'll rule out a stale install.","toolRequests":[{"toolCallId":"h3","name":"bash","arguments":{"command":"rm -rf node_modules && npm ci","description":"Reinstall dependencies"}}]}}
+{"type":"tool.execution_start","data":{"toolCallId":"h3","toolName":"bash","arguments":{"command":"rm -rf node_modules && npm ci","description":"Reinstall dependencies"}}}
+{"type":"tool.execution_complete","data":{"toolCallId":"h3","success":false,"error":{"code":"denied","message":"Denied by preToolUse hook: Recursive force-deletes are blocked in this repo. Ask a human to run it."}}}
+{"type":"assistant.turn_end","data":{"turnId":"2"}}
+{"type":"harness.context","data":{"segments":[{"name":"system","tokens":9800},{"name":"instructions","tokens":410},{"name":"skills","tokens":60},{"name":"tools","tokens":10400},{"name":"history","tokens":470},{"name":"prompt","tokens":9}]}}
+{"type":"harness.note","data":{"text":"AGENTS.md said the tests are the spec, so the model changes the code, not the test."}}
+{"type":"assistant.turn_start","data":{"turnId":"3"}}
+{"type":"assistant.message","data":{"content":"","toolRequests":[{"toolCallId":"h4","name":"edit","arguments":{"path":"grades.js","old_str":"return finalGrade >= 5;","new_str":"return finalGrade >= 5 && examGrade >= 5;"}}]}}
+{"type":"tool.execution_start","data":{"toolCallId":"h4","toolName":"edit","arguments":{"path":"grades.js","old_str":"return finalGrade >= 5;","new_str":"return finalGrade >= 5 && examGrade >= 5;"}}}
+{"type":"tool.execution_complete","data":{"toolCallId":"h4","success":true,"result":{"content":"File grades.js updated with changes."}}}
+{"type":"assistant.turn_end","data":{"turnId":"3"}}
+{"type":"harness.context","data":{"segments":[{"name":"system","tokens":9800},{"name":"instructions","tokens":410},{"name":"skills","tokens":60},{"name":"tools","tokens":10400},{"name":"history","tokens":600},{"name":"prompt","tokens":9}]}}
+{"type":"assistant.turn_start","data":{"turnId":"4"}}
+{"type":"assistant.message","data":{"content":"","toolRequests":[{"toolCallId":"h5","name":"bash","arguments":{"command":"npm test","description":"Run the tests"}}]}}
+{"type":"tool.execution_start","data":{"toolCallId":"h5","toolName":"bash","arguments":{"command":"npm test","description":"Run the tests"}}}
+{"type":"tool.execution_complete","data":{"toolCallId":"h5","success":true,"result":{"content":"npm test\n✔ a student who passed both passes the course\n✔ a student who failed the exam fails the course\n✔ a missing exam grade fails\nℹ tests 3 · pass 3 · fail 0"}}}
+{"type":"assistant.turn_end","data":{"turnId":"4"}}
+{"type":"harness.context","data":{"segments":[{"name":"system","tokens":9800},{"name":"instructions","tokens":410},{"name":"skills","tokens":60},{"name":"tools","tokens":10400},{"name":"history","tokens":720},{"name":"prompt","tokens":9}]}}
+{"type":"harness.note","data":{"text":"Same model, same prompt. The difference is the harness: one file of rules and one hook."}}
+{"type":"assistant.turn_start","data":{"turnId":"5"}}
+{"type":"assistant.message","data":{"content":"Fixed hasPassed in grades.js: a student now also needs an exam grade of at least 5, as the failing test said. All 3 tests pass.\n\nHarness check: AGENTS.md loaded","toolRequests":[]}}
+{"type":"assistant.turn_end","data":{"turnId":"5"}}
+{"type":"result","data":{"exitCode":0,"usage":{"premiumRequests":1}}}

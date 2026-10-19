@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { KEYMAP, GLOBAL, RESERVED, OTHER, binding, collisions, keysOf } from '../keys.mjs';
+import { KEYMAP, GLOBAL, OTHER, binding, collisions, keysOf } from '../keys.mjs';
 
-test('no screen gives one key two meanings (global and reserved keys included)', () => {
+test('no screen gives one key two meanings (global keys included)', () => {
   assert.deepEqual(collisions(), []);
 });
 
@@ -15,13 +15,21 @@ test('a collision is found when there is one', () => {
   }
 });
 
-test('PR #1 keeps d and m; u is the X-ray on a level and stays reserved on home for the replay', () => {
+test('PR #1 keeps d and m; u is the X-ray on a level and the replay on home', () => {
   assert.equal(binding('exercise', 'd', 'd').id, 'doctor');
   assert.equal(binding('exercise', 'm', 'm').id, 'more');
   assert.equal(binding('exercise', 'u', 'u').id, 'xray');
   assert.equal(binding('xray', 's', 's').id, 'side');
-  assert.deepEqual(RESERVED.home.map((r) => r.key), ['u']);
-  assert.equal(binding('home', 'u', 'u'), null);
+  assert.equal(binding('home', 'u', 'u').id, 'replay');
+});
+
+test('the replay steps with ← and →, switches recordings with tab, and left never means back there', () => {
+  assert.equal(binding('replay', 'right', '').id, 'nextTurn');
+  assert.equal(binding('replay', 'left', '').id, 'prevTurn');
+  assert.equal(binding('replay', 'tab', '\t').id, 'switch');
+  assert.equal(binding('replay', 'b', 'b').id, 'back');
+  assert.equal(binding('replay', 'u', 'u').id, 'back');
+  assert.equal(binding('replay', 'down', '').id, 'scroll');
 });
 
 test('letters are case-sensitive only where the upper case has its own meaning', () => {

@@ -217,3 +217,10 @@ test('linear agent and history print each case timeline', async () => {
   assert.match(text, /No JSON trace, so there is no timeline/);
   assert.match(text, /What happened in "guard": ⛔ powershell/);
 });
+test('linear replay prints the turns of either recording', async () => {
+  const { text } = await session(['replay', 'replay harnessed', 'replay hamster', 'quit']);
+  assert.match(text, /The agent loop, No harness: 6 turns/);
+  assert.match(text, /Now compare it with the other run: replay harnessed/);
+  assert.match(text, /denied by a hook: Recursive force-deletes/);
+  assert.match(text, /There is no recording "hamster"/);
+});

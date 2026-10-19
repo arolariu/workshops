@@ -19,11 +19,6 @@ export const GLOBAL = [
   b('?', 'help', 'every key, and the glossary'),
 ];
 
-/** Keys kept free for features that are coming, so nothing else takes them. */
-export const RESERVED = {
-  home: [{ key: 'u', for: 'the agent-loop replay (Phase 3)' }],
-};
-
 /** The "more" menu's items, in order (tui.mjs MENU must list exactly these keys). */
 export const MENU_KEYS = ['w', 'g', 'i', 'v', 's', 'f', 'x', 'H', 'o', 'y', 'd', 'e'];
 
@@ -38,6 +33,7 @@ export const KEYMAP = {
     b('p', 'path', 'choose a learning path'),
     b('d', 'doctor', 'setup doctor: what is installed, what is missing and how to fix it'),
     b('e', 'export', 'export a learning summary (Markdown or JSON, stays on this computer)'),
+    b('u', 'replay', '🎬 under the hood: replay an agent run turn by turn, without and with a harness'),
     b(PAGE, 'page', 'page up and down'),
   ],
   lab: [
@@ -148,6 +144,13 @@ export const KEYMAP = {
   ],
   learn: [b(digits(1, 4), 'answer', 'answer the question'), b(SCROLL, 'scroll', 'scroll'), b([...BACK, 'return', 'l'], 'back', 'back')],
   xray: [b(SCROLL, 'scroll', 'scroll'), b('s', 'side', 'your src/ or the reference sol/'), b('r', 'again', 'look again (and measure the MCP servers again)'), b([...BACK, 'return', 'u'], 'back', 'back')],
+  replay: [
+    b('right', 'nextTurn', 'the next turn'),
+    b('left', 'prevTurn', 'the previous turn'),
+    b('tab', 'switch', 'the other recording: without or with a harness'),
+    b(SCROLL, 'scroll', 'scroll'),
+    b(['b', 'escape', 'backspace', 'u'], 'back', 'back'),
+  ],
   recovery: [
     b(PREV, 'prev', 'choose'),
     b(NEXT, 'nextItem', 'choose'),
@@ -177,7 +180,6 @@ export function collisions() {
     const seen = new Map();
     const add = (key, id) => seen.set(key, [...(seen.get(key) ?? []), id]);
     for (const x of [...list, ...GLOBAL]) for (const k of x.keys) add(k, x.id);
-    for (const r of RESERVED[screen] ?? []) add(r.key, 'reserved');
     for (const [key, ids] of seen) if (ids.length > 1) out.push({ screen, key, ids });
   }
   return out;

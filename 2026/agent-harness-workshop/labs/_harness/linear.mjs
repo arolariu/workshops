@@ -23,6 +23,8 @@ import { creditSummary, meterLine } from './credits.mjs';
 import { loadGlossary, glossaryLines } from './glossary.mjs';
 import { xrayReport, inheritedChecks } from './xray.mjs';
 import { xrayLines, inheritedLines } from './screens/xray.mjs';
+import { loadReplay, otherReplay } from './replay.mjs';
+import { replayLines } from './screens/replay.mjs';
 
 const HELP = `Commands (type one and press Enter):
   list [path=ID] [level=L] [status=S] [minutes=N] [bookmarked] [words…]   numbered exercises, filtered
@@ -40,6 +42,7 @@ const HELP = `Commands (type one and press Enter):
   compare [FILE]    compare your work with the reference solution
   changes           your changes since your latest commit, file by file (needs git)
   xray [sol]        X-ray your harness (or the reference): what it adds to every turn, and its maturity level
+  replay [harnessed|FILE]  an agent run turn by turn, without (or with) a harness; no AI, no credits
   glossary [WORD]   the words this workshop uses, in one line each
   recovery          the starter, your checkpoints and backups
   checkpoint NAME   save your current work as a checkpoint
@@ -397,6 +400,14 @@ export function runLinear({
         say(`X-ray of ${sol ? 'the reference solution' : 'your work'} (${rel(sol ? ex.sol : ex.src)}). MCP servers get 5 seconds to list their tools.`);
         const report = await xrayReport({ key: ex.key, dir: sol ? ex.sol : ex.src, manifest, brought: sol ? null : store.get(ex.key).brought });
         xrayLines(report, { W: 100, fmt: { ...PLAIN, green: (s) => s, bold: (s) => s, cyan: (s) => s } }).forEach((l) => say(l));
+        return;
+      }
+      case 'replay': {
+        const rec = loadReplay(args.join(' ') || 'bare');
+        if (rec.error) { say(rec.error); return; }
+        say(`The agent loop, ${rec.title}: ${rec.turns.length} turns. Each turn: the model reads its context, writes a tool call, the harness decides, the result joins the history.`);
+        rec.turns.forEach((_, i) => replayLines(rec, i, { W: 100, fmt: { ...PLAIN, green: (s) => s, bold: (s) => s, cyan: (s) => s } }).forEach((l) => say(l)));
+        if (rec.scripted) say(`Now compare it with the other run: replay ${otherReplay(rec.id)}`);
         return;
       }
       case 'glossary': {
