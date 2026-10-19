@@ -181,3 +181,21 @@ test('test groups results by milestone; hint follows the current milestone; veri
   assert.match(bad.out, /a check names M3, but todo\.md has no "### M3" milestone/);
   assert.match(bad.out, /milestone M2 has no check/);
 });
+
+test('bring shows the plan, --dry-run changes nothing, and bringing records it', () => {
+  const labsDir = chainCourse(CHAIN_BASE);
+  assert.equal(cli(labsDir, ['sync-seeds', '--bootstrap']).code, 0);
+  assert.match(cli(labsDir, ['bring', 'lab-01', 'easy']).out, /Nothing to bring yet/);
+  fs.writeFileSync(path.join(labsDir, 'lab-00/easy/src/done.txt'), 'x\n');
+  fs.writeFileSync(path.join(labsDir, 'lab-00/easy/src/AGENTS.md'), 'mine\n');
+  assert.equal(cli(labsDir, ['test', 'lab-00', 'easy']).code, 0);
+  const dry = cli(labsDir, ['bring', 'lab-01', 'easy', '--dry-run']);
+  assert.match(dry.out, /AGENTS\.md\s+← lab-00 easy\s+new/);
+  assert.ok(!fs.existsSync(path.join(labsDir, 'lab-01/easy/src/AGENTS.md')));
+  const real = cli(labsDir, ['bring', 'lab-01', 'easy']);
+  assert.equal(real.code, 0, real.out);
+  assert.match(real.out, /Brought 1 file\(s\) in/);
+  assert.equal(fs.readFileSync(path.join(labsDir, 'lab-01/easy/src/AGENTS.md'), 'utf8'), 'mine\n');
+  const saved = JSON.parse(fs.readFileSync(path.join(labsDir, '.progress.json'), 'utf8')).entries['lab-01/easy'];
+  assert.deepEqual(saved.brought.files, [{ file: 'AGENTS.md', from: 'lab-00/easy' }]);
+});

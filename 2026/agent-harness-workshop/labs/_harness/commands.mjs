@@ -161,6 +161,35 @@ export async function run(ctx) {
     process.exit(report.ready ? 0 : 1);
   }
 
+  if (cmd === 'bring') {
+    const { ex } = pickExercise();
+    const ch = await import('./chain.mjs');
+    const B = await import('./bring.mjs');
+    const { bringLines, describeKey } = await import('./screens/bring.mjs');
+    const { loadCourse } = await import('./course.mjs');
+    const { progressView } = await import('./learning.mjs');
+    const target = ch.courseOrder(catalog).find((n) => n.key === ex.key);
+    const plan = B.bringPlan({ catalog, course: loadCourse(labsDir), manifest: ch.loadManifest(labsDir), view: progressView(progress, catalog), target });
+    say();
+    say(`  🧳 ${bold(bright(`Bring your work into ${describeKey(ex.key)}`))} ${dim(`(${rel(ex.src)})`)}`);
+    bringLines(plan, { W: 96, fmt: { dim, white, yellow, bright } }).forEach((l) => say(l));
+    say();
+    if (plan.error) process.exit(1);
+    if (!plan.items.length) return;
+    if (opt['dry-run']) {
+      say(`  👀 ${dim('Dry run: nothing changed. Run it again without --dry-run to bring these files in (your src/ is backed up first).')}`);
+      say();
+      return;
+    }
+    const r = B.applyBring({ labsDir, target, plan });
+    if (!r.ok) { say(`  ${yellow('Not done:')} ${dim(r.reason)}`); say(); process.exit(1); }
+    progress.set(ex.key, { brought: { at: new Date().toISOString(), files: r.files } });
+    say(`  ✅ ${bright(`Brought ${r.files.length} file(s) in.`)} ${dim('Backup of what you had:')} ${cyan(rel(r.backup.dir))}`);
+    say(`     ${dim('Now run the checks:')} ${cyan(`node labs/start.mjs test ${ex.labId} ${ex.level}`)}`);
+    say();
+    return;
+  }
+
   if (cmd === 'sync-seeds') {
     const ch = await import('./chain.mjs');
     const { loadCourse, saveCourse } = await import('./course.mjs');
@@ -253,6 +282,29 @@ export async function run(ctx) {
     const drift = starterDrift(ws, labsDir, catalog);
     if (drift) say(`   ${drift.ok ? '✅' : '❌'} ${white('starter manifest')}  ${drift.ok ? green(drift.message) : red(`${drift.message} Rebuild it with: node labs/start.mjs starters --write`)}`);
     if (drift && !drift.ok) problems++;
+    if (opt.bring) {
+      const ch = await import('./chain.mjs');
+      const B = await import('./bring.mjs');
+      const { loadCourse } = await import('./course.mjs');
+      const course = loadCourse(labsDir);
+      const manifest = ch.loadManifest(labsDir);
+      say();
+      say(`  🧳 ${bold(bright('Bringing work forward'))} ${dim('— a learner who finished every earlier level like the reference brings it all in: src/ must still fail, sol/ must still pass')}`);
+      say();
+      for (const node of ch.courseOrder(catalog).filter((n) => !only || n.lab.num === only)) {
+        const sim = B.simulateBring({ labsDir, catalog, course, manifest, target: node });
+        const s = await runChecks({ exDir: node.ex.dir, target: sim.src, env: { HARNESS_VERIFY: '1' } });
+        const o = await runChecks({ exDir: node.ex.dir, target: sim.sol, env: { HARNESS_VERIFY: '1' } });
+        fs.rmSync(sim.base, { recursive: true, force: true });
+        const srcOk = s.complete && s.failed > 0;
+        const solOk = o.complete && o.failed === 0 && o.blocked === 0 && o.passed > 0;
+        if (!srcOk || !solOk) problems++;
+        const n = sim.plan.items.length;
+        say(`   ${srcOk && solOk ? '✅' : '❌'} ${white(`${node.lab.id} ${node.ex.level.padEnd(14)}`)} ${dim(`+${n} file${n === 1 ? '' : 's'} from ${sim.plan.sources.length} level${sim.plan.sources.length === 1 ? '' : 's'}`)}  ${dim('src')} ${srcOk ? green(`fails ${s.failed}/${s.total}`) : red(!s.complete ? `could not run: ${s.fatal}` : 'passes - nothing to do!')}   ${dim('sol')} ${solOk ? green(`passes ${o.passed}/${o.total}`) : red(!o.complete ? `could not run: ${o.fatal}` : `fails ${o.failed + o.blocked}`)}`);
+        if (!solOk && o.complete) o.results.filter((r) => r.status === 'fail' || r.status === 'blocked').forEach((r) => say(`        ${red('sol ✗')} ${r.name}: ${dim(r.message.slice(0, 220))}`));
+        if (opt.verbose) sim.plan.items.forEach((it) => say(`        ${dim(`${it.file} ← ${it.from}`)}`));
+      }
+    }
     say();
     say(problems ? `  ❌ ${red(`${problems} verification problem(s) need attention.`)}` : `  ✅ ${bold(bright('All exercises verified.'))}`);
     say();

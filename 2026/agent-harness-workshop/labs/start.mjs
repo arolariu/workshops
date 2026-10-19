@@ -42,6 +42,7 @@ const COMMANDS = {
   diff: { args: [2, 2], opts: { file: 'value', ascii: 'flag' } },
   history: { args: [2, 2], opts: { json: 'flag', ascii: 'flag' } },
   bookmark: { args: [2, 2], opts: { remove: 'flag', ascii: 'flag' } },
+  bring: { args: [2, 2], opts: { 'dry-run': 'flag', ascii: 'flag' } },
   path: { args: [0, 1], opts: { ascii: 'flag' } },
   export: { args: [0, 0], opts: { format: 'value', name: 'value', dir: 'value', path: 'value', ascii: 'flag' } },
   doctor: { args: [0, 0], opts: { full: 'flag', lab: 'value', json: 'flag', ascii: 'flag' } },
@@ -114,6 +115,7 @@ function usage() {
   row('node labs/start.mjs test lab-01 easy --agent', 'also run the 🤖 agent checks (AI credits)');
   row('node labs/start.mjs hint lab-01 easy', 'reveal the next hint');
   row('node labs/start.mjs diff lab-01 easy', 'compare your work with the reference solution');
+  row('node labs/start.mjs bring lab-05 hard [--dry-run]', 'bring your own harness forward from earlier levels');
   row('node labs/start.mjs bookmark lab-01 easy', 'bookmark an exercise (--remove to undo)');
   row('node labs/start.mjs history lab-01 easy', 'agent check runs kept for this exercise');
   say();
@@ -132,6 +134,7 @@ function usage() {
   say(`  ${white('Facilitators')}`);
   row('node labs/start.mjs verify', 'every src/ must fail, every sol/ must pass');
   row('node labs/start.mjs verify --chain', '…and the seeded chain has not drifted');
+  row('node labs/start.mjs verify --bring', '…and bringing work forward never breaks a level');
   row('node labs/start.mjs sync-seeds [--dry-run]', 'rebuild every level\'s src/ and sol/ from the chain');
   row('node labs/start.mjs starters [--write]', 'check (or rebuild) the published starter manifest');
   row('node labs/start.mjs --path=builder --no-intro', 'start the app on a path, without the welcome screen');

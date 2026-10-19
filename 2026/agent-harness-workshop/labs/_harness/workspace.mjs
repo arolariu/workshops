@@ -277,6 +277,8 @@ function backupNow(labsDir, ex, reason) {
   const { dir } = publish(ex.src, path.join(recoveryDir(labsDir, ex), 'backups'), name, { kind: 'backup', exercise: ex.key, reason });
   return { id: `backup:${name}`, dir };
 }
+/** Back up the work folder to the recovery backups (restorable with "x"), before something else changes it. */
+export const backupWork = (labsDir, ex, reason) => backupNow(labsDir, ex, reason);
 
 /** Replace the work folder's files (not KEEP folders) with `files` [{ rel, buffer }]. A backup is taken first. */
 function replaceWork(labsDir, ex, files, reason) {
