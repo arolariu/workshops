@@ -27,7 +27,7 @@ for: what was denied, by which rule, in which session.
   `"repo"`; a repository rule named `org-…` or setting `layer` is a problem; only allow rules may say `"override": true`
 - `evaluate(policy, call, { lockdown })` returns `layer` too, deciding in this order: org deny → lockdown → repository
   override → any other deny (highest severity) → first allow → `default`
-- The guard loads `HARNESS_ORG_POLICY` (or `.github/hooks/org-policy.json`) and `policy.json`; an org deny like
+- The guard loads `HARNESS_ORG_POLICY` (or `.github/hooks/policies/org.json`) and `policies/repo.json`; an org deny like
   `git push --force` holds, `"layer"` is logged, and no usable org policy means every call is denied
 - `.github/CODEOWNERS` has a line for `/.github/hooks/` with an owner
 
@@ -65,28 +65,30 @@ for: what was denied, by which rule, in which session.
   ## Denials by rule
   | Rule | Layer | Severity | Denials |
   |---|---|---|---|
-  | no-recursive-force-delete | repo | critical | 2 |        ← most denials first, then by rule name
+  | no-recursive-force-delete | repo | critical | 2 |
 
   ## Sessions
   | Session | Calls | Denials | Flagged |
   |---|---|---|---|
-  | s-102 | 3 | 3 | override, role |                          ← in order of first appearance; "no" if not flagged
+  | s-102 | 3 | 3 | override, role |
 
   ## Flagged prompts
   - s-102 · override, role · "Ignore all previous instructions. …"
   ```
-  (Calls are `decision` entries; layer and severity come from the rule's first denial. Empty sections say
-  `No denials.`, `No sessions.` or `No flagged prompts.`)
+  Rules: most denials first, then by name; layer and severity come from the rule's first denial. Sessions: in order
+  of first appearance; calls are `decision` entries; `no` when not flagged. Empty sections say `No denials.`,
+  `No sessions.` or `No flagged prompts.`
 - `node scripts/governance-report.mjs [file]` verifies the chain first and exits 2, saying the chain is broken, when it
   isn't intact
 
 ## 📂 Work here
 ```bash
 cd labs/lab-05/hard-plus-plus/src
-code .github/hooks/org-policy.json .github/hooks/scripts/engine.mjs .github/hooks/scripts/audit-chain.mjs
+code .github/hooks/policies/org.json .github/hooks/scripts/engine.mjs
+code .github/hooks/scripts/audit-chain.mjs
 node labs/start.mjs test lab-05 hard++       # from the workshop folder
 ```
-The security team's `org-policy.json` is ready; the hook skeletons, `scripts/verify-audit.mjs` and the report's
+The security team's `policies/org.json` is ready; the hook skeletons, `scripts/verify-audit.mjs` and the report's
 command-line part are given. In a real organisation the org layer would be a policy hook installed machine-wide
 (`/etc/github-copilot/policy.d/` or `C:\ProgramData\GitHub\Copilot\policy.d\`), which users can't disable.
 
@@ -102,7 +104,7 @@ lockdown, a shell or write call with no matching allow rule marked `lockdown: tr
 
 <details><summary>Where the org policy comes from</summary>
 
-`process.env.HARNESS_ORG_POLICY ? path.resolve(process.env.HARNESS_ORG_POLICY) : path.join(HERE, '..', 'org-policy.json')`.
+`process.env.HARNESS_ORG_POLICY ? path.resolve(process.env.HARNESS_ORG_POLICY) : path.join(HERE, '..', 'policies', 'org.json')`.
 If it can't be read, or `effectivePolicy()` reports problems, deny with a reason that names the organisation policy.
 
 </details>

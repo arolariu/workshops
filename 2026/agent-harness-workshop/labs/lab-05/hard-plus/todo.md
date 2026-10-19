@@ -5,13 +5,13 @@
 ## 🎯 Mission
 Your guard works, but its rules are buried in code: the security team can't read them, and every new spelling of
 `rm -rf` means another regex in another `if`. Attackers (and models) are creative: `rd /s /q`, `Remove-Item -rec`,
-`bash -c "…"`. Turn the guard into a small **policy engine**: the rules move to `policy.json` (what to match, the
+`bash -c "…"`. Turn the guard into a small **policy engine**: the rules move to `policies/repo.json` (what to match, the
 decision, the reason, the severity), commands are normalised before any rule sees them, deny always wins, and the
 guard fails **closed** when the policy is broken or slow. Then add the rules for the calls a prompt injection would
 make.
 
 ## 📋 Requirements
-1. `.github/hooks/policy.json` holds every rule of the old guard, in the format below; `validatePolicy()` explains
+1. `.github/hooks/policies/repo.json` holds every rule of the old guard, in the format below; `validatePolicy()` explains
    what is wrong with a broken one.
 2. `evaluate()` decides: deny wins over allow, the highest severity names the rule, and the policy's `default`
    applies when nothing matches. The guard logs which rule decided.
@@ -24,15 +24,17 @@ make.
 **The policy format** (`engine.mjs` says the same at the top):
 ```text
 { "version": 1, "default": "allow" | "deny", "rules": [
-  { "id": "no-recursive-force-delete", "decision": "deny", "severity": "critical",
-    "reason": "Recursive force-deletes … Delete specific files instead, or ask the human.",
-    "match": { "tool": "shell", "command": "^delete --force --recursive\\b" } } ] }
+  { "id": "no-recursive-force-delete",
+    "decision": "deny", "severity": "critical",
+    "reason": "Recursive force-deletes … Delete specific files instead.",
+    "match": { "tool": "shell",
+               "command": "^delete --force --recursive\\b" } } ] }
 
-match (every key given must match; regexes are case-insensitive):
-  tool         "shell" | "write" | "read" | a tool name, or a list of those
-  command      each normalised command, e.g. "delete --force --recursive build" or "npm install lodash"
-  commandLine  the whole shell command, whitespace collapsed (pipes and $(…) live here)
-  path         each path the call touches (a file tool's path; a shell command's arguments)
+match: every key given must match; regexes are case-insensitive
+  tool         "shell" | "write" | "read" | a tool name, or a list
+  command      each normalised command: "delete --force --recursive x"
+  commandLine  the whole shell command (pipes and $(…) live here)
+  path         each path the call touches (file tools, shell arguments)
   text         JSON.stringify(args)
 ```
 
@@ -41,13 +43,13 @@ match (every key given must match; regexes are case-insensitive):
 - `validatePolicy(policy)` returns `[]` for a valid policy and at least one readable problem for each of the seven
   broken policies in `tests/fixtures/policies.json` (wrong version, unknown decision, duplicate id, deny without a
   reason, a regex that doesn't compile, an unknown match key, an empty match)
-- `policy.json` is valid and has at least 8 deny rules: rm -rf, dependencies (installs; `package.json` from tools and
+- `policies/repo.json` is valid and has at least 8 deny rules: rm -rf, dependencies (installs; `package.json` from tools and
   from the shell), `.env`, `.github/hooks` (tools and shell) and the five kinds of secret
 
 ### M2 · The engine
 - `evaluate(policy, call)` returns `{ decision, rule, severity, reason, matched }`: deny wins, the highest severity
   decides (the first on a tie), then the first matching allow rule, then `default`
-- `guard.mjs` reads `policy.json` and asks the engine; the old decisions still hold; a rule added to `policy.json`
+- `guard.mjs` reads `policies/repo.json` and asks the engine; the old decisions still hold; a rule added to `policies/repo.json`
   changes what the guard does; `.agent-logs/guard.jsonl` records `"rule"` and `"severity"`
 
 ### M3 · One command, many spellings
@@ -73,11 +75,14 @@ match (every key given must match; regexes are case-insensitive):
 ## 📂 Work here
 ```bash
 cd labs/lab-05/hard-plus/src
-code .github/hooks/policy.json .github/hooks/scripts/engine.mjs .github/hooks/scripts/guard.mjs
+code .github/hooks/policies/repo.json .github/hooks/scripts/engine.mjs
+code .github/hooks/scripts/guard.mjs
 node labs/start.mjs test lab-05 hard+        # from the workshop folder
 ```
 `engine.mjs` gives you the plumbing (`segments`, `tokens`, `base`, `compile`) and a working `normalize()` that calls
 your `canonical()` and `unwrap()`. `guard.mjs` is still the hard level's guard: you'll turn it into a thin client.
+The policy lives in `.github/hooks/policies/`, not next to `guardrails.json`: Copilot reads **every**
+`.github/hooks/*.json` as a hook configuration, and a policy isn't one.
 
 ## 💡 Hints
 ### M1
@@ -109,7 +114,7 @@ SEVERITY.indexOf(b.severity) > SEVERITY.indexOf(a.severity) ? b : a)`.
 <details><summary>A thin guard</summary>
 
 Keep the plumbing (read stdin, parse `toolArgs`, log, print the deny JSON). Replace the rules with: load and
-validate `policy.json` (next to the `scripts/` folder: `path.join(HERE, '..', 'policy.json')`), then
+validate `policies/repo.json` (from the guard: `path.join(HERE, '..', 'policies', 'repo.json')`), then
 `evaluate(policy, normalize(tool, args))`. Keep exporting `decide()` for your hard-level suite.
 
 </details>
@@ -143,9 +148,13 @@ decision in a `Worker`, start a timer, and if the timer fires first, `worker.ter
 <details><summary>The worker pattern</summary>
 
 ```js
-const worker = new Worker(fileURLToPath(import.meta.url), { workerData: { guardWorker: true, tool, args } });
+const worker = new Worker(fileURLToPath(import.meta.url), {
+  workerData: { guardWorker: true, tool, args },
+});
 // and at the top level of the same file:
-if (!isMainThread && workerData?.guardWorker) parentPort.postMessage(decision(workerData.tool, workerData.args));
+if (!isMainThread && workerData?.guardWorker) {
+  parentPort.postMessage(decision(workerData.tool, workerData.args));
+}
 ```
 Guard the stdin-reading part with `isMainThread`, or the worker will try to read stdin too.
 

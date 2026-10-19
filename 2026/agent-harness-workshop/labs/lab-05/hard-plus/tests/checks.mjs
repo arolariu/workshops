@@ -6,7 +6,7 @@ import { GUARD, shell, ps, tool, expectDecisions, hookConfig } from './helpers.m
 import { ghp, aws, key } from './secrets.mjs';
 
 const ENGINE = '.github/hooks/scripts/engine.mjs';
-const POLICY = '.github/hooks/policy.json';
+const POLICY = '.github/hooks/policies/repo.json';
 const SUITE = '.github/hooks/scripts/guard.test.mjs';
 const SEVERITY = ['low', 'medium', 'high', 'critical'];
 const fixture = (t, name) => JSON.parse(fs.readFileSync(path.join(t.exDir, 'tests', 'fixtures', name), 'utf8'));
@@ -14,9 +14,9 @@ const call = ([toolName, command]) => (toolName === 'powershell' ? ps(command) :
 
 /** The checks' own reading of the policy format (independent of your validatePolicy). */
 function schemaProblems(p) {
-  if (!p || typeof p !== 'object' || p.version !== 1) return ['policy.json needs "version": 1.'];
-  if (!['allow', 'deny'].includes(p.default)) return ['policy.json needs "default": "allow" or "deny".'];
-  if (!Array.isArray(p.rules)) return ['policy.json needs a "rules" list.'];
+  if (!p || typeof p !== 'object' || p.version !== 1) return ['policies/repo.json needs "version": 1.'];
+  if (!['allow', 'deny'].includes(p.default)) return ['policies/repo.json needs "default": "allow" or "deny".'];
+  if (!Array.isArray(p.rules)) return ['policies/repo.json needs a "rules" list.'];
   for (const r of p.rules) {
     const at = `Rule ${r?.id ?? '(no id)'}`;
     if (!/^[a-z0-9-]+$/.test(String(r?.id ?? ''))) return [`${at}: "id" must be lowercase letters, digits and dashes.`];
@@ -32,7 +32,7 @@ function schemaProblems(p) {
   return [];
 }
 
-/** Run the guard of a copy of your folder whose policy.json was changed by `edit`. */
+/** Run the guard of a copy of your folder whose policies/repo.json was changed by `edit`. */
 function guardWithPolicy(t, edit, payload, opts = {}) {
   const copy = t.copy(t.tmp());
   edit(path.join(copy, POLICY));
@@ -69,7 +69,7 @@ export default (t) => [
     const missed = broken.filter(([, p]) => !(validatePolicy(p) ?? []).length).map(([name]) => name);
     return !missed.length || `validatePolicy() found nothing wrong with: ${missed.join('; ')}.`;
   }, { milestone: 'M1' }),
-  t.check('policy.json is valid and carries every rule of the old guard', async () => {
+  t.check('policies/repo.json is valid and carries every rule of the old guard', async () => {
     const p = t.json(POLICY);
     const own = schemaProblems(p);
     if (own.length) return own[0];
@@ -77,7 +77,7 @@ export default (t) => [
     const yours = validatePolicy(p) ?? [];
     if (yours.length) return `Your validatePolicy() says: ${yours[0]}`;
     const denies = p.rules.filter((r) => r.decision === 'deny').length;
-    return denies >= 8 || `policy.json has ${denies} deny rule(s). Port every rule of the old guard: rm -rf; dependencies (npm/yarn/pnpm, and package.json from tools and from the shell); .env; .github/hooks (tools and shell); and the five kinds of secret.`;
+    return denies >= 8 || `policies/repo.json has ${denies} deny rule(s). Port every rule of the old guard: rm -rf; dependencies (npm/yarn/pnpm, and package.json from tools and from the shell); .env; .github/hooks (tools and shell); and the five kinds of secret.`;
   }, { milestone: 'M1' }),
 
   // M2 · The engine
@@ -99,9 +99,9 @@ export default (t) => [
     return (d?.decision === 'allow' && d.rule === null) || `With "default": "allow", a call that no rule matches is allowed (rule: null). Got ${JSON.stringify(d)?.slice(0, 140)}`;
   }, { milestone: 'M2' }),
   t.check('The old rules still hold: dependencies, .env, the hooks, secrets', () => expectDecisions(t, OLD_DENY, OLD_ALLOW), { milestone: 'M2' }),
-  t.check('The rules live in policy.json, and the log names the rule that decided', () => {
+  t.check('The rules live in policies/repo.json, and the log names the rule that decided', () => {
     const r = guardWithPolicy(t, addRule({ id: 'no-echo-check', decision: 'deny', severity: 'low', reason: 'No echo in this test: the check added this rule.', match: { tool: 'shell', command: '^echo\\b' } }), shell('echo hi'));
-    if (r.decision !== 'deny') return 'A rule added to policy.json (deny `echo`) did not change what the guard decides: the guard must read its rules from .github/hooks/policy.json.';
+    if (r.decision !== 'deny') return 'A rule added to policies/repo.json (deny `echo`) did not change what the guard decides: the guard must read its rules from .github/hooks/policies/repo.json.';
     if (!/the check added this rule/.test(r.reason)) return `Deny with the rule's own reason (got "${r.reason}").`;
     const file = path.join(r.copy, '.agent-logs', 'guard.jsonl');
     return (fs.existsSync(file) && /"rule":"no-echo-check"/.test(fs.readFileSync(file, 'utf8'))) || 'Log the rule that decided ("rule": "<id>") in .agent-logs/guard.jsonl.';

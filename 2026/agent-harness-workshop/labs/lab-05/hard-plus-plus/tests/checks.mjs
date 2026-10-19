@@ -8,8 +8,8 @@ const ENGINE = '.github/hooks/scripts/engine.mjs';
 const CHAIN_LIB = '.github/hooks/scripts/audit-chain.mjs';
 const SESSION = '.github/hooks/scripts/session-start.mjs';
 const SCAN = '.github/hooks/scripts/prompt-scan.mjs';
-const ORG = '.github/hooks/org-policy.json';
-const REPO = '.github/hooks/policy.json';
+const ORG = '.github/hooks/policies/org.json';
+const REPO = '.github/hooks/policies/repo.json';
 const CHAIN = path.join('.agent-logs', 'audit-chain.jsonl');
 const fixture = (t, name) => path.join(t.exDir, 'tests', 'fixtures', name);
 const text = (file) => fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
@@ -88,10 +88,10 @@ export default (t) => [
     const cwd = t.copy(t.tmp());
     const guard = path.join(cwd, GUARD);
     const push = t.hook(guard, shell('git push --force origin main'), { cwd });
-    if (push.decision !== 'deny') return 'The guard allowed "git push --force origin main": load org-policy.json and put it on top of policy.json with effectivePolicy().';
+    if (push.decision !== 'deny') return 'The guard allowed "git push --force origin main": load policies/org.json and put it on top of policies/repo.json with effectivePolicy().';
     const log = fs.existsSync(path.join(cwd, '.agent-logs', 'guard.jsonl')) ? text(path.join(cwd, '.agent-logs', 'guard.jsonl')) : '';
     if (!/"layer":"org"/.test(log)) return 'Log the layer that decided ("layer": "org") with each decision in .agent-logs/guard.jsonl.';
-    const none = t.hook(guard, shell('ls'), { cwd, env: { HARNESS_ORG_POLICY: path.join(cwd, 'nowhere', 'org-policy.json') } });
+    const none = t.hook(guard, shell('ls'), { cwd, env: { HARNESS_ORG_POLICY: path.join(cwd, 'nowhere', 'policies/org.json') } });
     if (none.decision !== 'deny') return 'With HARNESS_ORG_POLICY pointing at a file that does not exist, the guard allowed "ls". No organisation policy, no calls.';
     return /organi[sz]ation|org/i.test(none.reason) || `Say that the organisation policy is missing (got "${none.reason}").`;
   }, { milestone: 'M1' }),

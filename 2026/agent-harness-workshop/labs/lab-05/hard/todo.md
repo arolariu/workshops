@@ -85,7 +85,8 @@ rows are what catch a guard that blocks too much.
 
 ```js
 const reason = decide(c.tool, expand(c.args));
-assert.equal(reason ? 'deny' : 'allow', c.expect, reason ?? 'the guard allowed it');
+const got = reason ? 'deny' : 'allow';
+assert.equal(got, c.expect, reason ?? 'the guard allowed it');
 ```
 Import `decide` from `./guard.mjs` (not a copy of it): the check swaps that file for each mutant.
 

@@ -1,6 +1,6 @@
 // ⚙️ The policy engine. The guard asks it one question per tool call: given this policy, allow or deny?
 //   validatePolicy(policy) → problems        normalize(toolName, args) → a call        evaluate(policy, call) → a decision
-// policy.json: { version: 1, default: "allow" | "deny", rules: [{ id, decision, severity, reason, match }] }
+// policies/repo.json: { version: 1, default: "allow" | "deny", rules: [{ id, decision, severity, reason, match }] }
 // match (every key given must match; regexes are case-insensitive):
 //   tool         "shell" | "write" | "read" | a tool name, or a list of those
 //   command      tested against each normalised command, e.g. "delete --force --recursive build"

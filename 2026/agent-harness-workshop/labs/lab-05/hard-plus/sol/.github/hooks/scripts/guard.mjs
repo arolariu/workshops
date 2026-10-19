@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 🔒 preToolUse guard, policy edition. Copilot runs this before EVERY tool call and sends the call as JSON on stdin:
 //   { "toolName": "bash", "toolArgs": { "command": "npm test" }, "sessionId": "...", "cwd": "...", ... }
-// The rules live in .github/hooks/policy.json; engine.mjs decides. To block the call, print
+// The rules live in .github/hooks/policies/repo.json; engine.mjs decides. To block the call, print
 // { "permissionDecision": "deny", "permissionDecisionReason": "..." }. To allow it, print nothing.
 // It fails closed: a missing or broken policy, a crash, or no decision within DEADLINE_MS all deny.
 import fs from 'node:fs';
@@ -11,7 +11,7 @@ import { Worker, isMainThread, parentPort, workerData } from 'node:worker_thread
 import { normalize, evaluate, validatePolicy } from './engine.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-export const POLICY = path.join(HERE, '..', 'policy.json');
+export const POLICY = path.join(HERE, '..', 'policies', 'repo.json');
 // Copilot's own hook timeout (timeoutSec in guardrails.json) fails OPEN: a hook that runs out of time lets the call
 // through. So the guard keeps its own, much shorter deadline, and denies when it passes.
 export const DEADLINE_MS = 1500;
@@ -26,7 +26,7 @@ export function loadPolicy(file = POLICY) {
   try {
     policy = JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (e) {
-    return { error: e.code === 'ENOENT' ? `There is no policy at .github/hooks/${path.basename(file)}` : `The policy is not valid JSON (${e.message})` };
+    return { error: e.code === 'ENOENT' ? `There is no policy at .github/hooks/policies/${path.basename(file)}` : `The policy is not valid JSON (${e.message})` };
   }
   const problems = validatePolicy(policy);
   return problems.length ? { error: `The policy is broken: ${problems[0]}` } : { policy };

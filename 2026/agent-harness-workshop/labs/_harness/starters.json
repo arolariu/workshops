@@ -1,6 +1,6 @@
 {
   "format": 2,
-  "revision": "98a441e5a5d8e1727666472f699b1f8133bf12ff",
+  "revision": "5fcb45da6e0190292712bbdd6b02ab8378f4d633",
   "note": "Every seed file of every exercise's src/ as a git blob ID (line endings normalised), and the chain: where each level starts from and which files are its own starter files. Regenerate with: node labs/start.mjs sync-seeds",
   "exercises": {
     "lab-00/easy": {
@@ -310,9 +310,9 @@
     "lab-05/hard-plus": {
       ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
       ".github/hooks/guardrails.json": "b0d728dd04595edbbc12ee5a8a623f72dd678ceb",
-      ".github/hooks/policy.json": "7ab4825e4831493b3f8cf6c892af7e049d4bc93c",
+      ".github/hooks/policies/repo.json": "7ab4825e4831493b3f8cf6c892af7e049d4bc93c",
       ".github/hooks/scripts/audit.mjs": "d84f373989a8a3d232382d6a84786814ecec2aa6",
-      ".github/hooks/scripts/engine.mjs": "be083815546c239bd4bd7506aa1d862e90515199",
+      ".github/hooks/scripts/engine.mjs": "6b7cdb72fe9813cbe7846a7370ec95ba57e0b077",
       ".github/hooks/scripts/guard-cases.json": "d366a44bd0c18e43317d07d2a6879bc4bfad53e3",
       ".github/hooks/scripts/guard.mjs": "e22ca35020cbf6c1b5d626bc011b8d76500fb1fc",
       ".github/hooks/scripts/guard.test.mjs": "520e32f647f7d332897610cebdb58b71b7cf27bd",
@@ -341,17 +341,17 @@
     "lab-05/hard-plus-plus": {
       ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
       ".github/hooks/guardrails.json": "b0d728dd04595edbbc12ee5a8a623f72dd678ceb",
-      ".github/hooks/org-policy.json": "a417477cd3fd9651b0caa61d35cb809e9bd70703",
-      ".github/hooks/policy.json": "5216746559197ff1bbf907adf27215e7c926f60e",
+      ".github/hooks/policies/org.json": "a417477cd3fd9651b0caa61d35cb809e9bd70703",
+      ".github/hooks/policies/repo.json": "5216746559197ff1bbf907adf27215e7c926f60e",
       ".github/hooks/scripts/audit-chain.mjs": "a0f466730c360170e886f77b1de1bd3aa14da040",
       ".github/hooks/scripts/audit.mjs": "d84f373989a8a3d232382d6a84786814ecec2aa6",
-      ".github/hooks/scripts/engine.mjs": "01ba2a3b95baf52b5705e0d4e00b2a0b386b9551",
+      ".github/hooks/scripts/engine.mjs": "f96ae3b74e46160b2844b52c561e8cf54631bb64",
       ".github/hooks/scripts/guard-cases.json": "d366a44bd0c18e43317d07d2a6879bc4bfad53e3",
-      ".github/hooks/scripts/guard.mjs": "33c681f972d5d77c62690b1815eb15ea57a706b9",
+      ".github/hooks/scripts/guard.mjs": "4104146ab8d15d72a8b7caef4dd99ba004b9d1ba",
       ".github/hooks/scripts/guard.test.mjs": "520e32f647f7d332897610cebdb58b71b7cf27bd",
       ".github/hooks/scripts/prompt-scan.mjs": "bcdb519bea8e34e59ee6f82117e7ff80ecdd5751",
       ".github/hooks/scripts/run-tests-after-edit.mjs": "a5ad252ce39effcfcf5db526860658e33483f48f",
-      ".github/hooks/scripts/session-start.mjs": "d546d6e215ce0a6ea478a810cc2ca100ee0569fd",
+      ".github/hooks/scripts/session-start.mjs": "2bba36f689ccde2ebe7cec8ab7b9cd19ec9eca3a",
       ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
       ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
       ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
@@ -922,8 +922,8 @@
     "lab-05/hard-plus": {
       "from": "lab-05/hard",
       "starter": {
-        ".github/hooks/policy.json": "7ab4825e4831493b3f8cf6c892af7e049d4bc93c",
-        ".github/hooks/scripts/engine.mjs": "be083815546c239bd4bd7506aa1d862e90515199"
+        ".github/hooks/policies/repo.json": "7ab4825e4831493b3f8cf6c892af7e049d4bc93c",
+        ".github/hooks/scripts/engine.mjs": "6b7cdb72fe9813cbe7846a7370ec95ba57e0b077"
       },
       "inherited": {
         ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
@@ -958,21 +958,21 @@
     "lab-05/hard-plus-plus": {
       "from": "lab-05/hard-plus",
       "starter": {
-        ".github/hooks/org-policy.json": "a417477cd3fd9651b0caa61d35cb809e9bd70703",
+        ".github/hooks/policies/org.json": "a417477cd3fd9651b0caa61d35cb809e9bd70703",
         ".github/hooks/scripts/audit-chain.mjs": "a0f466730c360170e886f77b1de1bd3aa14da040",
         ".github/hooks/scripts/prompt-scan.mjs": "bcdb519bea8e34e59ee6f82117e7ff80ecdd5751",
-        ".github/hooks/scripts/session-start.mjs": "d546d6e215ce0a6ea478a810cc2ca100ee0569fd",
+        ".github/hooks/scripts/session-start.mjs": "2bba36f689ccde2ebe7cec8ab7b9cd19ec9eca3a",
         "scripts/governance-report.mjs": "c1d813d826e11813f8b99a0d63bd241cefe9762b",
         "scripts/verify-audit.mjs": "2d782fef7cbd3f51313f34430d81b25cc79a6c70"
       },
       "inherited": {
         ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
         ".github/hooks/guardrails.json": "b0d728dd04595edbbc12ee5a8a623f72dd678ceb",
-        ".github/hooks/policy.json": "5216746559197ff1bbf907adf27215e7c926f60e",
+        ".github/hooks/policies/repo.json": "5216746559197ff1bbf907adf27215e7c926f60e",
         ".github/hooks/scripts/audit.mjs": "d84f373989a8a3d232382d6a84786814ecec2aa6",
-        ".github/hooks/scripts/engine.mjs": "01ba2a3b95baf52b5705e0d4e00b2a0b386b9551",
+        ".github/hooks/scripts/engine.mjs": "f96ae3b74e46160b2844b52c561e8cf54631bb64",
         ".github/hooks/scripts/guard-cases.json": "d366a44bd0c18e43317d07d2a6879bc4bfad53e3",
-        ".github/hooks/scripts/guard.mjs": "33c681f972d5d77c62690b1815eb15ea57a706b9",
+        ".github/hooks/scripts/guard.mjs": "4104146ab8d15d72a8b7caef4dd99ba004b9d1ba",
         ".github/hooks/scripts/guard.test.mjs": "520e32f647f7d332897610cebdb58b71b7cf27bd",
         ".github/hooks/scripts/run-tests-after-edit.mjs": "a5ad252ce39effcfcf5db526860658e33483f48f",
         ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",

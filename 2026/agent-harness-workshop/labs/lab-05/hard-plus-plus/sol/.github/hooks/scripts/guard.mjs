@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // 🔒 preToolUse guard, governance edition. Copilot runs this before EVERY tool call and sends the call as JSON on stdin:
 //   { "toolName": "bash", "toolArgs": { "command": "npm test" }, "sessionId": "...", "cwd": "...", ... }
-// Two policies decide: the organisation's (org-policy.json, or the file in HARNESS_ORG_POLICY), which nothing here can
-// override, and this repository's (policy.json). A session flagged by the prompt hook is in lockdown. Every decision
+// Two policies decide: the organisation's (policies/org.json, or the file in HARNESS_ORG_POLICY), which nothing here can
+// override, and this repository's (policies/repo.json). A session flagged by the prompt hook is in lockdown. Every decision
 // goes into the hash-chained audit log. It fails closed: no usable policy, a crash, or no decision in time all deny.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,8 +12,8 @@ import { normalize, evaluate, effectivePolicy } from './engine.mjs';
 import { append } from './audit-chain.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-export const POLICY = path.join(HERE, '..', 'policy.json');
-export const ORG_POLICY = process.env.HARNESS_ORG_POLICY ? path.resolve(process.env.HARNESS_ORG_POLICY) : path.join(HERE, '..', 'org-policy.json');
+export const POLICY = path.join(HERE, '..', 'policies', 'repo.json');
+export const ORG_POLICY = process.env.HARNESS_ORG_POLICY ? path.resolve(process.env.HARNESS_ORG_POLICY) : path.join(HERE, '..', 'policies', 'org.json');
 // Copilot's own hook timeout (timeoutSec in guardrails.json) fails OPEN: a hook that runs out of time lets the call
 // through. So the guard keeps its own, much shorter deadline, and denies when it passes.
 export const DEADLINE_MS = 1500;

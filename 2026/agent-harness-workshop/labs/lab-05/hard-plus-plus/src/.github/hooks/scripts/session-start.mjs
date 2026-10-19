@@ -9,8 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { append } from './audit-chain.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-export const ORG_POLICY = process.env.HARNESS_ORG_POLICY ? path.resolve(process.env.HARNESS_ORG_POLICY) : path.join(HERE, '..', 'org-policy.json');
-export const REPO_POLICY = path.join(HERE, '..', 'policy.json');
+export const ORG_POLICY = process.env.HARNESS_ORG_POLICY ? path.resolve(process.env.HARNESS_ORG_POLICY) : path.join(HERE, '..', 'policies', 'org.json');
+export const REPO_POLICY = path.join(HERE, '..', 'policies', 'repo.json');
 const sha = (file) => { try { return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'); } catch { return null; } };
 
 /** What the model should know before it starts: who governs it, and what can never be allowed. */
