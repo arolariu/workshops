@@ -881,3 +881,17 @@ test('NO_COLOR and --no-anim draw plain frames that fit 80 columns', () => { /* 
 - **Agent re-sweep after the `local` change:** 11 of 12 changed levels pass. lab-05/easy failed this time and passed in
   the first sweep: the agent chose a command spelling outside `--allow-tool=shell(rm)`, so Copilot refused it before
   the hook ran. Run-to-run variance in a pre-existing check (Windows); noted for Lab 05's Phase 4 rewrite.
+- **Code review (after Task 11):** an independent review found real maintainer-side data-loss paths, all fixed with
+  regression tests: `starters --write` could rewrite the baseline and make `sync-seeds` delete or revert work (the chain
+  now records each level's inherited and starter IDs itself, and `starters --write` refuses); a fix made only in `src/`
+  was undone in `sol/` (now carried into `sol/`); an interrupted sync could leave a stale file posing as a solution
+  change (`sol/` is written first); `bring` ignored the target's `drop` list. Also: partial runs no longer mark a
+  milestone passed, milestone IDs are normalised, `course.json` typos are reported, a broken `course.json` no longer
+  stops the learner app, and failing sources with work are named in the bring plan.
+- **Open (content, needs a decision):** 13 bootstrapped overrides. Intentional: `lab-00/medium` grades.js (starts
+  with the bug fixed), `lab-02/easy` README.md (adds the Modules section its mission uses), `lab-05/easy` AGENTS.md
+  (adds the guardrails rule). Unclear: `lab-03/hard` deadlines.test.js (drops medium's red test, so hard starts green).
+  Stale copies that undo an earlier result: `lab-00/hard` grades.js + grades.test.js (no `gpa`), `lab-01/hard`
+  grades.test.js (no medium tests), `lab-02/medium` and `lab-03/easy` README.md + index.js (no `attendance` export),
+  `lab-05/easy` .gitignore (drops `mcp/state.json`), `lab-06/easy` AGENTS.md (drops the guardrails rule), `lab-07/hard`
+  issue-triage.md (drops medium's changes).
