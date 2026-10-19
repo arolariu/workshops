@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadCourse } from './course.mjs';
+import { parseQuiz } from './quiz.mjs';
 
 // mode: 'together' levels are done live in the workshop; 'homework' levels are optional and go deeper.
 // time / capstoneTime: the suggested time budget for Labs 00-07 and for the capstone lab.
@@ -39,6 +40,15 @@ export function parseDurationRange(meta) {
 }
 /** Minutes from a todo.md meta line, using the upper bound ("🕐 10–15 min" → 15), or null when it does not say. */
 export const parseDuration = (meta) => parseDurationRange(meta)?.[1] ?? null;
+
+/** "🧱 builds on: Lab 02 · easy" → "lab-02/easy"; "🧱 starts the chain" → "start"; otherwise null. */
+export function parseBuildsOn(meta) {
+  const s = String(meta ?? '');
+  if (/🧱\s*starts the chain/i.test(s)) return 'start';
+  const m = s.match(/🧱\s*builds on:\s*Lab\s*(\d+)\s*·\s*([\w+-]+)/i);
+  const level = m && normalizeLevel(m[2]);
+  return level ? `lab-${m[1].padStart(2, '0')}/${level}` : null;
+}
 
 const read = (f) => { try { return fs.readFileSync(f, 'utf8').replace(/\r/g, ''); } catch { return ''; } };
 const LABEL_PREFIX = new RegExp(`^(${DIFFICULTIES.flatMap((d) => [d.id, d.label]).map((s) => s.replace(/\+/g, '\\+')).sort((a, b) => b.length - a.length).join('|')})\\s*·\\s*`, 'i');
@@ -98,6 +108,21 @@ export function parseTodo(md) {
     done: pick(secs, 'done when'),
     hints: parseHints(pick(secs, 'hint')),
     further: pick(secs, 'going further', 'bonus'),
+    takeaway: pick(secs, 'takeaway'),
+    quiz: parseQuiz(pick(secs, 'check yourself')),
+    buildsOn: parseBuildsOn(meta),
+  };
+}
+
+/** The readme's header blockquote (the `>` lines before the first section): layer, maturity and threads. */
+function labSpine(readme) {
+  const header = (readme.split(/^##\s/m)[0].match(/^>.*$/gm) ?? []).map((l) => l.replace(/^>\s?/, '')).join('\n');
+  const field = (name) => header.match(new RegExp(`\\*\\*${name}:\\*\\*\\s*([^·\\n]+)`))?.[1].trim() ?? null;
+  const mat = field('Maturity')?.match(/^(L\d(?:\s*→\s*L\d)?)\s*(.*)$/);
+  return {
+    layer: field('Harness layer'),
+    maturity: mat ? { level: mat[1].replace(/\s+/g, ' '), name: mat[2].trim() } : null,
+    threads: (header.match(/\*\*Threads:\*\*\s*(.+)/)?.[1] ?? '').split('·').map((s) => s.trim()).filter(Boolean),
   };
 }
 
@@ -132,7 +157,7 @@ export function loadCatalog(labsDir, { course = loadCourse(labsDir, { strict: fa
           sol: path.join(dir, 'sol'),
           todoPath: path.join(dir, 'todo.md'),
           ...todo,
-          time: todo.meta.match(/🕐\s*([^·]+)/)?.[1].trim() || (capstone ? d.capstoneTime : d.time),
+          time: todo.meta.match(/🕐\s*([^·🧱]+)/u)?.[1].trim() || (capstone ? d.capstoneTime : d.time),
           minutes: parseDuration(todo.meta),
           minutesRange: parseDurationRange(todo.meta),
           hasAgent: fs.existsSync(path.join(dir, 'tests', 'agent.mjs')),
@@ -145,6 +170,9 @@ export function loadCatalog(labsDir, { course = loadCourse(labsDir, { strict: fa
         title: m?.[3] ?? h1,
         tagline: m?.[4] ?? '',
         intro: pick(secs, 'in one minute', 'idea'),
+        ...labSpine(readme),
+        underTheHood: pick(secs, 'under the hood'),
+        enterprise: pick(secs, 'in the enterprise'),
         readmePath: path.join(labsDir, id, 'readme.md'),
         capstone,
         levels,

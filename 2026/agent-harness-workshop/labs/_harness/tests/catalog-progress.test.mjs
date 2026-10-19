@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { DIFFICULTIES, normalizeLevel, loadCatalog, findExercise, parseDuration, parseDurationRange, parseTodo } from '../catalog.mjs';
+import { DIFFICULTIES, normalizeLevel, loadCatalog, findExercise, parseDuration, parseDurationRange, parseTodo, parseBuildsOn } from '../catalog.mjs';
 import { progressStore, captureEvidence, evidenceTracker, deriveStatus, sourceFingerprint, PROGRESS_VERSION } from '../progress.mjs';
-import { tmpdir, writeTree, fixtureWorkshop } from './helpers.mjs';
+import { tmpdir, writeTree, fixtureWorkshop, chainCourse } from './helpers.mjs';
 
 const todo = (label, title, meta = '> 🕐 15 min · 🆓 free checks') => `# 🟢 ${label} · ${title}\n\n${meta}\n\n## 🎯 Mission\nDo ${title}.\n\n## ✅ Done when\n- it works\n`;
 
@@ -311,4 +311,45 @@ test('a progress file from a newer version is left untouched', () => {
   store.set('lab-01/easy', { hints: 1 });
   assert.equal(fs.readFileSync(file, 'utf8'), future);
   assert.match(store.status().error, /newer/i);
+});
+
+test('the spine: lab layer, maturity, threads and sections; level takeaway, quiz and builds-on', () => {
+  const labsDir = chainCourse({ 'lab-00/easy': {}, 'lab-01/easy': {} });
+  fs.writeFileSync(path.join(labsDir, 'lab-01/readme.md'), [
+    '# Lab 01 · 📜 Instructions — What the agent knows', '',
+    '> **Harness layer:** Context · **Maturity:** L1 Instructed · 🟢 together · 🟡 🔴 homework', '>',
+    '> **Threads:** 🔴 The red build · 📏 Measurement', '',
+    '## 🔬 Under the hood', 'Always in context.', '', '## 🏛️ In the enterprise', '- one', '- two', '- three', '',
+  ].join('\r\n'));
+  fs.writeFileSync(path.join(labsDir, 'lab-01/easy/todo.md'), [
+    '# 🟢 Easy · Rules', '', '> 🕐 10 min · 👥 together · 🆓 free checks · 🧱 builds on: Lab 00 · easy', '',
+    '## 🎯 Mission', 'Go.', '', '## 🧠 Takeaway', 'Short rules, proven loaded.', '',
+    '## ❓ Check yourself', 'Q?', '1. a', '2. b', '', '<details><summary>Answer</summary>', '', '**1.** Because.', '', '</details>', '',
+  ].join('\n'));
+  const lab = loadCatalog(labsDir).find((l) => l.id === 'lab-01');
+  assert.equal(lab.layer, 'Context');
+  assert.deepEqual(lab.maturity, { level: 'L1', name: 'Instructed' });
+  assert.deepEqual(lab.threads, ['🔴 The red build', '📏 Measurement']);
+  assert.equal(lab.underTheHood, 'Always in context.');
+  assert.equal(lab.enterprise, '- one\n- two\n- three');
+  const ex = lab.levels[0];
+  assert.equal(ex.takeaway, 'Short rules, proven loaded.');
+  assert.equal(ex.quiz.answer, 1);
+  assert.equal(ex.quiz.why, 'Because.');
+  assert.equal(ex.buildsOn, 'lab-00/easy');
+  assert.equal(ex.time, '10 min', 'the builds-on part never leaks into the time');
+  const bare = loadCatalog(labsDir).find((l) => l.id === 'lab-00');
+  assert.equal(bare.layer, null);
+  assert.equal(bare.maturity, null);
+  assert.deepEqual(bare.threads, []);
+  assert.equal(bare.levels[0].quiz, null, 'no section, no quiz');
+  assert.equal(bare.levels[0].takeaway, '');
+});
+
+test('builds-on: a lab and a tier, the start of the chain, or nothing', () => {
+  assert.equal(parseBuildsOn('🕐 10 min · 🧱 builds on: Lab 02 · easy'), 'lab-02/easy');
+  assert.equal(parseBuildsOn('🧱 builds on: Lab 5 · hard+'), 'lab-05/hard-plus');
+  assert.equal(parseBuildsOn('🕐 8 min · 🧱 starts the chain'), 'start');
+  assert.equal(parseBuildsOn('🕐 8 min'), null);
+  assert.equal(parseBuildsOn('🧱 builds on: Lab 02 · impossible'), null);
 });
