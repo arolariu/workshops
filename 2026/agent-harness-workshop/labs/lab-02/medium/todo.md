@@ -56,8 +56,12 @@ copilot
 ```
 `SKILL.md` is a skeleton: write the frontmatter and the steps first, start a **new** session (`/new`) so Copilot
 reads it again, then use it on each crash, in this order: `crash-import.txt`, `crash.txt`, `crash-attendance.txt`.
-Each fix makes `node print-report.js` get one step further. Check from the workshop folder:
-`node labs/start.mjs test lab-02 medium`.
+Each fix makes `node print-report.js` get one step further. The line numbers in a crash file are from the moment it
+crashed: once you fix `summary()`, `attendanceLines()` sits a few lines lower than `report.js:23`, so look for the
+function, not only the number. Check from the workshop folder: `node labs/start.mjs test lab-02 medium`.
+
+The optional agent check calls the skill the way a person does, with the prompt `/explain-error fixtures/crash.txt`,
+so it should pass whichever invocation choice you make in M3 (the reference chooses `false`).
 
 ## 💡 Hints
 ### M1

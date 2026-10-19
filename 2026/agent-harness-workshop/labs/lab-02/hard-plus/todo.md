@@ -71,8 +71,9 @@ block   allowed-tools  pre-approves shell, bash, powershell or write
 - Vetting a skill never runs it: a skill whose scripts write a file when they run leaves no file behind
 
 ### M5 · Decide and install
-- `VERDICT.md`: for each vendor skill, `**Verdict:** block|review|ok` and the evidence (at least 3 rules with
-  `file:line` for grade-sync, 2 for study-timer), plus a "What vetting can't see" section with 3 or more bullets
+- `VERDICT.md`: a `## <skill>` section for each vendor skill, with `**Verdict:** block|review|ok` and the evidence:
+  rule ids, each with the `file:line` it points at (at least 3 of each for grade-sync, 2 for study-timer; the lines
+  must exist in that skill's files), plus a "What vetting can't see" section with 3 or more bullets
 - `.github/skills/csv-export/` holds exactly what `vendor/csv-export/` holds, and your vetter says `ok` for it
 - grade-sync and study-timer are in no skills folder, and `copilot skill list` shows csv-export but neither of them
 

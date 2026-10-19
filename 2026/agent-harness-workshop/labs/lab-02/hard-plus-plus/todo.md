@@ -14,7 +14,7 @@ and an opt-in real run, report precision and recall, fix the descriptions, and s
 2. `evals/routing/route.mjs` routes a request to one skill (or none) with the lexical pre-check below.
 3. `evals/routing/metrics.mjs` reads canaries, computes precision and recall per skill, and writes the report.
 4. `node evals/routing/run.mjs` runs the 24 requests through the pre-check; `--real --max-credits N` runs them through
-   Copilot, read-only and capped, and refuses without a cap.
+   Copilot, read-only and capped, and refuses without a cap (or above 3 credits a request without `--yes`).
 5. The descriptions route well: macro precision and recall of 0.85 or more, every skill at least 2 of 3, at least 5
    of the 6 no-skill requests left alone, and all six descriptions in 1,500 characters together.
 6. `write-docs` is split: a short `SKILL.md` that says when to read each `references/*.md`, and nothing that belongs
@@ -69,8 +69,9 @@ Requests that need no skill: 6 of 6 loaded none.
 - `node evals/routing/run.mjs` writes `evals/routing/results.json` and `report.md` for your six skills
 - `realArgs()` has `-p <request>`, `--no-ask-user`, `--max-ai-credits=<n>`, `--deny-tool=write` and
   `--deny-tool=shell`, and never `--allow-all`, `--yolo` or `--dynamic-retrieval`
-- `--real` without `--max-credits` returns 2 and asks nothing; with it, every request is asked once, the canaries are
-  read, and `report-real.md` is written (the lexical report stays as it was)
+- `--real` without `--max-credits`, or with more than 3 credits a request and no `--yes`, returns 2 and asks nothing;
+  otherwise every request is asked once (through the `ask` that `main()` is given, never Copilot directly), the
+  canaries are read, and `report-real.md` is written (the lexical report stays as it was)
 
 ### M5 · The right skill loads
 - With the checks' own pre-check on your descriptions: macro precision and recall ≥ 0.85, every skill ≥ 0.67 on both,
@@ -133,8 +134,9 @@ A request that loads two skills is right for one and wrong for the other. Check 
 ### M4
 <details><summary>Testing a runner that costs money</summary>
 
-`main(argv, { ask })` takes `ask` as a parameter, so the checks pass a fake one and never start Copilot. Keep the
-cap check before the first `ask()`, and pass `{ credits, cwd: root }` on every call.
+`main(argv, { ask })` takes `ask` as a parameter, so the checks pass a fake one and never start Copilot (they block
+every process while `main()` runs, so a direct `askCopilot()` call fails the check). Keep both cap checks before the
+first `ask()`, and pass `{ credits, cwd: root }` on every call.
 
 </details>
 

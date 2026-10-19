@@ -24,4 +24,4 @@ One or two sentences in plain words: what went wrong and why, for a student who 
 ### Fix
 The smallest change that fixes it, as a code block, plus one regression test to add.
 
-Then end your answer with the line `[skill:explain-error]`.
+Then, as the last line of your answer (after the three sections), write `[skill:explain-error]`.

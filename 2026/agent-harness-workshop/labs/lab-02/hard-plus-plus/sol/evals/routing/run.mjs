@@ -2,6 +2,7 @@
 // The routing eval: send every request in requests.json, see which skill loads, report precision and recall.
 //   node evals/routing/run.mjs                           the lexical pre-check (free, instant, deterministic)
 //   node evals/routing/run.mjs --real --max-credits 2    real Copilot runs: read-only, capped per request
+//                                                        (more than 3 credits a request needs --yes too)
 // Writes evals/routing/results.json and report.md (lexical), or results-real.json and report-real.md (real).
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -11,6 +12,7 @@ import { loadSkills, library, route } from './route.mjs';
 import { canaries, metrics, report } from './metrics.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+const MAX_WITHOUT_YES = 3;
 const winQuote = (a) => (/^[\w\-./:=@,]+$/.test(a) ? a : `"${String(a).replace(/"/g, '""')}"`);
 
 /** The copilot arguments for one request: a prompt, no questions, read-only, and a credit cap. */
@@ -37,6 +39,10 @@ export async function main(argv, { ask = askCopilot, root = path.resolve(HERE, '
   const credits = at >= 0 ? Number(argv[at + 1]) : NaN;
   if (real && !(Number.isInteger(credits) && credits > 0)) {
     log('A real run spends AI credits: add --max-credits <n>, the cap for each request (for example --max-credits 2).');
+    return 2;
+  }
+  if (real && credits > MAX_WITHOUT_YES && !argv.includes('--yes')) {
+    log(`--max-credits ${credits} allows up to ${requests.length * credits} AI credits for one eval. Add --yes if you mean it.`);
     return 2;
   }
   const results = [];

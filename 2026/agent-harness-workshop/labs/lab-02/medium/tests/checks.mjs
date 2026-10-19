@@ -1,8 +1,9 @@
 // Free checks for Lab 02 · medium: a command you call by name.
 const SKILL = '.github/skills/explain-error/SKILL.md';
 const stepCount = (body) => body.split('\n').filter((l) => /^\s*\d+[.)]\s+\S/.test(l)).length;
-const prose = (body) => body.replace(/```[\s\S]*?```/g, '');
-const heading = (body, h) => prose(body).search(new RegExp(`^#{1,4}\\s*\\W*\\s*${h}\\b`, 'im'));
+// Only the fence lines go: an answer template is usually written inside a ```markdown block, and its headings count.
+const prose = (body) => body.split('\n').filter((l) => !/^\s*(```|~~~)/.test(l)).join('\n');
+const heading = (body, h) => prose(body).search(new RegExp(`^[ \\t>]*#{1,4}\\s*\\W*\\s*${h}\\b`, 'im'));
 
 /** The comment that justifies `disable-model-invocation`: on its line, or the comment lines right above it. */
 function justification(raw) {
@@ -54,7 +55,7 @@ export default (t) => [
   }, { milestone: 'M2' }),
   t.check('Where is a file:line relative to the project', () => {
     const { body } = t.frontmatter(SKILL);
-    if (!/<?\bfile>?:<?line\b|\bpath:line\b/i.test(body)) return 'Say what Where looks like: `<file>:<line>`.';
+    if (!/<?\b(file|path)>?:<?line\b/i.test(body)) return 'Say what Where looks like: `<file>:<line>`.';
     return /relative|project root/i.test(body) || 'Say the path is relative to the project root (a stack trace prints file:///home/… paths that mean nothing on your machine).';
   }, { milestone: 'M2' }),
   t.check('A rule for each kind of crash', () => {

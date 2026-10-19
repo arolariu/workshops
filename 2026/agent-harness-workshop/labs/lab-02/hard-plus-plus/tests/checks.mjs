@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { SIX, WHEN, MIN_SCORE, library as refLibrary, score as refScore, readSkills, lexicalEval } from './helpers.mjs';
+import { SIX, WHEN, MIN_SCORE, library as refLibrary, score as refScore, readSkills, lexicalEval, withoutProcesses, COPILOT_ITSELF } from './helpers.mjs';
 
 const ROUTE = 'evals/routing/route.mjs';
 const METRICS = 'evals/routing/metrics.mjs';
@@ -16,6 +16,13 @@ const TOY = [
   { name: 'pizza-recipe', description: 'Bake a pizza at home from a recipe. Use when the user wants to cook pizza.' },
   { name: 'weather', description: 'Tell the weather forecast for a city. Use when the user asks about rain or sun.' },
 ];
+/** A check body that runs your code with no way to start a process (see withoutProcesses): starting one fails it. */
+const guarded = (t, fn) => async () => {
+  const r = await withoutProcesses(t, fn);
+  if (r.started.length) return `${COPILOT_ITSELF} It tried to start: ${[...new Set(r.started)].join(', ')}.`;
+  if (r.error) throw r.error;
+  return r.value;
+};
 /** A copy of your folder, and its run.mjs loaded from there (so the runner writes into the copy, never into yours). */
 async function runner(t) {
   const copy = t.copy(t.tmp());
@@ -131,7 +138,7 @@ export default (t) => [
   }, { milestone: 'M3' }),
 
   // M4 · The eval runner
-  t.check('node evals/routing/run.mjs writes the lexical report for your six skills', async () => {
+  t.check('node evals/routing/run.mjs writes the lexical report for your six skills', guarded(t, async () => {
     const { copy, mod } = await runner(t);
     if (typeof mod.main !== 'function') return `${RUN} should export main(argv, { ask, root, log }).`;
     const code = await mod.main([], { root: copy, log: () => {}, ask: () => t.fail('The lexical run must not ask Copilot.') });
@@ -145,8 +152,8 @@ export default (t) => [
     const md = fs.readFileSync(path.join(dir, 'report.md'), 'utf8');
     const macro = md.split('\n').find((l) => /macro/i.test(l)) ?? '';
     return (macro.includes(n2(m.macro.precision)) && macro.includes(n2(m.macro.recall))) || t.fail('The report\'s macro row doesn\'t match the pre-check on your skills.', { expected: `precision ${n2(m.macro.precision)}, recall ${n2(m.macro.recall)}`, actual: macro.trim() || '(no macro row)' });
-  }, { milestone: 'M4' }),
-  t.check('realArgs(): one prompt, no questions, read-only, capped', async () => {
+  }), { milestone: 'M4' }),
+  t.check('realArgs(): one prompt, no questions, read-only, capped', guarded(t, async () => {
     const { realArgs } = await t.import(RUN);
     const a = (realArgs?.('Export my grades to a CSV file.', { credits: 2 }) ?? []).map(String);
     const has = (flag, value) => a.includes(`${flag}=${value}`) || a.some((x, i) => x === flag && a[i + 1] === value);
@@ -159,15 +166,18 @@ export default (t) => [
     if (missing.length) return `realArgs() is missing: ${missing.join(', ')}.`;
     const risky = a.filter((x) => /^--(allow-all|yolo|allow-all-tools|allow-all-paths|dynamic-retrieval)\b/.test(x) || /^--allow-tool=(write|shell)/.test(x));
     return !risky.length || `Never in an eval: ${risky.join(', ')} (--dynamic-retrieval even changes your settings for good).`;
-  }, { milestone: 'M4' }),
-  t.check('--real refuses to start without --max-credits', async () => {
+  }), { milestone: 'M4' }),
+  t.check('--real refuses without a cap, and above 3 credits a request without --yes', guarded(t, async () => {
     const { copy, mod } = await runner(t);
     let asked = 0;
     const code = await mod.main(['--real'], { root: copy, log: () => {}, ask: () => { asked++; return ''; } });
     if (asked) return `main(['--real']) asked Copilot ${asked} time(s) without a credit cap.`;
-    return code === 2 || `main(['--real']) without --max-credits should return 2, got ${code}.`;
-  }, { milestone: 'M4' }),
-  t.check('--real asks every request once, reads the canaries, and writes report-real.md', async () => {
+    if (code !== 2) return `main(['--real']) without --max-credits should return 2, got ${code}.`;
+    const big = await mod.main(['--real', '--max-credits', '10'], { root: copy, log: () => {}, ask: () => { asked++; return ''; } });
+    if (asked) return `main(['--real', '--max-credits', '10']) asked Copilot without --yes: that's up to 240 credits.`;
+    return big === 2 || `Above 3 credits a request, refuse (return 2) unless --yes is given; got ${big}.`;
+  }), { milestone: 'M4' }),
+  t.check('--real asks every request once, reads the canaries, and writes report-real.md', guarded(t, async () => {
     const { copy, mod } = await runner(t);
     const requests = JSON.parse(fs.readFileSync(path.join(copy, 'evals', 'routing', 'requests.json'), 'utf8'));
     const byText = new Map(requests.map((r) => [r.request, r]));
@@ -188,7 +198,7 @@ export default (t) => [
     const md = fs.readFileSync(file, 'utf8');
     const row = md.split('\n').find((l) => l.includes('| write-docs |')) ?? '';
     return (row.includes('0.75') && row.includes('1.00') && /5 of 6/.test(md)) || `With the fake answers, write-docs has precision 0.75 and recall 1.00, and 5 of 6 no-skill requests load none. The report says: ${row.trim() || '(no write-docs row)'}`;
-  }, { milestone: 'M4' }),
+  }), { milestone: 'M4' }),
 
   // M5 · The right skill loads
   t.check('The pre-check routes the 24 requests well (precision and recall)', () => {
@@ -235,10 +245,11 @@ export default (t) => [
   }, { milestone: 'M6' }),
   t.check('write-docs no longer claims other skills\' jobs', () => {
     const fm = t.frontmatter('.github/skills/write-docs/SKILL.md');
-    const claims = String(fm.data.description ?? '').match(/changelog|release notes?|commit message|error|crash|export/gi);
+    const OTHERS = /\bchangelogs?\b|\brelease notes?\b|\bcommit messages?\b|\bexplain\w*\b[^.]*?\b(errors?|crash(es)?)\b|\bstack traces?\b|\bcrash(es)?\b|\bexport(s|ing)?\b/gi;
+    const claims = String(fm.data.description ?? '').match(OTHERS);
     if (claims) return `The description still claims: ${[...new Set(claims.map((c) => c.toLowerCase()))].join(', ')}. Those requests belong to release-notes, explain-error and csv-export.`;
     const files = ['.github/skills/write-docs/SKILL.md', ...t.files('.github/skills/write-docs/references')];
-    const sections = files.flatMap((f) => (t.read(f) ?? '').split('\n').filter((l) => /^#{1,4}\s/.test(l) && /changelog|release notes|explain\w*\s+errors?|crash|export/i.test(l)).map((l) => `${f}: ${l.trim()}`));
+    const sections = files.flatMap((f) => (t.read(f) ?? '').split('\n').filter((l) => /^#{1,4}\s/.test(l) && new RegExp(OTHERS.source, 'i').test(l)).map((l) => `${f}: ${l.trim()}`));
     return !sections.length || `These sections teach another skill's job; delete them: ${sections.join('; ')}.`;
   }, { milestone: 'M6' }),
 ];

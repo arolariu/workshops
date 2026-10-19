@@ -54,7 +54,10 @@ note on the next line, indented two spaces):
 - fix(deadlines): round days up (7d6c5b4)
 ```
 Without `--version` the title is `## [Unreleased]`. Nothing to list: the title, a blank line, `No user-facing
-changes.`. Only `feat` and `fix` get a section of their own; tests, chores, docs and the rest stay in the JSON.
+changes.`. Besides breaking changes, only `feat`, `fix` and `revert` get a section; tests, chores, docs and the rest
+stay in the JSON. `### ⏪ Reverted` lists `groups.revert`: reverts of commits from **before** the range, which take
+back something users already had. A pair that cancels inside the range appears nowhere in the notes (only in the
+JSON's `reverted`): users never saw that change.
 
 ## 🧭 Milestones
 ### M1 · Read one commit
@@ -90,12 +93,10 @@ code .github/skills/release-notes/scripts/changes.mjs
 cd .github/skills/release-notes/scripts
 node changes.mjs --from ../../../../fixtures/git-log.txt
 node --test changes.test.mjs
-cd ../../../..
-node labs/start.mjs test lab-02 hard     # from the workshop folder
 ```
 `changes.mjs` already reads git (full messages, since the last tag), reads `--from` files, and parses the command
 line: you write `parseCommit`, `group` and `render`. `npm test` skips the dot folder `.github/`, so name the test
-file to run it.
+file to run it. Check from the workshop folder (four levels above `src/`): `node labs/start.mjs test lab-02 hard`.
 
 ## 💡 Hints
 ### M1
@@ -124,11 +125,14 @@ First pass: for each revert with a `revertOf`, find its target in the list (`a.s
 
 <details><summary>Try it on a real history</summary>
 
+Make the demo repository **outside** the workshop (a repository inside it would be a nested repo), and delete it
+afterwards. `<src>` is the full path of this level's `src/` folder:
 ```bash
-git init demo && cd demo
+cd ~
+git init release-demo && cd release-demo
 git commit --allow-empty -m "chore: start" && git tag v1.0.0
 git commit --allow-empty -m "feat(ui): x" -m "BREAKING CHANGE: y"
-node ../.github/skills/release-notes/scripts/changes.mjs
+node <src>/.github/skills/release-notes/scripts/changes.mjs
 ```
 
 </details>

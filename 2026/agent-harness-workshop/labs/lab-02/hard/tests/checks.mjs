@@ -22,11 +22,14 @@ const runJson = (t, args, cwd) => {
   try { return JSON.parse(out); } catch { return t.fail(`Without --format md the script must print JSON. It printed: ${out.trim().slice(0, 160)}`); }
 };
 
-/** A throwaway repository: fixed author and dates, commits made from steps ({ msg, body?, file?, tag?, revert? }). */
+/** A throwaway repository: fixed author and dates, commits made from steps ({ msg, body?, file?, tag?, revert? }).
+ *  Your global git config can't interfere: no signing, no hooks (an empty hooks folder), and a time limit. */
 function gitRepo(t, steps) {
   const dir = t.tmp();
+  const hooks = t.tmp();
   const env = { ...process.env, GIT_AUTHOR_DATE: '2026-10-19T10:00:00Z', GIT_COMMITTER_DATE: '2026-10-19T10:00:00Z' };
-  const git = (...a) => execFileSync('git', ['-c', 'user.name=Check', '-c', 'user.email=check@example.com', '-c', 'commit.gpgsign=false', '-c', 'core.autocrlf=false', ...a], { cwd: dir, env, stdio: 'ignore' });
+  const config = ['-c', 'user.name=Check', '-c', 'user.email=check@example.com', '-c', 'commit.gpgSign=false', '-c', 'tag.gpgSign=false', '-c', `core.hooksPath=${hooks}`, '-c', 'core.autocrlf=false'];
+  const git = (...a) => execFileSync('git', [...config, ...a], { cwd: dir, env, stdio: 'ignore', timeout: 20000 });
   git('init', '-q');
   for (const s of steps) {
     if (s.revert) git('revert', '--no-edit', 'HEAD');

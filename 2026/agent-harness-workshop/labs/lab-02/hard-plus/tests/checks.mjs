@@ -2,7 +2,7 @@
 // time, and the vendor samples are only read: nothing a check touches ever runs.
 import fs from 'node:fs';
 import path from 'node:path';
-import { VET, SKILL_DIRS, VENDOR, makeSkill, skillMd, CLEAN, rules, where, readTree } from './helpers.mjs';
+import { VET, SKILL_DIRS, VENDOR, makeSkill, skillMd, CLEAN, rules, where, readTree, withoutProcesses } from './helpers.mjs';
 
 const GOOD_DESC = 'description: Export StudyBuddy grades to a CSV file. Use when the user asks to export grades as CSV.';
 const vet = (t) => t.import(VET);
@@ -211,26 +211,40 @@ export default (t) => [
     });
     t.node([t.path(VET), dir, '--json']);
     const { vetSkill } = await vet(t);
-    vetSkill(dir);
+    const inProcess = await withoutProcesses(t, () => vetSkill(dir));
+    if (inProcess.started.length) return `vetSkill() tried to start a process (${[...new Set(inProcess.started)].join(', ')}). A vetter only reads files: it never runs, installs or asks anything.`;
     return !fs.existsSync(marker) || 'Vetting the skill ran its code! The vetter must only read files (never import, require or run them).';
   }, { milestone: 'M4' }),
 
   // M5 · Decide and install
   t.check('VERDICT.md: a verdict and the evidence for each vendor skill', () => {
     const s = t.need('VERDICT.md', 'Write VERDICT.md.');
-    const section = (name) => s.split(/^##\s+/m).find((part) => part.trim().toLowerCase().startsWith(name)) ?? null;
+    // "## grade-sync", "## `grade-sync`", "## 1. grade-sync (block)": the heading starts with the skill's name.
+    const section = (name) => s.split(/^##\s+/m).find((part) => part.trim().replace(/^[^a-z0-9]+/i, '').toLowerCase().startsWith(name)) ?? null;
     for (const [name, want] of Object.entries(VENDOR)) {
       const part = section(name);
       if (!part) return `VERDICT.md needs a "## ${name}" section.`;
-      const v = part.match(/\*\*Verdict:\*\*\s*`?(block|review|ok)\b/i)?.[1]?.toLowerCase();
+      const v = part.match(/\bverdict\b[*_:`\s]*(block|review|ok)\b/i)?.[1]?.toLowerCase();
       if (!v) return `The ${name} section needs a line like "**Verdict:** ${want}".`;
       if (v !== want) return `${name}: your verdict is "${v}". Look at the findings again (and the files behind them).`;
     }
     const cited = (name, ids) => ids.filter((id) => new RegExp(`\\b${id}\\b`).test(section(name)));
-    const gs = cited('grade-sync', ['allowed-tools', 'hidden-instructions', 'pipe-to-shell', 'write-outside', 'exfiltration', 'eval', 'network', 'secrets']);
-    if (gs.length < 3) return `Back the grade-sync verdict with evidence: name at least 3 rules it breaks, with file:line (found ${gs.join(', ') || 'none'}).`;
-    const st = cited('study-timer', ['name', 'description', 'absolute-path']);
-    return st.length >= 2 || `Back the study-timer verdict with evidence: name at least 2 of its problems (name, description, absolute-path), with file:line.`;
+    // file:line references that point at a real line of a real file of that skill.
+    const lines = (name) => [...new Set([...section(name).matchAll(/([\w./-]+\.[A-Za-z0-9]+):(\d+)/g)].filter(([, file, line]) => {
+      const text = t.read(`vendor/${name}/${file}`);
+      return text != null && Number(line) >= 1 && Number(line) <= text.split('\n').length;
+    }).map(([ref]) => ref))];
+    const evidence = [
+      ['grade-sync', 3, ['allowed-tools', 'hidden-instructions', 'pipe-to-shell', 'write-outside', 'exfiltration', 'eval', 'network', 'secrets']],
+      ['study-timer', 2, ['name', 'description', 'absolute-path']],
+    ];
+    for (const [name, n, ids] of evidence) {
+      const rules = cited(name, ids);
+      if (rules.length < n) return `Back the ${name} verdict with evidence: name at least ${n} of the rules it breaks (${ids.join(', ')}), each with its file:line (found ${rules.join(', ') || 'none'}).`;
+      const refs = lines(name);
+      if (refs.length < n) return `Back the ${name} verdict with at least ${n} file:line references to its files, like SKILL.md:5 or scripts/sync.mjs:16 (found ${refs.join(', ') || 'none that point at a real line'}).`;
+    }
+    return true;
   }, { milestone: 'M5' }),
   t.check('VERDICT.md: what vetting can\'t see', () => {
     const s = t.need('VERDICT.md', 'Write VERDICT.md.');

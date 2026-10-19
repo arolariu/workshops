@@ -2,6 +2,7 @@
 // The routing eval: send every request in requests.json, see which skill loads, report precision and recall.
 //   node evals/routing/run.mjs                           the lexical pre-check (free, instant, deterministic)
 //   node evals/routing/run.mjs --real --max-credits 2    real Copilot runs: read-only, capped per request
+//                                                        (more than 3 credits a request needs --yes too)
 // Writes evals/routing/results.json and report.md (lexical), or results-real.json and report-real.md (real).
 // Given: askCopilot() (one real run). Your work: TODO(M4) realArgs() and main().
 import { spawnSync } from 'node:child_process';
@@ -35,9 +36,10 @@ export async function main(argv, { ask = askCopilot, root = path.resolve(HERE, '
   const requests = JSON.parse(fs.readFileSync(path.join(root, 'evals', 'routing', 'requests.json'), 'utf8'));
   const skills = loadSkills(root);
   // TODO(M4): without --real: route() each request over library(skills) → { id, request, expect, got: [name] or [] }.
-  // With --real: return 2 unless --max-credits <n> (a positive integer) is given; say the ceiling (requests × n);
-  // then got = canaries(await ask(request, { credits: n, cwd: root })). Finally metrics(), report(), and write
-  // results(-real).json and report(-real).md into evals/routing/; log the report; return 0.
+  // With --real: return 2 unless --max-credits <n> (a positive integer) is given, and unless --yes is given when n is
+  // over 3; say the ceiling (requests × n); then got = canaries(await ask(request, { credits: n, cwd: root })).
+  // Never call askCopilot() yourself: use the `ask` you're given (the checks pass a fake one). Finally metrics(),
+  // report(), and write results(-real).json and report(-real).md into evals/routing/; log the report; return 0.
   log(`TODO: the eval runner (${requests.length} requests, ${skills.length} skills).`);
   return 0;
 }

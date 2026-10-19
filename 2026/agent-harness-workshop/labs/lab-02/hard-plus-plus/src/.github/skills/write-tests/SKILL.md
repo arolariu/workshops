@@ -8,3 +8,5 @@ description: Writes tests. Use when the user asks for tests, a new module with t
    there is one.
 3. Write one `test()` per case with `node:test` and `node:assert/strict`, next to the tests that are already there.
 4. Run `npm test`. A test for a bug must fail before the fix and pass after it.
+5. Don't change the code under test unless the user asks you to: the tests are the deliverable. If one fails because
+   of a bug, say so and show the failing test.
