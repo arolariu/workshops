@@ -158,3 +158,26 @@ test('after a pass: the takeaway and the question; answer N gives feedback; quiz
   assert.match(text, /There is no option 9/);
   assert.equal(progressStore(labsDir).get('lab-03/easy').quiz, 'wrong', 'the first answer is the one recorded');
 });
+test('show includes the time on the level; past 1.5x the suggestion, one nudge toward a hint', async () => {
+  const { labsDir } = fixtureWorkshop();
+  let now = 5_000_000;
+  const input = new PassThrough();
+  const output = new PassThrough();
+  let text = '';
+  output.write = (s) => { text += String(s); return true; };
+  const done = runLinear({ labsDir, input, output, deps: { now: () => now } });
+  const send = async (line) => { input.write(`${line}\n`); await new Promise((r) => setTimeout(r, 30)); };
+  await send('open lab-01 easy');
+  now += 12 * 60_000;
+  await send('show');
+  assert.match(text, /⏱ 12 min here · suggested 10/);
+  now += 5 * 60_000;
+  await send('show');
+  assert.match(text, /⏱ 17 min here[\s\S]*A hint \(type "hint"\) could save you time/);
+  now += 60_000;
+  await send('show');
+  assert.equal((text.match(/could save you time/g) ?? []).length, 1, 'only one nudge');
+  input.end('quit\n');
+  await done;
+  assert.equal(progressStore(labsDir).get('lab-01/easy').activeMs, 18 * 60_000);
+});

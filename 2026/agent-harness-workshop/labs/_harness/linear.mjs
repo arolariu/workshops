@@ -18,6 +18,7 @@ import { bringPlan, applyBring } from './bring.mjs';
 import { revealNextHint, revealedHints, groupChecks, milestoneBar } from './milestones.mjs';
 import { bringLines } from './screens/bring.mjs';
 import { answerQuiz, quizUnlocked } from './screens/learn.mjs';
+import { levelClock, suggestedMinutes, timerText, shouldNudge } from './timer.mjs';
 
 const HELP = `Commands (type one and press Enter):
   list [path=ID] [level=L] [status=S] [minutes=N] [bookmarked] [words…]   numbered exercises, filtered
@@ -49,7 +50,7 @@ const HELP = `Commands (type one and press Enter):
 export function runLinear({
   labsDir, input = process.stdin, output = process.stdout, open = null, path: startPath = null, deps: overrides = {},
 }) {
-  const deps = { runChecks: realRunChecks, runAgentChecks: realRunAgentChecks, loadAgentChecks: realLoadAgentChecks, listRuns: realListRuns, inspectEnvironment: realInspect, runInteractive: realRunInteractive, changesDiff: realChangesDiff, ...overrides };
+  const deps = { runChecks: realRunChecks, runAgentChecks: realRunAgentChecks, loadAgentChecks: realLoadAgentChecks, listRuns: realListRuns, inspectEnvironment: realInspect, runInteractive: realRunInteractive, changesDiff: realChangesDiff, now: () => Date.now(), ...overrides };
   const rootDir = path.dirname(labsDir);
   const catalog = loadCatalog(labsDir);
   const store = progressStore(labsDir);
@@ -78,6 +79,23 @@ export function runLinear({
   const label = (lab, ex) => `Lab ${lab.num} ${lab.title}, ${ex.label}: ${ex.title}`;
   const order = courseOrder(catalog);
   const PLAIN = { dim: (s) => s, white: (s) => s, yellow: (s) => s, bright: (s) => s };
+  // The level timer (timer.mjs): each command is an action on the open exercise.
+  const clock = levelClock({ now: () => deps.now() });
+  const credit = (list) => { for (const { key, ms } of list) store.set(key, { activeMs: (store.get(key).activeMs ?? 0) + ms }); };
+  const timeOn = (ex) => (store.get(ex.key).activeMs ?? 0) + clock.pending(ex.key);
+  function tick({ nudge = false } = {}) {
+    const key = current?.ex.key ?? null;
+    credit(clock.touch(key));
+    if (!key) return;
+    if (clock.pending(key) >= 60_000) credit(clock.take());
+    if (!nudge) return;
+    const { ex } = current;
+    const entry = store.get(key);
+    if (shouldNudge({ activeMs: timeOn(ex), suggested: suggestedMinutes(ex), hintsLeft: ex.hints.length - revealedHints(ex, entry).size, nudged: entry.nudged })) {
+      store.set(key, { nudged: true });
+      say('⏱ A hint (type "hint") could save you time.');
+    }
+  }
 
   async function bring() {
     if (!need()) return;
@@ -126,8 +144,14 @@ export function runLinear({
       if (!found?.ex) { say(found?.error ?? `Use: open lab-01 easy (difficulties: ${levelChoices()}).`); return; }
       current = { lab: found.lab, ex: found.ex };
     }
-    store.set('_ui', { lab: current.lab.id, level: current.ex.level });
+    opened();
     show();
+  }
+
+  /** Remember the open exercise, and when it was first opened. */
+  function opened() {
+    store.set('_ui', { lab: current.lab.id, level: current.ex.level });
+    if (!store.get(current.ex.key).firstOpened) store.set(current.ex.key, { firstOpened: new Date(deps.now()).toISOString() });
   }
 
   function show() {
@@ -137,6 +161,7 @@ export function runLinear({
     const entry = view.entry(ex);
     say(`Open: ${label(lab, ex)}.`);
     if (ex.meta) say(`  ${stripAnsi(ex.meta)}`);
+    say(`  ${timerText(timeOn(ex), suggestedMinutes(ex))}`);
     say(`${ex.theme}. ${ex.mode === 'together' ? 'Done together in the workshop.' : 'Optional homework.'}`);
     if (lab.layer) say(`Harness layer: ${lab.layer} (Lab ${lab.num}).${lab.maturity ? ` Maturity: ${lab.maturity.level} ${lab.maturity.name}.` : ''}${lab.threads.length ? ` Threads: ${lab.threads.join(', ')}.` : ''}`);
     const pred = predecessorOf(order, ex.key);
@@ -368,7 +393,7 @@ export function runLinear({
         const nu = nextExercise(catalog, view, { path: pathId, current: current?.ex.key ?? null, last: ui.lab && ui.level ? `${ui.lab}/${ui.level}` : null });
         if (!nu) { say(pathId === 'all' ? 'Every exercise passes.' : `Your ${pathById(pathId).label} path is complete.`); return; }
         current = { lab: nu.lab, ex: nu.ex };
-        store.set('_ui', { lab: current.lab.id, level: current.ex.level });
+        opened();
         show();
         return;
       }
@@ -412,6 +437,7 @@ export function runLinear({
     const finish = (code) => {
       if (finished) return;
       finished = true;
+      credit(clock.touch(null));
       process.off('SIGINT', onSigint);
       say('Goodbye. Continue any time with: node labs/start.mjs --linear');
       rl.close();
@@ -425,7 +451,9 @@ export function runLinear({
       while (queue.length && !finished) {
         const line = queue.shift();
         let result;
+        tick();
         try { result = await handle(line); } catch (e) { say(`Something went wrong: ${e.message}`); }
+        tick({ nudge: true });
         if (result === 'quit') { finish(0); return; }
         if (!finished) output.write('> ');
       }

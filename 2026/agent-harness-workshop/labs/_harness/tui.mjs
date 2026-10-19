@@ -26,6 +26,7 @@ import { bringLines } from './screens/bring.mjs';
 import { changesLines } from './screens/changes.mjs';
 import { answerQuiz, quizLines, takeawayLines, quizUnlocked } from './screens/learn.mjs';
 import { layerMapLines } from './screens/layers.mjs';
+import { levelClock, suggestedMinutes, timerText, shouldNudge } from './timer.mjs';
 import { KEYMAP, MENU_KEYS, binding } from './keys.mjs';
 import { checkGroupLines, milestoneListLines, hintDots } from './screens/milestones.mjs';
 
@@ -69,6 +70,7 @@ export async function startTui({
     runChecks: realRunChecks, runAgentChecks: realRunAgentChecks, loadAgentChecks: realLoadAgentChecks, listRuns: realListRuns,
     inspectEnvironment: realInspect, runInteractive: realRunInteractive, openFolder: realOpenFolder, copyToClipboard: realCopy,
     changesDiff: realChangesDiff,
+    now: () => Date.now(),
     ...overrides,
   };
   setAscii(ascii);
@@ -154,6 +156,7 @@ export async function startTui({
   const quit = (code = 0) => {
     if (quitting) return;
     quitting = true;
+    try { credit(clock.touch(null)); } catch { /* progress could not be saved: the time is lost, nothing else */ }
     restore();
     const { done } = counts();
     const g = (s) => `${style.fg(C.green)}${s}${style.reset}`;
@@ -306,6 +309,27 @@ export async function startTui({
     S.quizChoice = { key: ex.key, choice: n };
     render();
   };
+
+  // ---------- the level timer (timer.mjs) ----------
+  const clock = levelClock({ now: () => deps.now() });
+  const levelKey = () => (ON_LEVEL.has(S.screen) ? exObj()?.key ?? null : null);
+  const credit = (list) => { for (const { key, ms } of list) store.set(key, { activeMs: (store.get(key).activeMs ?? 0) + ms }); };
+  const firstVisit = () => { const ex = exObj(); if (ex && !view.entry(ex).firstOpened) store.set(ex.key, { firstOpened: new Date(deps.now()).toISOString() }); };
+  const activeMs = (ex) => (view.entry(ex).activeMs ?? 0) + clock.pending(ex.key);
+  /** Note an action on the current level (or none). Saves the time now and then, and nudges once toward a hint. */
+  function tickClock({ flush = false } = {}) {
+    const key = levelKey();
+    credit(clock.touch(key));
+    if (!key) return;
+    if (flush || clock.pending(key) >= 60_000) credit(clock.take());
+    const ex = exObj();
+    const entry = view.entry(ex);
+    const hintsLeft = ex.hints.length - revealedHints(ex, entry).size;
+    if (shouldNudge({ activeMs: activeMs(ex), suggested: suggestedMinutes(ex), hintsLeft, nudged: entry.nudged })) {
+      store.set(key, { nudged: true });
+      toast(`⏱ ${yellow('A hint (h) could save you time.')}`, 8000);
+    }
+  }
 
   // ---------- screens ----------
   function splashScreen() {
@@ -583,6 +607,7 @@ export async function startTui({
     const switcher = lab.levels.map((e, i) => `${e.badge}${i === S.level ? bold(bright(DIFFICULTIES.find((d) => d.id === e.level)?.key ?? '')) : dim(DIFFICULTIES.find((d) => d.id === e.level)?.key ?? '')}`).join(' ');
     L.push(...header(`${ex.badge} ${bold(bright(`${LABEL(ex)} · ${ex.title}`))}`, dim(`Lab ${lab.num} · ${lab.emoji} ${lab.title} · ${ex.theme} · ${ex.mode === 'together' ? '👥 together' : '🏠 homework'}`), switcher));
     if (ex.meta) L.push(...para(dim(ex.meta.replace(/\*\*/g, ''))));
+    L.push(...para(dim(timerText(activeMs(ex), suggestedMinutes(ex)))));
     L.push(...para(startsFrom(ex)));
     L.push(...para(`📖 ${dim('Press')} ${keycap('g')} ${dim(`for the lab guide: ${lab.title} explained, with examples and links.`)}`));
     const section = (icon, title, md) => {
@@ -1181,7 +1206,8 @@ ${levelKeyRows()}
     if (['home', 'lab', 'browse', 'exercise'].includes(screen) && screen !== S.screen) refresh();
     S.screen = screen;
     if (screen === 'exercise' || screen === 'lab') saveUi();
-    if (screen === 'exercise') S.changes = gitChanges(exObj().src);
+    if (screen === 'exercise') { S.changes = gitChanges(exObj().src); firstVisit(); }
+    tickClock();
     render();
   }
   const goBack = (fallback = 'home') => go(S.back[S.screen] && S.back[S.screen] !== S.screen ? S.back[S.screen] : fallback);
@@ -1231,6 +1257,7 @@ ${levelKeyRows()}
     if (summary.planMilestones?.length) S.run.planMilestones = summary.planMilestones;
     store.recordChecks(ex.key, summary, evidence);
     view.tracker.invalidate(ex.key);
+    tickClock({ flush: true });
     const fixName = nextFixName(summary.results);
     const firstFail = fixName ? summary.results.findIndex((r) => r.name === fixName) : summary.results.findIndex((r) => r.status !== 'pass');
     S.detail.idx = Math.max(0, firstFail);
@@ -1499,6 +1526,7 @@ ${levelKeyRows()}
     const ex = exObj();
     keepStarter(ex);
     stopWatch();
+    tickClock({ flush: true });
     suspend();
     const g = (s) => `${style.fg(C.green)}${s}${style.reset}`;
     out.write(`\n${g(`  💻 Copilot is starting in ${bold(rel(ex.src))}`)}\n${g(dim('     When you are done, type /exit and you come straight back to the lab app.'))}\n\n`);
@@ -1511,6 +1539,7 @@ ${levelKeyRows()}
       await waitKey();
     }
     resume();
+    tickClock({ flush: true });
     if (!res.missing) {
       view.tracker.invalidate(ex.key);
       toast('👋 Welcome back! Checking your work…');
@@ -1791,6 +1820,7 @@ ${levelKeyRows()}
   function onKey(str, k = {}) {
     if (S.suspended || quitting) return;
     const name = k.name ?? str;
+    tickClock();
     if (k.ctrl && name === 'c') {
       if (S.agentRun) { cancelAgent(); return; }
       if (S.run?.running) { cancelChecks(); return; }
@@ -1839,6 +1869,8 @@ ${levelKeyRows()}
   const longAgo = !meta.introAt || now() - Date.parse(meta.introAt) > 6 * 3600 * 1000;
   if (S.screen === 'exercise') {
     S.changes = gitChanges(exObj().src);
+    firstVisit();
+    tickClock();
   } else if (intro && ANIM && !isAscii()) {
     S.screen = 'splash';
     S.t.splash = longAgo ? now() : now() - 2400;

@@ -527,3 +527,26 @@ test('the lab screen shows the layer map with this lab marked and its threads', 
   assert.ok(s.indexOf('YOUR HARNESS') < s.indexOf('CHOOSE YOUR LEVEL'));
   t.quit();
 });
+test('the mission screen shows time on the level; past 1.5x the suggestion, one toast offers a hint', async () => {
+  let now = 1_000_000;
+  const MIN = 60_000;
+  const t = await app({ open: 'lab-01/easy', size: { columns: 100, rows: 50 }, deps: { now: () => now } });
+  assert.match(text(t.output), /⏱ under a minute here · suggested 10/);
+  assert.ok(progressStore(t.labsDir).get('lab-01/easy').firstOpened, 'the first visit is remembered');
+  now += 16 * MIN;
+  press(t.input, '', 'down');
+  assert.match(text(t.output), /⏱ 16 min here · suggested 10/);
+  assert.match(t.state.toast?.msg ?? '', /A hint \(h\) could save you time/);
+  assert.equal(progressStore(t.labsDir).get('lab-01/easy').nudged, true);
+  assert.equal(progressStore(t.labsDir).get('lab-01/easy').activeMs, 16 * MIN);
+  t.state.toast = null;
+  now += 3 * 60 * MIN; // an idle laptop
+  press(t.input, '', 'up');
+  assert.equal(t.state.toast, null, 'only one nudge');
+  assert.match(text(t.output), /⏱ 1 h 1 min here/, '16 min + at most 45 min for the idle stretch');
+  press(t.input, 'b');
+  now += 30 * MIN;
+  press(t.input, '', 'down');
+  assert.equal(progressStore(t.labsDir).get('lab-01/easy').activeMs, 61 * MIN, 'time off the level does not count');
+  t.quit();
+});
