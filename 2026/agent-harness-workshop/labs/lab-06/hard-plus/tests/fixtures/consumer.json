@@ -1,0 +1,21 @@
+{
+  "_about": "M2 and M4: a project that installed two APM packages. The checks write these files into a temp folder, deploy campus-standards from vendor/, and compute apm.lock.yaml.",
+  "files": {
+    "apm.yml": "name: campus-app\nversion: 1.0.0\ndescription: A course app on the university's shared harness\ndependencies:\n  apm:\n    - microsoft/apm-sample-package#v1.0.0\n    - studybuddy-org/campus-standards#v1.4.0\n",
+    "AGENTS.md": "# Campus app\n\nPlain Node.js 22. Run the tests with `npm test`.\n\n## Grades\n- When you compute or explain a grade, follow the campus-grading-rules skill.\n",
+    "README.md": "# campus-app\n\nA course app. Its agents use the university's campus-grading-rules.\n",
+    ".github/agents/tutor.agent.md": "---\nname: tutor\ndescription: Explains grades and deadlines to students, step by step. Read-only.\ntools: ['read', 'search']\n---\nExplain every grade with the campus-grading-rules skill, and show the formula.\n"
+  },
+  "packages": [
+    {
+      "repo": "microsoft/apm-sample-package",
+      "ref": "v1.0.0",
+      "commit": "5b1f3c7e9a2d4f6b8c0e1a3d5f7b9c2e4a6d8f01",
+      "version": "1.0.0",
+      "files": {
+        ".github/instructions/apm-sample.instructions.md": "---\napplyTo: \"**\"\n---\n# APM sample\n\n- Keep functions small and name them after what they return.\n",
+        ".github/prompts/hello.prompt.md": "---\ndescription: Say hello the APM way\n---\nGreet the user and list the instructions you loaded.\n"
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "sb-portal": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["mcp/sb-portal.mjs"]
+    }
+  }
+}

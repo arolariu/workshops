@@ -1,0 +1,14 @@
+{
+  "repo": "studybuddy-org/campus-standards",
+  "version": "2.0.0",
+  "ref": "v2.0.0",
+  "commit": "9d2e4f6a8c0b1d3e5f7a9c1b3d5e7f9a0c2e4f68",
+  "deploy": {
+    ".github/instructions/campus.instructions.md": "files/instructions/campus.md",
+    ".github/instructions/campus-deadlines.instructions.md": "files/instructions/campus-deadlines.md",
+    ".github/skills/campus-grading/SKILL.md": "files/skills/campus-grading/SKILL.md"
+  },
+  "migrations": [
+    { "rename": "campus-grading-rules", "to": "campus-grading" }
+  ]
+}

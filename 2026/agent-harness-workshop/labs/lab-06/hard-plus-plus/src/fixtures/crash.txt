@@ -1,0 +1,12 @@
+$ node print-report.js
+file:///home/alex/studybuddy/report.js:11
+    const items = course.grades.map((g) => ({ grade: g.grade, weight: g.weight }));
+                                ^
+
+TypeError: Cannot read properties of undefined (reading 'map')
+    at file:///home/alex/studybuddy/report.js:11:33
+    at Array.map (<anonymous>)
+    at summary (file:///home/alex/studybuddy/report.js:10:20)
+    at file:///home/alex/studybuddy/print-report.js:5:13
+
+Node.js v22.11.0

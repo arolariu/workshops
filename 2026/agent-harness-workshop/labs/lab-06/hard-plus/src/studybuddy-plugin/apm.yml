@@ -1,0 +1,7 @@
+# TODO(M1): this plugin is an APM package too. Give it the same name and version as
+# plugin.json and a description, and pin every dependency to one exact release.
+name: studybuddy-harness
+version: 0.0.0
+dependencies:
+  apm:
+    - microsoft/apm-sample-package#main

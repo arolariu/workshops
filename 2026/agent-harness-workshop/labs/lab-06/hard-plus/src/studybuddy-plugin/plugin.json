@@ -1,0 +1,12 @@
+{
+  "name": "studybuddy-harness",
+  "description": "StudyBuddy's agent harness from Labs 02-05: a read-only reviewer, two skills, a guard hook and the portal MCP server.",
+  "version": "1.0.0",
+  "author": { "name": "StudyBuddy team" },
+  "license": "MIT",
+  "keywords": ["education", "code-review", "debugging", "guardrails"],
+  "agents": "agents",
+  "skills": "skills",
+  "hooks": "hooks/hooks.json",
+  "mcpServers": "mcp/servers.json"
+}

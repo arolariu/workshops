@@ -1,6 +1,6 @@
 # Lab 06 · 📦 Plugins, extensions & APM — Extend and share
 
-> **Harness layer:** Distribution · **Maturity:** L5 Governed · 🟢 together · 🟡 🔴 homework
+> **Harness layer:** Distribution · **Maturity:** L5 Governed · 🟢 together · 🟡 🔴 🟣 💎 homework
 >
 > **Threads:** 🕵️ The reviewer
 
@@ -35,9 +35,12 @@ tokens at all.
 ## Plugins
 ```text
 studybuddy-plugin/
-├── plugin.json              { "name", "description", "version", "author": { "name" } }
+├── plugin.json        { "name", "description", "version", "author": { "name" },
+│                        "hooks": "hooks/hooks.json", "mcpServers": "mcp/servers.json" }
 ├── agents/sb-reviewer.agent.md
-└── skills/sb-explain-error/SKILL.md
+├── skills/sb-explain-error/SKILL.md
+├── hooks/hooks.json   + hooks/scripts/sb-guard.mjs
+└── mcp/servers.json   + mcp/sb-portal.mjs
 ```
 | You want to… | Do this |
 |---|---|
@@ -46,9 +49,20 @@ studybuddy-plugin/
 | Install from GitHub | `copilot plugin install owner/repo` or `owner/repo:path/to/plugin` |
 | Try a local plugin without installing | `copilot --plugin-dir ./studybuddy-plugin` |
 | See what's installed | `copilot plugin list` or `/plugin` |
+| Add your own marketplace | `copilot plugin marketplace add owner/repo` or an **absolute** local path |
 
 If a project and a plugin both define an agent or skill with the same name, the **project's wins**, so
 give plugin items their own names.
+
+Good to know (Copilot CLI 1.0.101):
+- A plugin's hook command and its stdio MCP servers run **from the plugin's folder**: point them at files inside the
+  plugin, and use the payload's `cwd` to find the project.
+- `--plugin-dir … plugin list` and `skill list` show a plugin's version and skills; `mcp list` doesn't show its MCP
+  servers until it's installed. `COPILOT_HOME=<a new folder>` gives you a throwaway setup to install into.
+- Direct installs (`copilot plugin install ./path`, `owner/repo`) still work but are deprecated: only
+  `plugin@marketplace` will stay.
+- `copilot plugin marketplace add ./folder` is read as a GitHub `owner/repo`: give a local marketplace as an absolute
+  path. The CLI checks the catalog's schema, not that each entry's name and version match its `plugin.json`.
 
 ## APM: dependencies for your harness
 ```yaml
@@ -96,8 +110,10 @@ tools for the model and listen to session events.
 | Level | Mission | You practise |
 |---|---|---|
 | 🟢 easy | **Install, don't copy**: a shared harness via APM, plus a marketplace plugin | `apm.yml`, lockfiles, plugin installs |
-| 🟡 medium | **A zero-credit command**: `/grades` computes what you need on the exam | extensions, `joinSession`, commands |
-| 🔴 hard | **Ship it as a plugin**: package your agents and skills for anyone to install | `plugin.json`, `--plugin-dir`, naming |
+| 🟡 medium | **A zero-credit command**: `/grades` and `/due` with argument parsing and errors that help | extensions, `joinSession`, commands |
+| 🔴 hard | **Ship it as a plugin**: your agents, skills, guard hook and MCP server, prefixed and versioned | `plugin.json`, `--plugin-dir`, naming |
+| 🟣 hard+ | **Supply chain**: pin everything, a lock verifier, a shadow detector, and a breaking upgrade done by a codemod | pinning, drift, upgrades |
+| 💎 hard++ | **An internal marketplace**: two versioned plugins, a gatekeeper, a release script, and a tool the model can trust | distribution at org scale |
 
 ## Common pitfalls
 - **Unpinned dependencies** (`owner/repo` without `#tag`): your harness changes under your feet.
@@ -106,5 +122,8 @@ tools for the model and listen to session events.
 
 ## Learn more
 - [About plugins for Copilot CLI](https://docs.github.com/copilot/concepts/agents/copilot-cli/about-cli-plugins)
+- [CLI plugin reference](https://docs.github.com/copilot/reference/copilot-cli-reference/cli-plugin-reference): `plugin.json`, `marketplace.json`, load order
+- [Creating a plugin marketplace](https://docs.github.com/copilot/how-tos/copilot-cli/customize-copilot/plugins-marketplace)
+- [Creating extensions for Copilot CLI](https://docs.github.com/copilot/tutorials/create-an-extension): commands and tools
 - [Agent Package Manager (APM)](https://github.com/microsoft/apm)
 - [awesome-copilot](https://github.com/github/awesome-copilot): the default plugin marketplace
