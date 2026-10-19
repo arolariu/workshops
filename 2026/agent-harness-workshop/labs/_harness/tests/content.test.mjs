@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { loadCatalog } from '../catalog.mjs';
 import { courseOrder, predecessorOf } from '../chain.mjs';
 import { quizProblems } from '../quiz.mjs';
+import { LAYERS, scanHarness, scorecard, maturity } from '../scorecard.mjs';
 
 const labsDir = path.resolve(import.meta.dirname, '..', '..');
 const catalog = loadCatalog(labsDir);
@@ -83,4 +84,17 @@ test('the live track does not teach "it is always answer 2": answers vary, and t
   assert.ok(most <= Math.ceil(at.length / 2), `answers ${at.join(' ')}: one position is used too often`);
   const longest = quizzes.filter((q) => q.options[q.answer - 1].length === Math.max(...q.options.map((o) => o.length))).length;
   assert.ok(longest <= Math.ceil(quizzes.length / 2), `the right answer is the longest option in ${longest} of ${quizzes.length} quizzes`);
+});
+
+test('every reference solution passes the scorecard rules of the layers earlier labs taught, and climbs the maturity ladder', () => {
+  const expected = { 'lab-00': 'L0', 'lab-01': 'L1', 'lab-02': 'L2', 'lab-03': 'L3', 'lab-04': 'L3', 'lab-05': 'L4', 'lab-06': 'L4', 'lab-07': 'L4' };
+  for (const ex of levels) {
+    const scan = scanHarness(ex.sol);
+    assert.deepEqual(scan.problems, [], ex.key);
+    const rules = scorecard(scan);
+    const earlier = new Set(LAYERS.filter((l) => l.lab < ex.labId).map((l) => l.id));
+    const bad = rules.filter((r) => earlier.has(r.layer) && r.ok === false);
+    assert.deepEqual(bad.map((r) => `${r.id}: ${r.message}`), [], `${ex.key}: the inherited checks fail on the reference`);
+    if (expected[ex.labId]) assert.equal(maturity(rules, scan).level, expected[ex.labId], `${ex.key} maturity`);
+  }
 });

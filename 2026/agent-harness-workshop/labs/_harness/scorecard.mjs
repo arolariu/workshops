@@ -1,0 +1,274 @@
+// The scorecard (spec §5.5): what a harness folder contains, layer by layer, a few rules per layer, and the maturity level
+// they add up to. Pure apart from reading the folder; MCP tool lists come in from outside (xray.mjs measures them).
+import fs from 'node:fs';
+import path from 'node:path';
+import { parseFrontmatter, parseYaml } from './kit.mjs';
+
+export const LAYERS = [
+  { id: 'instructions', title: 'Instructions', icon: '📜', lab: 'lab-01', level: 'L1' },
+  { id: 'skills', title: 'Skills', icon: '🧩', lab: 'lab-02', level: 'L2' },
+  { id: 'agents', title: 'Custom agents', icon: '🎭', lab: 'lab-03', level: 'L3' },
+  { id: 'mcp', title: 'MCP servers', icon: '🔌', lab: 'lab-04', level: 'L2' },
+  { id: 'hooks', title: 'Hooks', icon: '🔒', lab: 'lab-05', level: 'L4' },
+  { id: 'distribution', title: 'Plugins & APM', icon: '📦', lab: 'lab-06', level: 'L5' },
+  { id: 'workflows', title: 'Agentic workflows', icon: '🚀', lab: 'lab-07', level: 'L5' },
+  { id: 'governance', title: 'Governance', icon: '🏛️', lab: 'lab-08', level: 'L5' },
+];
+export const LEVEL_NAMES = { L0: 'Bare', L1: 'Instructed', L2: 'Equipped', L3: 'Scoped', L4: 'Guarded', L5: 'Governed' };
+// Each level needs every group to have at least one layer present ("any of"), and every present layer at that level to pass.
+const REQUIRES = {
+  L1: [['instructions']],
+  L2: [['skills', 'mcp']],
+  L3: [['agents']],
+  L4: [['hooks']],
+  L5: [['distribution'], ['governance']],
+};
+const NEEDS = {
+  instructions: 'an AGENTS.md with commands, boundaries and a definition of done',
+  'skills|mcp': 'a skill or an MCP server',
+  agents: 'a custom agent with an explicit tools list',
+  hooks: 'a preToolUse hook for both shells, with a timeout',
+  distribution: 'a pinned, shared harness (APM or a plugin)',
+  governance: 'a HARNESS.md that names an owner, the layers, the threat model and the budget',
+};
+
+const SKIP = new Set(['node_modules', '.git', '.agent-logs', 'apm_modules', 'runs']);
+function walk(root) {
+  const out = [];
+  const go = (abs, rel, depth) => {
+    if (depth > 6) return;
+    let entries = [];
+    try { entries = fs.readdirSync(abs, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (SKIP.has(e.name)) continue;
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) go(path.join(abs, e.name), r, depth + 1);
+      else if (e.isFile()) out.push(r);
+    }
+  };
+  go(root, '', 0);
+  return out.sort();
+}
+const toolList = (v) => (v == null ? null : (Array.isArray(v) ? v : String(v).split(',')).map((x) => String(x).trim().replace(/^['"]|['"]$/g, '')).filter(Boolean));
+
+/** What the folder holds, layer by layer. Broken JSON or YAML becomes a `problems` entry, never a throw. */
+export function scanHarness(dir) {
+  const files = walk(dir);
+  const read = (rel) => { try { return fs.readFileSync(path.join(dir, ...rel.split('/')), 'utf8').replace(/\r\n/g, '\n'); } catch { return null; } };
+  const problems = [];
+  const json = (rel) => { const t = read(rel); if (t == null) return null; try { return JSON.parse(t); } catch (e) { problems.push(`${rel} is not valid JSON: ${e.message}`); return null; } };
+  const front = (rel) => { try { return parseFrontmatter(read(rel) ?? ''); } catch (e) { problems.push(`${rel} has frontmatter that cannot be read: ${e.message}`); return null; } };
+  const scan = { dir, files, problems, artifacts: [] };
+  const art = (layer, rel) => scan.artifacts.push({ layer, path: rel });
+
+  scan.instructions = files.filter((f) => f === 'AGENTS.md' || f === '.github/copilot-instructions.md' || /^\.github\/instructions\/.+\.instructions\.md$/.test(f)).map((f) => {
+    const text = read(f) ?? '';
+    const fm = f.endsWith('.instructions.md') ? front(f) : null;
+    art('instructions', f);
+    return { path: f, text, applyTo: fm?.data?.applyTo ?? null };
+  });
+  scan.skills = files.filter((f) => /^\.github\/skills\/[^/]+\/SKILL\.md$/.test(f)).map((f) => {
+    const folder = f.split('/')[2];
+    const fm = front(f);
+    return { path: f, folder, name: String(fm?.data?.name ?? ''), description: String(fm?.data?.description ?? ''), size: (read(f) ?? '').length };
+  });
+  for (const f of files) if (/^\.github\/skills\//.test(f)) art('skills', f);
+  scan.agents = files.filter((f) => /^\.github\/agents\/[^/]+\.agent\.md$/.test(f)).map((f) => {
+    const fm = front(f);
+    art('agents', f);
+    return { path: f, name: String(fm?.data?.name ?? path.basename(f, '.agent.md')), description: String(fm?.data?.description ?? ''), tools: toolList(fm?.data?.tools) };
+  });
+  const mcpPath = ['.mcp.json', '.github/mcp.json'].find((f) => files.includes(f));
+  scan.mcp = null;
+  if (mcpPath) {
+    const cfg = json(mcpPath);
+    const servers = Object.entries(cfg?.mcpServers ?? cfg?.servers ?? {}).map(([name, s]) => ({ name, type: s?.type ?? (s?.url ? 'http' : 'stdio'), command: s?.command ?? null, args: Array.isArray(s?.args) ? s.args.map(String) : [], env: s?.env ?? {}, url: s?.url ?? null }));
+    scan.mcp = { path: mcpPath, servers };
+    art('mcp', mcpPath);
+    for (const f of files) if (/^mcp\//.test(f)) art('mcp', f);
+  }
+  scan.hooks = files.filter((f) => /^\.github\/hooks\/[^/]+\.json$/.test(f)).map((f) => {
+    const cfg = json(f);
+    const list = (k) => (Array.isArray(cfg?.hooks?.[k]) ? cfg.hooks[k] : []);
+    return { path: f, preToolUse: list('preToolUse'), postToolUse: list('postToolUse'), events: Object.keys(cfg?.hooks ?? {}) };
+  });
+  for (const f of files) if (/^\.github\/hooks\//.test(f)) art('hooks', f);
+  scan.apm = null;
+  if (files.includes('apm.yml')) {
+    let data = null;
+    try { data = parseYaml(read('apm.yml') ?? ''); } catch (e) { problems.push(`apm.yml cannot be read: ${e.message}`); }
+    const deps = data?.dependencies?.apm ?? data?.dependencies ?? [];
+    scan.apm = { path: 'apm.yml', deps: (Array.isArray(deps) ? deps : []).map((d) => (typeof d === 'string' ? d : String(d?.name ?? d?.repo ?? JSON.stringify(d)))) };
+    art('distribution', 'apm.yml');
+    if (files.includes('apm.lock.yaml')) art('distribution', 'apm.lock.yaml');
+  }
+  scan.plugins = files.filter((f) => /(^|\/)plugin\.json$/.test(f) && f.split('/').length <= 3 && !f.startsWith('.github/')).map((f) => {
+    const p = json(f);
+    for (const g of files) if (g.startsWith(`${path.posix.dirname(f)}/`)) art('distribution', g);
+    return { path: f, name: p?.name ?? null, version: p?.version ?? null, description: p?.description ?? null };
+  });
+  scan.workflows = files.filter((f) => /^\.github\/workflows\/[^/]+\.md$/.test(f)).map((f) => {
+    art('workflows', f);
+    return { path: f, frontmatter: front(f)?.data ?? null };
+  });
+  scan.harnessMd = files.includes('HARNESS.md') ? { path: 'HARNESS.md', text: read('HARNESS.md') ?? '' } : null;
+  if (scan.harnessMd) art('governance', 'HARNESS.md');
+  return scan;
+}
+
+/** Is a layer there at all? */
+export function present(scan, layer) {
+  switch (layer) {
+    case 'instructions': return scan.instructions.length > 0;
+    case 'skills': return scan.skills.length > 0;
+    case 'agents': return scan.agents.length > 0;
+    case 'mcp': return Boolean(scan.mcp?.servers.length);
+    case 'hooks': return scan.hooks.length > 0;
+    case 'distribution': return Boolean(scan.apm) || scan.plugins.length > 0;
+    case 'workflows': return scan.workflows.length > 0;
+    case 'governance': return Boolean(scan.harnessMd);
+    default: return false;
+  }
+}
+
+const READ_ONLY_ROLE = (a) => /review|audit/i.test(a.name) || /read-only|readonly|never edits/i.test(a.description);
+const WRITE_TOOLS = /^(edit|write|execute|shell|bash|powershell|\*|all)\b/i;
+const WHEN = /\buse (it |this )?when\b|\bwhen (the user|you|asked|someone)\b|\buse (it )?(after|before|to|for)\b/i;
+const READ_TOOL = /^(get|list|search|read|find)_/;
+const WRITE_TOOL = /^(mark|set|create|update|delete|add|remove|save|write)_/;
+const list = (xs) => xs.join('; ');
+
+/** The rules: [{ id, layer, level, ok: true | false | null, message, files }]. ok null = not applicable or not measured. */
+export function scorecard(scan, { mcpTools } = {}) {
+  const out = [];
+  const level = (layer) => LAYERS.find((l) => l.id === layer).level;
+  const add = (id, layer, ok, message, files = []) => out.push({ id, layer, level: level(layer), ok, message, files });
+  const none = (layer, what) => (id) => add(id, layer, null, `No ${what} here.`);
+
+  // Instructions
+  const main = scan.instructions.find((i) => i.path === 'AGENTS.md') ?? scan.instructions.find((i) => i.path === '.github/copilot-instructions.md');
+  if (!main) ['instructions-short', 'instructions-cover'].forEach(none('instructions', 'AGENTS.md'));
+  else {
+    const lines = main.text.replace(/\n+$/, '').split('\n').length;
+    add('instructions-short', 'instructions', lines < 100, lines < 100 ? `${main.path} is ${lines} lines.` : `${main.path} has ${lines} lines; keep it under 100 (every line is sent on every turn).`, [main.path]);
+    const t = main.text;
+    const missing = [
+      [/^#+.*command/im.test(t) || /\b(npm|node|npx|pnpm|yarn) \S+/.test(t), 'commands'],
+      [/^#+.*(boundar|never|don'?t)/im.test(t) || /\bnever\b/i.test(t), 'boundaries'],
+      [/definition of done|done when|^#+.*\bdone\b/im.test(t), 'definition of done'],
+    ].filter(([ok]) => !ok).map(([, w]) => w);
+    add('instructions-cover', 'instructions', !missing.length, missing.length ? `${main.path} should cover: ${missing.join(', ')}.` : `${main.path} covers commands, boundaries and the definition of done.`, [main.path]);
+  }
+
+  // Skills
+  if (!scan.skills.length) ['skill-name', 'skill-description'].forEach(none('skills', 'skills'));
+  else {
+    const badName = scan.skills.filter((s) => s.name !== s.folder);
+    add('skill-name', 'skills', !badName.length, badName.length ? list(badName.map((s) => `name "${s.name}" should match its folder "${s.folder}"`)) : 'Every skill is named after its folder.', badName.map((s) => s.path));
+    const vague = scan.skills.filter((s) => s.description.length < 40 || !WHEN.test(s.description));
+    add('skill-description', 'skills', !vague.length, vague.length ? list(vague.map((s) => `${s.folder}: the description should say what it does and when to use it ("Use when …"), in 40+ characters`)) : 'Every description says what the skill does and when to use it.', vague.map((s) => s.path));
+  }
+
+  // Agents
+  if (!scan.agents.length) ['agent-tools', 'agent-readonly'].forEach(none('agents', 'custom agents'));
+  else {
+    const open = scan.agents.filter((a) => !a.tools?.length);
+    add('agent-tools', 'agents', !open.length, open.length ? list(open.map((a) => `${a.name}: no tools list, so it can use every tool`)) : 'Every agent has an explicit tools list.', open.map((a) => a.path));
+    const ro = scan.agents.filter(READ_ONLY_ROLE);
+    const leaks = ro.map((a) => ({ a, w: (a.tools ?? ['(every tool)']).filter((x) => WRITE_TOOLS.test(x) || x === '(every tool)') })).filter((x) => x.w.length);
+    if (!ro.length) add('agent-readonly', 'agents', null, 'No read-only role (reviewer, auditor) to check.');
+    else add('agent-readonly', 'agents', !leaks.length, leaks.length ? list(leaks.map(({ a, w }) => `${a.name} is a read-only role but has ${w.join(', ')}`)) : `${ro.map((a) => a.name).join(', ')}: read-only, and the tools say so.`, leaks.map(({ a }) => a.path));
+  }
+
+  // MCP
+  if (!scan.mcp?.servers.length) ['mcp-described', 'mcp-readonly-hint'].forEach(none('mcp', 'MCP servers'));
+  else {
+    const measured = scan.mcp.servers.filter((s) => Array.isArray(mcpTools?.[s.name]?.tools));
+    const unmeasured = scan.mcp.servers.filter((s) => !measured.includes(s)).map((s) => `${s.name} (${mcpTools?.[s.name]?.error ?? 'its tools were not listed'})`);
+    if (!measured.length) {
+      ['mcp-described', 'mcp-readonly-hint'].forEach((id) => add(id, 'mcp', null, `not measured: ${unmeasured.join('; ')}`, [scan.mcp.path]));
+    } else {
+      const tools = measured.flatMap((s) => mcpTools[s.name].tools.map((t) => ({ ...t, server: s.name })));
+      const note = unmeasured.length ? ` (not measured: ${unmeasured.join('; ')})` : '';
+      const bare = tools.filter((t) => !String(t.description ?? '').trim() || !t.inputSchema);
+      add('mcp-described', 'mcp', !bare.length, bare.length ? `${list(bare.map((t) => `${t.name} needs ${!String(t.description ?? '').trim() ? 'a description' : 'an input schema'}`))}${note}` : `Every tool (${tools.length}) has a description and an input schema.${note}`, [scan.mcp.path]);
+      const ro = (t) => t.annotations?.readOnlyHint === true;
+      const wrong = [
+        ...tools.filter((t) => READ_TOOL.test(t.name) && !ro(t)).map((t) => `${t.name} only reads: mark it readOnlyHint`),
+        ...tools.filter((t) => WRITE_TOOL.test(t.name) && ro(t)).map((t) => `${t.name} changes things but is marked read-only`),
+      ];
+      add('mcp-readonly-hint', 'mcp', !wrong.length, wrong.length ? `${list(wrong)}${note}` : `Read tools are marked read-only, write tools are not.${note}`, [scan.mcp.path]);
+    }
+  }
+
+  // Hooks
+  if (!scan.hooks.length) none('hooks', 'hooks')('hooks-both-shells');
+  else {
+    const pre = scan.hooks.flatMap((h) => h.preToolUse.map((e) => ({ e, path: h.path })));
+    const bad = pre.filter(({ e }) => !e?.bash || !e?.powershell || !(Number(e?.timeoutSec) > 0));
+    const msg = !pre.length ? 'No preToolUse hook: nothing can block a tool call.'
+      : bad.length ? list(bad.map(({ e, path: p }) => `${p}: ${[!e?.bash && 'bash', !e?.powershell && 'powershell'].filter(Boolean).map((s) => `no "${s}" command`).concat(Number(e?.timeoutSec) > 0 ? [] : ['no timeoutSec']).join(', ')}`))
+        : 'preToolUse runs on both shells, with a timeout.';
+    add('hooks-both-shells', 'hooks', pre.length > 0 && !bad.length, msg, scan.hooks.map((h) => h.path));
+  }
+
+  // Distribution
+  if (!scan.apm) none('distribution', 'apm.yml')('apm-pinned');
+  else {
+    const loose = scan.apm.deps.filter((d) => !/#[^#\s]+$/.test(d));
+    add('apm-pinned', 'distribution', !loose.length, loose.length ? `Pin these to a tag (owner/repo#v1.0.0): ${loose.join(', ')}` : `Every dependency is pinned (${scan.apm.deps.length}).`, ['apm.yml']);
+  }
+  if (!scan.plugins.length) none('distribution', 'plugin.json')('plugin-manifest');
+  else {
+    const gaps = scan.plugins.map((p) => ({ p, miss: ['name', 'version', 'description'].filter((k) => !p[k]) })).filter((x) => x.miss.length);
+    add('plugin-manifest', 'distribution', !gaps.length, gaps.length ? list(gaps.map(({ p, miss }) => `${p.path} needs ${miss.join(', ')}`)) : 'plugin.json has a name, a version and a description.', scan.plugins.map((p) => p.path));
+  }
+
+  // Workflows
+  if (!scan.workflows.length) ['workflow-readonly', 'workflow-safe-outputs', 'workflow-limits'].forEach(none('workflows', 'agentic workflows'));
+  else {
+    const fm = scan.workflows.map((w) => ({ w, d: w.frontmatter ?? {} }));
+    const writes = fm.filter(({ d }) => {
+      const p = d.permissions;
+      if (p == null) return true;
+      if (typeof p === 'string') return /write/i.test(p);
+      return Object.values(p).some((v) => /write/i.test(String(v)));
+    });
+    add('workflow-readonly', 'workflows', !writes.length, writes.length ? list(writes.map(({ w, d }) => `${w.path}: ${d.permissions == null ? 'no permissions block, so the default token may write' : 'the agent has write permission'}`)) : "The agents' permissions are read-only.", writes.map(({ w }) => w.path));
+    const unbounded = fm.flatMap(({ w, d }) => Object.entries(d['safe-outputs'] ?? {}).filter(([, v]) => v && typeof v === 'object' && !(Number(v.max) > 0)).map(([k]) => `${w.path}: ${k} has no max`));
+    add('workflow-safe-outputs', 'workflows', !unbounded.length, unbounded.length ? list(unbounded) : 'Every safe output has a max.', scan.workflows.map((w) => w.path));
+    const limits = fm.filter(({ d }) => d['timeout-minutes'] == null || d['max-ai-credits'] == null);
+    add('workflow-limits', 'workflows', !limits.length, limits.length ? list(limits.map(({ w, d }) => `${w.path}: needs ${[d['timeout-minutes'] == null && 'timeout-minutes', d['max-ai-credits'] == null && 'max-ai-credits'].filter(Boolean).join(' and ')}`)) : 'Every workflow has a timeout and a credit limit.', scan.workflows.map((w) => w.path));
+  }
+
+  // Governance
+  if (!scan.harnessMd) none('governance', 'HARNESS.md')('harness-owner');
+  else {
+    const t = scan.harnessMd.text;
+    const missing = [[/owner/i, 'an owner'], [/layer/i, 'the layers'], [/threat/i, 'the threat model'], [/budget|credit/i, 'the budget']].filter(([re]) => !re.test(t)).map(([, w]) => w);
+    add('harness-owner', 'governance', !missing.length, missing.length ? `HARNESS.md should name ${missing.join(', ')}.` : 'HARNESS.md names an owner, the layers, the threat model and the budget.', ['HARNESS.md']);
+  }
+  return out;
+}
+
+/** { level, name, reached, next } — the highest level reached together with every level below it. */
+export function maturity(rules, scan) {
+  const layerOk = (layer) => rules.filter((r) => r.layer === layer).every((r) => r.ok !== false);
+  const reached = {};
+  let level = 'L0';
+  let next = null;
+  let below = true;
+  for (const L of ['L1', 'L2', 'L3', 'L4', 'L5']) {
+    const missing = REQUIRES[L].filter((group) => !group.some((l) => present(scan, l)));
+    const failing = LAYERS.filter((l) => l.level === L && present(scan, l.id) && !layerOk(l.id));
+    reached[L] = below && !missing.length && !failing.length;
+    if (reached[L]) level = L;
+    else if (below) {
+      const needs = missing.map((g) => NEEDS[g.join('|')]);
+      const fix = failing.flatMap((l) => rules.filter((r) => r.layer === l.id && r.ok === false).map((r) => r.message));
+      next = `${L} ${LEVEL_NAMES[L]} needs ${[...needs, ...fix.map((m) => `a fix: ${m}`)].join('; and ')}.`;
+    }
+    below = reached[L];
+  }
+  return { level, name: LEVEL_NAMES[level], reached, next };
+}
