@@ -136,12 +136,15 @@ function print(s, file) {
   for (const t of s.turns) {
     const steps = t.tools.map((x) => `${ICON[x.outcome] ?? '🔧'} ${x.name}${MARK[x.outcome] ?? ''}`);
     if (t.said) steps.push('💬');
-    console.log(`     turn ${t.id.padEnd(3)} ${steps.join(' · ') || '-'}`);
+    console.log(`     turn ${String(t.id).padEnd(3)} ${steps.join(' · ') || '-'}`);
   }
   console.log('');
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Run as a script, not imported? Compare real paths: a symlink, a junction or a short 8.3 name must still count.
+const isMain = (() => {
+  try { return Boolean(process.argv[1]) && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) {
   const args = process.argv.slice(2);
   let files = args;

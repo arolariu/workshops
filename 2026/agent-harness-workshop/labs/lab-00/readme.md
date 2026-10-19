@@ -71,8 +71,9 @@ back into the history. Then press **tab** to see the same task with a harness, o
 ## 💳 AI credits
 Every prompt costs AI credits. Student plans get a monthly budget, so: use `!command` for things that don't
 need AI, keep prompts focused, check `/usage`, and use `--max-ai-credits` (minimum 30) on scripted runs.
-The cap is a **soft** cap: usage is known only after a response, so the call that crosses it still completes, and
-the next one is blocked (`copilot help limits`).
+The cap is a **soft** cap: usage is known only after a response, so a response can cross it. Near the cap, the next
+model call is the last one, with tools disabled; once the cap is reached, Copilot asks you to raise or unset the
+limit before it goes on (`copilot help limits`).
 
 ## 📈 What a scripted run prints
 `copilot -p "…" -s --output-format json` prints one JSON event per line, and nothing else:

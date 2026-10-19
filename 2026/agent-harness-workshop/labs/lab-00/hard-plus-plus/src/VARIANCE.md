@@ -29,8 +29,9 @@ Outcomes: denied 3/3.
 
 ## Why the runs differ
 - **The model samples.** At every step it picks the next tokens from a probability distribution, so the same prompt
-  can start differently: run 2 loaded a skill first, run 3 went straight to inspecting the folder. Runs 2 and 3 share
-  the setup (same commit, model and flags) and still took 6 and 3 turns.
+  can start differently: run 2 loaded a skill first, run 3 went straight to inspecting the folder, and they took 6
+  and 3 turns. A caveat on this sample: run 3 is derived from run 2 (`fixtures/flight/README.md`), so this pair
+  illustrates the effect rather than proving it; only real runs of one setup can, which is why I'd record my own.
 - **Small differences compound.** The model is stateless: every turn, the harness sends the whole history again,
   every tool result included. One different early step (a skill's instructions, an extra `Get-Item`) changes the
   context of every later turn, so the paths drift further apart: 2 to 5 tool calls for the same job.

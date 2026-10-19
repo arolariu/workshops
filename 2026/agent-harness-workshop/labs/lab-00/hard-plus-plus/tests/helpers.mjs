@@ -66,13 +66,43 @@ export async function runScenario(t, name, overrides = {}) {
   return { s, result, calls: model.calls, runs, events };
 }
 
+/** A child's environment that can't reach the real Copilot (no credits, ever): an empty PATH, no HARNESS_COPILOT. */
+export function noCopilotEnv(t) {
+  const empty = t.tmp();
+  return { PATH: empty, Path: empty, HARNESS_COPILOT: path.join(empty, 'no-copilot') };
+}
+
+/** Run `fn` where nothing can start the real Copilot: PATH is an empty folder (Path on Windows) while it runs. */
+export async function withoutCopilot(t, fn) {
+  const saved = { PATH: process.env.PATH, HARNESS_COPILOT: process.env.HARNESS_COPILOT };
+  const env = noCopilotEnv(t);
+  process.env.PATH = env.PATH;
+  process.env.HARNESS_COPILOT = env.HARNESS_COPILOT;
+  try {
+    return await fn();
+  } finally {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+}
+
 /** "[fake model] …" when the fake model complained: it says what the loop did wrong. */
 export const complaint = (answer) => (/^\[fake model\]/.test(String(answer ?? '')) ? ` The fake model said: ${answer}` : '');
 
-const KNOWN = new Set(['user.message', 'assistant.turn_start', 'assistant.message', 'tool.execution_start', 'tool.execution_complete', 'assistant.turn_end', 'session.usage_checkpoint', 'session.error', 'result', 'session.info', 'assistant.idle', 'assistant.message_delta']);
+// Copilot's event types come in families (session.*, assistant.*, tool.*, user.*, model.*, …), plus the flat `result`.
+// The replays in labs/_harness/replays/ add their own harness.* notes.
+const COPILOT_TYPE = /^(session|model|assistant|tool|user|subagent|hook|skill|permission|system|harness)\.[a-z0-9_.]+$/;
 const isObject = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
-/** What breaks Copilot's format in a JSONL stream (at most 5 problems); [] when it reads like a real run. */
-export function formatProblems(text) {
+
+/**
+ * What breaks Copilot's format in a JSONL stream (at most 5 problems); [] when it reads like a real run. The shared
+ * rules hold for every stream Copilot prints (and for the replays): a real run must pass them, and a check makes sure
+ * it does. `strict` adds what this level's mini agent must log on top: an id and a timestamp on every event, the model
+ * and the turnId on assistant messages and tool events, and every turn and tool call finished.
+ */
+export function formatProblems(text, { strict = false } = {}) {
   const p = [];
   const events = [];
   String(text).split(/\r?\n/).forEach((line, i) => {
@@ -83,22 +113,31 @@ export function formatProblems(text) {
     else events.push(e);
   });
   if (p.length) return p.slice(0, 5);
-  if (events[0]?.type !== 'user.message') p.push('the first event is user.message');
+  const firstTurn = events.findIndex((e) => e.type === 'assistant.turn_start');
+  const prompt = events.findIndex((e) => e.type === 'user.message');
+  if (prompt < 0 || (firstTurn >= 0 && prompt > firstTurn)) p.push('user.message (the prompt) comes before the first assistant.turn_start');
   if (events.at(-1)?.type !== 'result') p.push('the last event is result');
+  // Copilot's custom tools (apply_patch) carry their arguments as text; the mini agent's tools always take an object.
+  const argsOk = (a) => isObject(a) || (!strict && typeof a === 'string');
   let open = null;
   const requested = new Set();
   const started = new Map();
   events.forEach((e, i) => {
     const bad = (msg) => p.push(`event ${i + 1} (${e.type}): ${msg}`);
-    if (!KNOWN.has(e.type)) return bad('Copilot has no event of this type');
     if (e.type === 'result') {
       if ('data' in e) bad('result is flat: exitCode and usage sit next to type, not inside data');
       if (!Number.isInteger(e.exitCode) || !isObject(e.usage)) bad('result has exitCode (a number) and usage (an object)');
+      if (i !== events.length - 1) bad('result is the last event');
       return;
     }
+    if (!COPILOT_TYPE.test(e.type)) return bad(`"${e.type}" is not one of the events this level logs (Copilot's types start with session., assistant., tool., user. or model.)`);
     const d = e.data;
     if (!isObject(d)) return bad('every event but result has a data object');
-    if (typeof e.id !== 'string' || Number.isNaN(Date.parse(e.timestamp ?? ''))) bad('every event has an id and an ISO timestamp');
+    if (strict && (typeof e.id !== 'string' || Number.isNaN(Date.parse(e.timestamp ?? '')))) bad('every event has an id and an ISO timestamp (emitter() adds them)');
+    const inTurn = (what) => {
+      if (d.turnId !== undefined && d.turnId !== open) bad(`data.turnId (${d.turnId}) is not the open turn (${open})`);
+      else if (strict && d.turnId === undefined) bad(`${what} carries the turnId of its turn`);
+    };
     if (e.type === 'user.message' && typeof d.content !== 'string') bad('data.content is the prompt');
     if (e.type === 'assistant.turn_start') {
       if (typeof d.turnId !== 'string') bad('data.turnId is a string ("0", "1", …)');
@@ -112,16 +151,16 @@ export function formatProblems(text) {
     if (e.type === 'assistant.message') {
       if (typeof d.content !== 'string' || !Array.isArray(d.toolRequests)) return bad('data has content (text) and toolRequests (a list)');
       for (const r of d.toolRequests) {
-        if (typeof r?.toolCallId !== 'string' || typeof r.name !== 'string' || !isObject(r.arguments)) bad('each toolRequest is { toolCallId, name, arguments }, with arguments as an object, not JSON text');
+        if (typeof r?.toolCallId !== 'string' || typeof r.name !== 'string' || !argsOk(r.arguments)) bad(strict ? 'each toolRequest is { toolCallId, name, arguments }, with arguments as an object, not JSON text' : 'each toolRequest is { toolCallId, name, arguments }');
         else requested.add(r.toolCallId);
       }
-      if (typeof d.model !== 'string' || !d.model) bad('data.model names the model');
-      if (d.turnId !== open) bad('data.turnId is the open turn');
+      if (strict && (typeof d.model !== 'string' || !d.model)) bad('data.model names the model');
+      inTurn('an assistant.message');
     }
     if (e.type === 'tool.execution_start') {
       if (!requested.has(d.toolCallId)) bad('a tool starts after the assistant.message that requested it (same toolCallId)');
-      if (typeof d.toolName !== 'string' || !isObject(d.arguments)) bad('data has toolName and arguments (an object)');
-      if (d.turnId !== open) bad('data.turnId is the open turn');
+      if (typeof d.toolName !== 'string' || !argsOk(d.arguments)) bad('data has toolName and arguments (an object)');
+      inTurn('a tool event');
       started.set(d.toolCallId, false);
     }
     if (e.type === 'tool.execution_complete') {
@@ -130,7 +169,7 @@ export function formatProblems(text) {
       if (typeof d.success !== 'boolean') bad('data.success is true or false');
       else if (d.success && typeof d.result?.content !== 'string') bad('a success has result: { content }');
       else if (!d.success && (typeof d.error?.message !== 'string' || typeof d.error?.code !== 'string')) bad('a failure has error: { message, code }');
-      if (d.turnId !== open) bad('data.turnId is the open turn');
+      inTurn('a tool event');
     }
     if (e.type === 'session.usage_checkpoint') {
       const mm = d.accountingSnapshot?.modelMetrics;
@@ -138,7 +177,18 @@ export function formatProblems(text) {
     }
     if (e.type === 'session.error' && (typeof d.errorType !== 'string' || typeof d.message !== 'string')) bad('data has errorType and message');
   });
-  for (const [id, done] of started) if (!done) p.push(`tool call ${id} never completed`);
-  if (open !== null) p.push(`turn ${open} never ended`);
+  if (strict) {
+    for (const [id, done] of started) if (!done) p.push(`tool call ${id} never completed`);
+    if (open !== null) p.push(`turn ${open} never ended`);
+  }
   return p.slice(0, 5);
+}
+
+/** Copilot's own streams, for the self-test: the replays the app ships, and the recorded runs in the reference. */
+export function realStreams(t) {
+  const replays = path.join(t.exDir, '..', '..', '_harness', 'replays');
+  const files = fs.existsSync(replays) ? fs.readdirSync(replays).filter((f) => f.endsWith('.jsonl')).map((f) => path.join(replays, f)) : [];
+  for (const f of ['ok', 'denied', 'failed']) files.push(path.join(t.solDir, 'fixtures', `${f}.jsonl`));
+  for (const k of [1, 2, 3]) files.push(path.join(t.solDir, 'fixtures', 'flight', `run-${k}`, 'events.jsonl'));
+  return files;
 }

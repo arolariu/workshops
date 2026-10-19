@@ -54,20 +54,28 @@ session.error            { errorType, message }
 result                   { exitCode, usage: { premiumRequests: 0 } }
 ```
 In events, `arguments` is an **object** (parsed; `{}` when it didn't parse). `code` is `denied` or `failure`.
-`errorType` is `max_turns` or `budget`. `result` is flat: `emitter()` puts its data next to `type`.
+`errorType` is `max_turns` or `budget`. `result` is flat: `emitter()` puts its data next to `type`. This loop logs a
+`session.usage_checkpoint` after every model call (running totals), so the budget shows; Copilot logs one, at the end.
 
-**The permission rules** (`--allow-tool` and `--deny-tool` in Copilot):
+**The permission rules** (like `--allow-tool` and `--deny-tool` in Copilot):
 ```text
-"shell"             every shell command  "write"  every write tool
-"shell(npm test)"   npm test, npm test … "read"   every read tool
-"shell(git:*)"      any git command      "view"   one tool, by name
+"shell"             every shell command
+"shell(npm test)"   npm test, npm test …
+"shell(git:*)"      any git command
+"read", "write"     every read tool, every write tool
+"read(.env)"        a read of .env (* inside a folder, ** across)
+"write(build)"      a write to build/ or anything in it
+"view", "view(…)"   one tool by name: this lab's extension
 1. a deny rule covers the call, or one part of it   → denied
 2. allow rules cover every part of the call         → allowed
 3. a read tool                                      → allowed
 4. anything else → denied: "Permission denied because no interactive
    user response was available."
 ```
-The parts of a shell command are what's between `&&`, `||`, `;` and `|`.
+The parts of a shell command are what's between `&&`, `||`, `;` and `|`; `read(…)` and `write(…)` match the
+call's `path`. A deny rule the gate can't read (`read(` with no closing bracket) denies **every** call: a guard that
+doesn't understand its rules fails closed. Copilot's own kinds are `shell`, `read`, `write`, `url`, `memory` and
+MCP server names; this lab's tools only have the first three, and naming a tool (`view`) is our extension.
 
 ## 🧭 Milestones
 ### M1 · One turn
@@ -86,7 +94,10 @@ The parts of a shell command are what's between `&&`, `||`, `;` and `|`.
 
 ### M3 · The permission gate
 - `gate(call, { allow, deny })` returns `{ allowed, rule, reason }` with the rules above, where `call` is
-  `{ name, kind, arguments }` and `rule` is the rule that decided (or `null`)
+  `{ name, kind, arguments }` and `rule` is the rule that decided (for a command allowed part by part, the first
+  part's rule), or `null`
+- `deny: ['read(.env)']` stops `view .env`, `deny: ['write(grades.js)']` stops editing it, and an unreadable deny
+  rule denies everything
 - `denied` (it allows `shell(npm test)`): `npm test` runs, `rm -rf build` is denied, the model reads why, and
   `build/app.js` is still there
 
@@ -152,8 +163,10 @@ is the error, so the model can react to it. Only then call the model again.
 <details><summary>Parts, then rules</summary>
 
 Split the command (`split(/\s*(?:&&|\|\||;|\|)\s*/)`). A rule is `head` or `head(arg)`: `head` must be the call's
-`kind` or its tool name; `arg` ending in `:*` compares the first word of a part, otherwise the part must equal `arg`
-or start with `arg` and a space. Deny if any deny rule covers any part; allow if every part has an allow rule.
+`kind` or its tool name; for a shell call, `arg` ending in `:*` compares the first word of a part, otherwise the part
+must equal `arg` or start with `arg` and a space; for other calls, `arg` is a path pattern for `arguments.path`.
+Read every deny rule first: one you can't parse means deny. Then deny if any deny rule covers any part, and allow if
+every part has an allow rule.
 
 </details>
 
@@ -167,11 +180,13 @@ When the budget is reached, stop without running that reply's tool calls.
 </details>
 
 ### M5
-<details><summary>Copilot's order</summary>
+<details><summary>The order of the events</summary>
 
 `user.message` once; per turn `assistant.turn_start`, `assistant.message`, `session.usage_checkpoint`, a
 `tool.execution_start` and `tool.execution_complete` per call, `assistant.turn_end`; at the end `session.error` if a
-limit stopped the run, then `result`. Compare with a real run: `fixtures/ok.jsonl`.
+limit stopped the run, then `result`. One difference from Copilot, on purpose: a real run logs a single
+`session.usage_checkpoint`, at the end (see `fixtures/ok.jsonl`); this loop logs one after every model call (running
+totals), so you can see the budget fill up. Your `run-stats.mjs` reads the last one either way.
 
 </details>
 

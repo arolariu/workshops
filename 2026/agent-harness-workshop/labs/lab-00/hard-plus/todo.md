@@ -47,16 +47,17 @@ runs/20261020-101500-which-functions/run-1/events.jsonl
   that the commit differs
 
 ### M3 · Variance across N
-- `variance(runs)` returns `n`, `prompt`, `setup`, `turns`, `toolCalls` and `tokens.input`/`tokens.output` (each
-  `{ min, median, max }`), `tools` (in how many runs each tool appears), `sequences` (how many different tool
-  sequences), `outcomes` and `problems`
+- `variance(runs)` returns `n`, `measured` (how many runs the spread comes from), `prompt`, `setup`, `turns`,
+  `toolCalls` and `tokens.input`/`tokens.output` (each `{ min, median, max }`), `tools` (in how many runs each tool
+  appears), `sequences` (how many different tool sequences), `outcomes` and `problems`
 - On `fixtures/flight/`: turns 3/5/6, input tokens 61840/86609/119891, powershell in 3 runs, skill in 1, 3 different
   sequences, denied 3/3, and the commit differs
 - `node scripts/flight.mjs variance fixtures/flight` prints the report (`report()` is given)
 
 ### M4 · Messy runs
 - A stream cut in the middle of a line (a killed run): the broken line is counted, the outcome is `incomplete`, and
-  `problems` says so; `variance()` counts it as `incomplete` and lists it under `problems`
+  `problems` says so; `variance()` counts it as `incomplete`, lists it under `problems`, and keeps it out of the
+  turns, tool calls and tokens (it stopped halfway: its 0 tokens would drag the spread down)
 - No `meta.json`: no crash, `meta` is `null`, and nobody can call it the same setup (`differs` starts with `meta`)
 - No `events.jsonl`: the run stays out of the numbers and is listed in `problems`; with fewer than 2 usable runs,
   `variance()` throws an error that says "at least 2", and the CLI exits 1
@@ -139,9 +140,10 @@ all of them.
 ### M5
 <details><summary>What can sampling explain?</summary>
 
-Compare `run-2` and `run-3` first: same commit, model and flags, and still 6 versus 3 turns. Then `run-1` and `run-2`:
-the commit differs (the deny reason the model read changed). Only the first difference is the model alone. Which
-numbers moved most, and why does an early step move all the later ones?
+Compare `run-2` and `run-3` first: same commit, model and flags, and 6 versus 3 turns. But `run-3` is **derived** from
+`run-2` (`fixtures/flight/README.md`), so that gap illustrates what sampling does; it doesn't prove it. Your own N
+runs are the real test. Then `run-1` and `run-2`: the commit differs (the deny reason the model read changed), so not
+all of that difference is the model's. Which numbers moved most, and why does an early step move all the later ones?
 
 </details>
 

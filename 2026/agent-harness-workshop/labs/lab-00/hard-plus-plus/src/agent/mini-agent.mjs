@@ -7,7 +7,6 @@
 //        [--allow-tool RULE]… [--deny-tool RULE]… [--out run.jsonl]
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fakeModel, loadScenario } from './fake-model.mjs';
 import { TOOLS, workspace } from './tools.mjs';
@@ -30,13 +29,14 @@ export function parseArguments(text) {
 
 /**
  * The permission gate, with Copilot's rules: a deny rule wins; then every part of the call must be covered by an
- * allow rule; reads need no rule; anything else is denied, because a script has nobody to ask.
+ * allow rule; reads need no rule; anything else is denied, because a script has nobody to ask. A deny rule the gate
+ * can't read denies every call: a guard that can't understand its rules fails closed.
  */
 export function gate(call, { allow = [], deny = [] } = {}) {
-  // TODO(M3): call is { name, kind, arguments }. Rules: "shell", "shell(npm test)", "shell(git:*)", "write", "read"
-  //           or a tool's name. Split a shell command on && || ; | and check every part. Return
-  //           { allowed, rule, reason }: the rule that decided (or null), and the reason for a denial (NO_USER when
-  //           no rule allows it).
+  // TODO(M3): call is { name, kind, arguments }. Rules: "shell", "shell(npm test)", "shell(git:*)", "read",
+  //           "read(.env)", "write", "write(build)" or a tool's name. Split a shell command on && || ; | and check
+  //           every part; read(…) and write(…) match the call's path. Return { allowed, rule, reason }: the rule
+  //           that decided (or null), and the reason for a denial (NO_USER when no rule allows it).
   return { allowed: true, rule: null, reason: null };
 }
 
@@ -83,7 +83,10 @@ export function emitter(write, sessionId = crypto.randomUUID()) {
   };
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Run as a script, not imported? Compare real paths: a symlink, a junction or a short 8.3 name must still count.
+const isMain = (() => {
+  try { return Boolean(process.argv[1]) && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) {
   const args = process.argv.slice(2);
   const many = (name) => args.flatMap((a, i) => (a === name && i + 1 < args.length ? [args[i + 1]] : []));

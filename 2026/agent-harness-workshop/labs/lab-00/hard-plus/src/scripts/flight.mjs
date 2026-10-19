@@ -71,13 +71,15 @@ const stat = (xs) => {
 };
 
 /**
- * How much N runs differ: { n, prompt, setup, turns, toolCalls, tokens: { input, output } (each { min, median, max }),
- * tools: { name: runs that used it }, sequences, outcomes: { outcome: runs }, problems: [{ run, problem }] }.
+ * How much N runs differ: { n, measured, prompt, setup, turns, toolCalls, tokens: { input, output } (each { min,
+ * median, max }), tools: { name: runs that used it }, sequences, outcomes: { outcome: runs }, problems: [{ run,
+ * problem }] }.
  */
 export function variance(runs) {
-  // TODO(M3): the numbers above, from profile() of every run.
+  // TODO(M3): the numbers above, from profile() of every run (measured = how many runs the spread comes from).
   // TODO(M4): leave out runs without events (their problems are listed), and throw an Error that says "at least 2"
-  //           when fewer than 2 runs are left.
+  //           when fewer than 2 runs are left. A run that never finished (outcome 'incomplete') stopped halfway:
+  //           count its outcome, but keep it out of turns, toolCalls and tokens.
   return null;
 }
 
@@ -85,7 +87,8 @@ export function variance(runs) {
 
 /** The variance as Markdown: paste it into VARIANCE.md. */
 export function report(v) {
-  const row = (label, s) => `| ${label} | ${s.min} | ${s.median} | ${s.max} |`;
+  const row = (label, s) => (s ? `| ${label} | ${s.min} | ${s.median} | ${s.max} |` : `| ${label} | – | – | – |`);
+  const measured = v.measured ?? v.n;
   const tools = Object.entries(v.tools).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name, k]) => `| ${name} | ${k}/${v.n} |`);
   const outcomes = Object.entries(v.outcomes).sort((a, b) => b[1] - a[1]).map(([o, k]) => `${o} ${k}/${v.n}`).join(' · ');
   return [
@@ -94,12 +97,13 @@ export function report(v) {
     v.prompt ? `Prompt: "${v.prompt}"` : 'Prompt: ⚠ the runs have different prompts',
     '',
     ...(v.setup.same ? [] : [`⚠ Not one setup: ${v.setup.differs.join(', ')} differ(s) between runs. Some of the variance may come from the setup, not from the model.`, '']),
+    ...(measured < v.n ? [`Turns, calls and tokens come from the ${measured} finished run(s); ${v.n - measured} never finished.`, ''] : []),
     '| Measure | Min | Median | Max |',
     '|---|---:|---:|---:|',
     row('Turns', v.turns),
     row('Tool calls', v.toolCalls),
-    row('Input tokens', v.tokens.input),
-    row('Output tokens', v.tokens.output),
+    row('Input tokens', v.tokens?.input),
+    row('Output tokens', v.tokens?.output),
     '',
     '| Tool | Runs that used it |',
     '|---|---:|',
@@ -125,12 +129,12 @@ function printCompare(a, b, c) {
   console.log(`   outcome   ${c.outcome.a} vs ${c.outcome.b}\n`);
 }
 
-/** The run folders in `folder` (folders with meta.json or events.jsonl), or the folder itself when it is a run. */
+/** The run folders in `folder` (folders with meta.json or events.jsonl), run-2 before run-10, or the folder itself when it is a run. */
 export function runFolders(folder) {
   const isRun = (d) => fs.existsSync(path.join(d, 'meta.json')) || fs.existsSync(path.join(d, 'events.jsonl'));
   if (isRun(folder)) return [folder];
   if (!fs.existsSync(folder)) return [];
-  return fs.readdirSync(folder, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => path.join(folder, e.name)).filter(isRun).sort();
+  return fs.readdirSync(folder, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => path.join(folder, e.name)).filter(isRun).sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 }
 
 export function gitInfo(cwd = process.cwd()) {
@@ -162,7 +166,10 @@ export function runCopilot(args) {
 const stamp = (d) => d.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'run';
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Run as a script, not imported? Compare real paths: a symlink, a junction or a short 8.3 name must still count.
+const isMain = (() => {
+  try { return Boolean(process.argv[1]) && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2);
   const option = (name) => {

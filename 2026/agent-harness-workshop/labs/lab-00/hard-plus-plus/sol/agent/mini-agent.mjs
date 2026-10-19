@@ -7,7 +7,6 @@
 //        [--allow-tool RULE]… [--deny-tool RULE]… [--out run.jsonl]
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fakeModel, loadScenario } from './fake-model.mjs';
 import { TOOLS, workspace } from './tools.mjs';
@@ -30,27 +29,41 @@ export function parseArguments(text) {
 }
 
 const SPLIT = /\s*(?:&&|\|\||;|\|)\s*/;
-/** Does `rule` ("shell", "shell(npm test)", "shell(git:*)", "write", "view", …) cover `part` of `call`? */
+/** A rule ("shell", "shell(npm test)", "read(.env)", "write(build)", "view", …) as { head, arg }, or null when it can't be read. */
+function parseRule(rule) {
+  const m = String(rule ?? '').trim().match(/^([\w-]+)(?:\((.*)\))?$/);
+  return m ? { head: m[1], arg: m[2]?.trim() || null } : null;
+}
+const slash = (p) => String(p ?? '').replace(/\\/g, '/').replace(/^\.\//, '');
+/** A path pattern: * matches inside one folder, ** across folders, and a folder covers everything in it. */
+function pathMatches(pattern, file) {
+  const glob = slash(pattern).replace(/\/$/, '').replace(/[.+^$()|[\]\\{}]/g, '\\$&').replace(/\*\*/g, '\0').replace(/\*/g, '[^/]*').replace(/\?/g, '[^/]').replace(/\0/g, '.*');
+  return new RegExp(`^${glob}(?:/.*)?$`).test(slash(file));
+}
+/** Does the parsed rule cover `part` of `call`? Shell rules match commands; read and write rules match the path. */
 function covers(rule, call, part) {
-  const m = String(rule).trim().match(/^([\w-]+)(?:\((.*)\))?$/);
-  if (!m || (m[1] !== call.kind && m[1] !== call.name)) return false;
-  if (m[2] === undefined) return true;
-  if (call.kind !== 'shell') return false;
-  const pattern = m[2].trim();
-  if (pattern.endsWith(':*')) return part.split(/\s+/)[0] === pattern.slice(0, -2);
-  return part === pattern || part.startsWith(`${pattern} `);
+  if (rule.head !== call.kind && rule.head !== call.name) return false;
+  if (!rule.arg) return true;
+  if (call.kind === 'shell') {
+    if (rule.arg.endsWith(':*')) return part.split(/\s+/)[0] === rule.arg.slice(0, -2);
+    return part === rule.arg || part.startsWith(`${rule.arg} `);
+  }
+  return typeof call.arguments?.path === 'string' && pathMatches(rule.arg, call.arguments.path);
 }
 
 /**
  * The permission gate, with Copilot's rules: a deny rule wins; then every part of the call must be covered by an
- * allow rule; reads need no rule; anything else is denied, because a script has nobody to ask.
+ * allow rule; reads need no rule; anything else is denied, because a script has nobody to ask. A deny rule the gate
+ * can't read denies every call: a guard that can't understand its rules fails closed.
  */
 export function gate(call, { allow = [], deny = [] } = {}) {
+  const unreadable = deny.find((rule) => !parseRule(rule));
+  if (unreadable !== undefined) return { allowed: false, rule: unreadable, reason: `The deny rule "${unreadable}" can't be read, so every call is denied (fail closed).` };
   const parts = call.kind === 'shell' ? String(call.arguments?.command ?? '').split(SPLIT).map((p) => p.trim()).filter(Boolean) : [''];
   if (!parts.length) parts.push('');
-  const denied = deny.find((rule) => parts.some((p) => covers(rule, call, p)));
+  const denied = deny.find((rule) => parts.some((p) => covers(parseRule(rule), call, p)));
   if (denied) return { allowed: false, rule: denied, reason: `Denied by the rule "${denied}".` };
-  const rules = parts.map((p) => allow.find((rule) => covers(rule, call, p)));
+  const rules = parts.map((p) => allow.find((rule) => { const r = parseRule(rule); return r && covers(r, call, p); }));
   if (rules.every(Boolean)) return { allowed: true, rule: rules[0], reason: null };
   if (call.kind === 'read') return { allowed: true, rule: null, reason: null };
   return { allowed: false, rule: null, reason: NO_USER };
@@ -146,7 +159,10 @@ export function emitter(write, sessionId = crypto.randomUUID()) {
   };
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Run as a script, not imported? Compare real paths: a symlink, a junction or a short 8.3 name must still count.
+const isMain = (() => {
+  try { return Boolean(process.argv[1]) && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) {
   const args = process.argv.slice(2);
   const many = (name) => args.flatMap((a, i) => (a === name && i + 1 < args.length ? [args[i + 1]] : []));

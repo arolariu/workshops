@@ -40,15 +40,16 @@ Last, measure: is planning worth its tokens? Do the same request once without a 
 
 ## 📂 Work here
 ```bash
-cd labs/lab-00/medium
-cp -r src direct      # PowerShell: Copy-Item -Recurse src direct
-cd src
+mkdir -p labs/.runs                    # from the workshop folder
+cp -r labs/lab-00/medium/src labs/.runs/direct
+cd labs/lab-00/medium/src
 copilot
 node labs/start.mjs test lab-00 medium     # from the workshop folder
 ```
-The copy in `direct/` is for M4's run without a plan: make it now, while there's no `gpa` yet, and delete it when
-you're done. `PLAN.md` is already in `src/` with its four headings and an empty usage table: fill it in as you go.
-This level uses AI credits for two short sessions.
+The copy in `labs/.runs/direct/` is for M4's run without a plan: make it now, while there's no `gpa` yet. In
+PowerShell: `mkdir -Force labs/.runs` and `Copy-Item -Recurse labs/lab-00/medium/src labs/.runs/direct`. `labs/.runs/`
+is ignored by git, but delete the copy when you're done. `PLAN.md` is already in `src/` with its four headings and an
+empty usage table: fill it in as you go. This level uses AI credits for two short sessions.
 
 ## 💡 Hints
 ### M1
@@ -93,7 +94,7 @@ Once the tests are green, ask: "Rewrite gpa() as a one-liner and drop the input 
 <details><summary>Two runs, two bills</summary>
 
 `/usage` shows this session's AI credits and tokens: copy them into the `plan-first` row now. For `direct`, start
-`copilot` in the `direct/` copy, ask for the same feature in one prompt without planning, run `/usage`, copy the
+`copilot` in `labs/.runs/direct/`, ask for the same feature in one prompt without planning, run `/usage`, copy the
 numbers, then delete the copy. Same feature, two prices.
 
 </details>
