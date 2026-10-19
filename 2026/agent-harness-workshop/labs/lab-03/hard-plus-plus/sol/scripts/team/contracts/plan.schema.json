@@ -1,0 +1,25 @@
+{
+  "$comment": "plan.json: the planner's answer. The implementer may change only the files listed here; a person approves it before anything changes.",
+  "type": "object",
+  "required": ["goal", "files", "steps"],
+  "additionalProperties": false,
+  "properties": {
+    "goal": { "type": "string", "minLength": 10 },
+    "files": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[\\w./-]+$" } },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "file", "change"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^S\\d+$" },
+          "file": { "type": "string", "pattern": "^[\\w./-]+$" },
+          "change": { "type": "string", "minLength": 10 }
+        }
+      }
+    },
+    "tests": { "type": "array", "items": { "type": "string" } }
+  }
+}

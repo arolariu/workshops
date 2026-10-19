@@ -1,6 +1,6 @@
 # Lab 03 · 🎭 Custom agents — Roles with least privilege
 
-> **Harness layer:** Roles · **Maturity:** L3 Scoped · 🟢 together · 🟡 🔴 homework
+> **Harness layer:** Roles · **Maturity:** L3 Scoped · 🟢 together · 🟡 🔴 🟣 💎 homework
 >
 > **Threads:** 🕵️ The reviewer · 🔐 Least privilege
 
@@ -44,12 +44,25 @@ File: `.github/agents/reviewer.agent.md` (the file name is the agent name).
 | `read` | read files |
 | `search` | search the code (grep/glob) |
 | `edit` | create and change files |
-| `execute` | run shell commands |
+| `execute` | run shell commands (also `shell`, `Bash`, `powershell`) |
 | `web` | fetch web pages |
-| `agent` | delegate to other agents |
-| `studybuddy/*` | use every tool of the MCP server named `studybuddy` (Lab 04) |
+| `agent` | delegate to other agents (also `custom-agent`, `Task`) |
+| `studybuddy/*` | use every tool of the MCP server named `studybuddy` (Lab 04); `studybuddy/get_grades` just one |
 
 Leave `tools` out and the agent gets **everything**, so always set it.
+
+Good to know:
+- Aliases count in **any case**, and `*` **anywhere** in the list means every tool (`['view', '*']` too). `[]` means
+  no tools at all. A name Copilot doesn't know (a typo such as `exec`) is **ignored without a warning**.
+- Copilot loads every `.md` file under `.github/agents/`, **subfolders too** (`agents/team/reviewer.agent.md` is the
+  agent `team--reviewer`). Keep notes, fixtures and policies somewhere else.
+- `disable-model-invocation: true` (or `infer: false`) keeps an agent from being picked by the main agent; you can
+  still start it with `--agent` or `/agent`. Any agent with the `agent` tool can hand work to every other agent the
+  model may pick: that's how a read-only agent ends up with a deputy that can write.
+- Run as a subagent, a custom agent doesn't read `AGENTS.md` unless its frontmatter says
+  `include-custom-instructions: true`.
+- `--max-ai-credits` is at least 30 **per session**, so a script that calls two agents needs at least 60 credits of
+  cap. There's no free command that lists agents (`/agent` needs a live session): a script reads the files.
 
 ## Using agents
 | You want to… | Do this |
@@ -73,8 +86,10 @@ Agents live in `.github/agents/` (project), `~/.copilot/agents/` (personal) or i
 | Level | Mission | You practise |
 |---|---|---|
 | 🟢 easy | **Eyes, not hands**: a reviewer that physically cannot edit | `tools`, output formats |
-| 🟡 medium | **A specialist with a boundary**: a test-writer that proves bugs instead of fixing them | narrow roles, red tests |
-| 🔴 hard | **Two agents, one loop**: reviewer → fixer, scripted | `--agent`, `-p`, permission flags |
+| 🟡 medium | **A specialist with a boundary**: a test-writer turns every review finding into a red test that proves it | narrow roles, red tests |
+| 🔴 hard | **Two agents, one loop**: reviewer → fixer with JSON findings, stop rules, a credit cap per round and a run report | `--agent`, handoffs, stop rules |
+| 🟣 hard+ | **Privilege audit**: what each agent can really do (aliases, wildcards, delegation), against a role policy; then fix five agents | least privilege, the confused deputy |
+| 💎 hard++ | **An agent team**: planner → a person → implementer → tester → reviewer, with contracts, budgets and resumable runs | multi-agent design, separation of duties |
 
 ## Common pitfalls
 - **No `tools` line**: the agent can do anything. Least privilege means an explicit list.
@@ -83,4 +98,6 @@ Agents live in `.github/agents/` (project), `~/.copilot/agents/` (personal) or i
 
 ## Learn more
 - [Creating custom agents for Copilot CLI](https://docs.github.com/copilot/how-tos/copilot-cli/customize-copilot/create-custom-agents-for-cli)
-- [Custom agents configuration reference](https://docs.github.com/copilot/reference/custom-agents-configuration)
+- [Custom agents configuration reference](https://docs.github.com/copilot/reference/custom-agents-configuration): every frontmatter field and tool alias
+- [CLI command reference · custom agents](https://docs.github.com/copilot/reference/copilot-cli-reference/cli-command-reference#custom-agents-reference): where agents load from, and the built-in agents
+- `copilot help permissions` and `copilot help limits`

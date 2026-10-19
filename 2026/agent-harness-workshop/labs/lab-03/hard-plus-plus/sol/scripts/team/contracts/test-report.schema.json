@@ -1,0 +1,12 @@
+{
+  "$comment": "test-report.json: the tester's answer after running the tests on the change.",
+  "type": "object",
+  "required": ["passed", "failed", "failing"],
+  "additionalProperties": false,
+  "properties": {
+    "passed": { "type": "integer", "minimum": 0 },
+    "failed": { "type": "integer", "minimum": 0 },
+    "failing": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "covered": { "type": "array", "items": { "type": "string", "pattern": "^S\\d+$" } }
+  }
+}

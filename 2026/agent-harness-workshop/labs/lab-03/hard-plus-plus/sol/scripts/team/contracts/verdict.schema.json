@@ -1,0 +1,22 @@
+{
+  "$comment": "verdict.json: the reviewer's answer about the change, the plan and the test report.",
+  "type": "object",
+  "required": ["decision", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "decision": { "enum": ["approve", "request-changes"] },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "location", "problem"],
+        "properties": {
+          "severity": { "enum": ["high", "medium", "low"] },
+          "location": { "type": "string", "pattern": "^[\\w./-]+:\\d+$" },
+          "problem": { "type": "string", "minLength": 1 },
+          "suggestion": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "$comment": "The agent team: who does what, with which permissions and how many credits. scripts/team.mjs runs the stages in this order; {goal} and {run} in a prompt become the run's goal and folder.",
+  "budget": 180,
+  "stages": [
+    {
+      "id": "plan", "agent": "planner", "credits": 30, "reads": [], "writes": "plan.json", "contract": "plan",
+      "allow": [], "deny": ["write", "shell"],
+      "prompt": "Goal: {goal}\nPlan the change. A script reads your answer: answer with only one ```json block: {\"goal\": \"…\", \"files\": [\"file.js\"], \"steps\": [{\"id\": \"S1\", \"file\": \"file.js\", \"change\": \"…\"}], \"tests\": [\"npm test\"]}"
+    },
+    { "id": "approve", "human": true, "reads": ["plan.json"], "writes": "approval.json" },
+    {
+      "id": "implement", "agent": "implementer", "credits": 60, "reads": ["plan.json"], "writes": "changes.patch",
+      "allow": ["write", "shell(npm:*)"], "deny": ["shell(git push)", "shell(node:*)"],
+      "prompt": "Implement the approved plan in {run}/plan.json. Change only the files it lists, then run npm test."
+    },
+    {
+      "id": "test", "agent": "tester", "credits": 30, "reads": ["plan.json", "changes.patch"], "writes": "test-report.json", "contract": "test-report",
+      "allow": ["write", "shell(npm:*)"], "deny": ["shell(git push)", "shell(node:*)"],
+      "prompt": "Test the change in {run}/changes.patch against the plan in {run}/plan.json. Run npm test, add a test for any step that has none (test files only), and answer with only one ```json block: {\"passed\": 0, \"failed\": 0, \"failing\": [\"test name\"], \"covered\": [\"S1\"]}"
+    },
+    {
+      "id": "review", "agent": "reviewer", "credits": 30, "reads": ["plan.json", "changes.patch", "test-report.json"], "writes": "verdict.json", "contract": "verdict",
+      "allow": [], "deny": ["write", "shell"],
+      "prompt": "Review the change in {run}/changes.patch against {run}/plan.json and {run}/test-report.json. A script reads your answer: answer with only one ```json block: {\"decision\": \"approve\" | \"request-changes\", \"findings\": [{\"severity\": \"high\" | \"medium\" | \"low\", \"location\": \"file.js:12\", \"problem\": \"…\", \"suggestion\": \"…\"}]}"
+    }
+  ]
+}

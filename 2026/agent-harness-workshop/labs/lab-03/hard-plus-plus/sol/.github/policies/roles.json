@@ -1,0 +1,126 @@
+{
+  "$comment": "The role policy for StudyBuddy's custom agents, owned by the security team. Each agent has one role; a role says what it may do (read, search, edit, execute, web, agent, todo, mcp:read, mcp:write) and whether only a person or a script may start it (\"invocation\": \"explicit\"). Read by scripts/audit-agents.mjs. It lives outside .github/agents/ on purpose: Copilot loads every .md file in there as an agent.",
+  "version": 1,
+  "roles": {
+    "reviewer": {
+      "may": [
+        "read",
+        "search"
+      ],
+      "why": "Eyes, not hands: it reports, and someone else acts."
+    },
+    "test-writer": {
+      "may": [
+        "read",
+        "search",
+        "edit",
+        "execute"
+      ],
+      "why": "Writes and runs tests; which files it may touch is up to its instructions."
+    },
+    "fixer": {
+      "may": [
+        "read",
+        "search",
+        "edit",
+        "execute"
+      ],
+      "why": "Changes code and runs the tests; the review decides what to fix."
+    },
+    "docs": {
+      "may": [
+        "read",
+        "search",
+        "edit"
+      ],
+      "why": "Writes text; it never needs to run anything."
+    },
+    "triage": {
+      "may": [
+        "read",
+        "search"
+      ],
+      "why": "Sorts reports; a person decides what happens next."
+    },
+    "release": {
+      "may": [
+        "read",
+        "search",
+        "execute"
+      ],
+      "invocation": "explicit",
+      "why": "Runs commands, so it only runs when a person asks for it."
+    },
+    "portal-reader": {
+      "may": [
+        "read",
+        "search",
+        "mcp:read"
+      ],
+      "why": "Answers from the portal; it never changes it."
+    },
+    "coverage": {
+      "may": [
+        "read",
+        "search",
+        "execute"
+      ],
+      "why": "Runs the tests with coverage and reports; it changes nothing."
+    },
+    "planner": {
+      "may": [
+        "read",
+        "search"
+      ],
+      "invocation": "explicit",
+      "why": "Plans; a person approves before anything changes."
+    },
+    "implementer": {
+      "may": [
+        "read",
+        "search",
+        "edit",
+        "execute"
+      ],
+      "invocation": "explicit",
+      "why": "Changes the files of an approved plan, nothing else."
+    },
+    "tester": {
+      "may": [
+        "read",
+        "search",
+        "edit",
+        "execute"
+      ],
+      "invocation": "explicit",
+      "why": "Writes and runs tests for the change; never library code."
+    }
+  },
+  "agents": {
+    "reviewer": "reviewer",
+    "test-writer": "test-writer",
+    "fixer": "fixer",
+    "docs-writer": "docs",
+    "triage": "triage",
+    "release": "release",
+    "portal": "portal-reader",
+    "coverage": "coverage",
+    "planner": "planner",
+    "implementer": "implementer",
+    "tester": "tester"
+  },
+  "mcp": {
+    "studybuddy": {
+      "get_deadlines": "read",
+      "get_grades": "read",
+      "get_courses": "read",
+      "get_exam_dates": "read",
+      "mark_done": "write"
+    }
+  },
+  "builtinAgents": {
+    "general-purpose": [
+      "*"
+    ]
+  }
+}
