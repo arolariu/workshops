@@ -146,7 +146,8 @@ test('a learner who watches stdout never sees the grader\'s events, so cannot re
   assert.equal(result.allPass, false);
 });
 
-test('noisy learner output is bounded and marked, and protocol events are still parsed after the limit', async () => {
+// PR #1 follow-up: under parallel load on Windows this test once stalled before its first check; it now fails in minutes, not 10.
+test('noisy learner output is bounded and marked, and protocol events are still parsed after the limit', { timeout: 180000 }, async () => {
   const { exDir, target } = fixture(`export default (t) => [
     t.check('noisy', () => {
       const line = 'x'.repeat(99) + '\\n';
@@ -157,7 +158,7 @@ test('noisy learner output is bounded and marked, and protocol events are still 
     }),
     t.check('still counted', () => true),
   ];`);
-  const result = await runChecks({ exDir, target });
+  const result = await runChecks({ exDir, target, timeout: 120000 });
   assert.equal(result.state, 'pass', result.fatal ?? '');
   assert.equal(result.total, 2);
   assert.equal(result.truncated, true);
@@ -281,4 +282,14 @@ test('an interrupted run never marks a milestone as passed', async () => {
   const res = await runChecks({ exDir, target });
   assert.equal(res.state, 'interrupted');
   assert.deepEqual(res.milestones, { M1: 'fail' });
+});
+
+test('checks that never start are stopped after the start timeout, with a reason, instead of waiting for the overall timeout', async () => {
+  const { exDir, target } = fixture("setInterval(() => {}, 1000);\nawait new Promise(() => {});\nexport default () => [];\n");
+  const t0 = Date.now();
+  const result = await runChecks({ exDir, target, startTimeout: 1500 });
+  assert.ok(Date.now() - t0 < 15000, `stopped after ${Date.now() - t0} ms`);
+  assert.equal(result.state, 'interrupted');
+  assert.equal(result.complete, false);
+  assert.match(result.fatal, /did not start within 2 s/);
 });

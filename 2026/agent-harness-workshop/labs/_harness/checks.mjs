@@ -22,7 +22,7 @@ export const STATES = ['pass', 'fail', 'blocked', 'skipped', 'cancelled', 'inter
  * { state, allPass, complete, results, passed, failed, skipped, blocked, total, fatal, stdout, stderr, exitCode, truncated }
  * state: pass | fail | blocked | skipped | cancelled | interrupted
  */
-export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, signal, timeout = 10 * 60 * 1000, hangGrace = 15000 }) {
+export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, signal, timeout = 10 * 60 * 1000, hangGrace = 15000, startTimeout = 60000 }) {
   const results = [];
   let plan = null;
   let done = false;
@@ -43,6 +43,10 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
   const cancel = () => inner.abort();
   signal?.addEventListener('abort', cancel, { once: true });
   let watchdog = null;
+  // Until the plan arrives, no check is running, so the per-check watchdog can't help: a run that never starts
+  // (seen once under heavy parallel load on Windows) must not keep the learner waiting for the overall timeout.
+  let stalled = false;
+  let startTimer = null;
   const armWatchdog = (ev) => {
     clearTimeout(watchdog);
     const limit = Number.isFinite(ev.timeout) && ev.timeout > 0 ? ev.timeout : 60000;
@@ -59,6 +63,7 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
         if (!Number.isInteger(ev.total) || ev.total < 0 || !Array.isArray(ev.names) || ev.names.length !== ev.total || !ev.names.every((n) => typeof n === 'string')) return violate('an invalid plan');
         if (ev.milestones !== undefined && (!Array.isArray(ev.milestones) || ev.milestones.length !== ev.total || !ev.milestones.every((m) => m === null || typeof m === 'string'))) return violate('an invalid list of milestones');
         plan = { total: ev.total, names: ev.names, milestones: ev.milestones ?? ev.names.map(() => null) };
+        clearTimeout(startTimer);
         break;
       case 'start':
         if (!validIdx(ev.idx) || results[ev.idx] || current !== null) return violate('an unexpected start event');
@@ -156,6 +161,7 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
 
   const finish = (proc) => {
     clearTimeout(watchdog);
+    clearTimeout(startTimer);
     signal?.removeEventListener('abort', cancel);
     if (separator) stdout = capped(stdout, '\n', MAX_OUTPUT);
     if (buf && !skipping) stdout = capped(stdout, buf, MAX_OUTPUT);
@@ -167,6 +173,7 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
     if (cancelled) reason = 'The checks were cancelled.';
     else if (fatal) reason = fatal;
     else if (proc?.error) reason = `Could not start the checks: ${proc.error}`;
+    else if (stalled) reason = `The checks did not start within ${Math.round(startTimeout / 1000)} s and were stopped. Run them again; if it keeps happening, restart the lab app.`;
     else if (hung) reason = `The check "${hung}" did not finish in time and was stopped.`;
     else if (proc?.timedOut) reason = `The checks took longer than ${Math.round(timeout / 1000)}s and were stopped.`;
     else if (protocolError) reason = `The checks reported something unexpected (${protocolError}), so this run cannot be trusted.`;
@@ -206,6 +213,7 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
   for (const [dir, what] of [[target, 'folder to check'], [exDir, 'exercise folder']]) {
     if (!fs.existsSync(dir)) return finish({ error: `the ${what} ${dir} does not exist.`, stderr: '' });
   }
+  startTimer = setTimeout(() => { if (!plan) { stalled = true; inner.abort(); } }, startTimeout);
   const proc = await runProcess(process.execPath, [path.join(HERE, 'run-checks.mjs'), exDir, target], {
     cwd: target,
     env: { ...process.env, ...env },
