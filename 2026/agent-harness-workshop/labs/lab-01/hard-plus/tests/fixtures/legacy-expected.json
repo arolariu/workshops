@@ -1,0 +1,105 @@
+{
+  "rules": 56,
+  "vague": [
+    ".github/copilot-instructions.md:97",
+    ".github/copilot-instructions.md:98",
+    ".github/copilot-instructions.md:101",
+    ".github/copilot-instructions.md:103",
+    ".github/copilot-instructions.md:132",
+    ".github/copilot-instructions.md:147",
+    ".github/copilot-instructions.md:165",
+    ".github/copilot-instructions.md:174"
+  ],
+  "duplicates": [
+    [
+      "AGENTS.md:8",
+      ".github/copilot-instructions.md:111"
+    ],
+    [
+      "AGENTS.md:12",
+      ".github/copilot-instructions.md:127"
+    ],
+    [
+      "AGENTS.md:16",
+      ".github/copilot-instructions.md:142"
+    ],
+    [
+      "AGENTS.md:17",
+      ".github/copilot-instructions.md:144"
+    ],
+    [
+      "AGENTS.md:20",
+      ".github/copilot-instructions.md:181"
+    ],
+    [
+      "AGENTS.md:21",
+      ".github/copilot-instructions.md:169"
+    ],
+    [
+      "AGENTS.md:22",
+      ".github/copilot-instructions.md:182"
+    ],
+    [
+      "AGENTS.md:22",
+      ".github/copilot-instructions.md:184"
+    ],
+    [
+      ".github/copilot-instructions.md:182",
+      ".github/copilot-instructions.md:184"
+    ]
+  ],
+  "contradictions": {
+    "indent": {
+      "values": [
+        "2",
+        "4"
+      ],
+      "rules": [
+        ".github/copilot-instructions.md:125",
+        ".github/copilot-instructions.md:130"
+      ]
+    },
+    "quotes": {
+      "values": [
+        "double",
+        "single"
+      ],
+      "rules": [
+        ".github/copilot-instructions.md:126",
+        ".github/copilot-instructions.md:131"
+      ]
+    },
+    "decimals": {
+      "values": [
+        "1",
+        "2"
+      ],
+      "rules": [
+        "AGENTS.md:16",
+        ".github/copilot-instructions.md:142",
+        ".github/copilot-instructions.md:143",
+        ".github/copilot-instructions.md:196"
+      ]
+    },
+    "runner": {
+      "values": [
+        "jest",
+        "node:test"
+      ],
+      "rules": [
+        "AGENTS.md:7",
+        "AGENTS.md:13",
+        ".github/copilot-instructions.md:164",
+        ".github/copilot-instructions.md:167",
+        ".github/instructions/tests.instructions.md:5"
+      ]
+    }
+  },
+  "commands": [
+    ".github/copilot-instructions.md:112 npm run lint",
+    ".github/copilot-instructions.md:113 npm run build",
+    ".github/copilot-instructions.md:114 npm run test:watch",
+    ".github/copilot-instructions.md:115 npm run coverage",
+    ".github/copilot-instructions.md:116 yarn test"
+  ]
+}

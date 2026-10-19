@@ -1,0 +1,10 @@
+{
+  "name": "@studybuddy/cli",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The studybuddy command line",
+  "scripts": {
+    "test": "node --test"
+  }
+}

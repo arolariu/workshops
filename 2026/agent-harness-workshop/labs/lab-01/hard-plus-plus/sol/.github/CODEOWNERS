@@ -1,0 +1,20 @@
+# Instructions are code: every rule file has an owner, and a change to it needs that owner's review.
+# The last matching line wins. On GitHub it has teeth with a branch rule: "Require review from Code Owners".
+*                            @studybuddy/maintainers
+
+# The shared baseline, the gate and the canary suite: the platform team.
+/AGENTS.md                   @studybuddy/platform
+/.github/                    @studybuddy/platform
+/.agents/                    @studybuddy/platform
+/scripts/                    @studybuddy/platform
+/evals/                      @studybuddy/platform
+
+# Each package: its own team.
+/packages/cli/               @studybuddy/cli-team
+/packages/portal/            @studybuddy/portal-team
+/packages/planner/           @studybuddy/planner-team
+
+# A package's rules sit on top of the baseline: its team and platform review them together.
+/packages/cli/AGENTS.md      @studybuddy/cli-team @studybuddy/platform
+/packages/portal/AGENTS.md   @studybuddy/portal-team @studybuddy/platform
+/packages/planner/AGENTS.md  @studybuddy/planner-team @studybuddy/platform

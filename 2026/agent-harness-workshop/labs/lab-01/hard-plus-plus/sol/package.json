@@ -1,0 +1,12 @@
+{
+  "name": "studybuddy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A tiny study helper used in the Build Your Agent Harness workshop",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "test": "node --test",
+    "check:instructions": "node scripts/check-instructions.mjs --strict"
+  }
+}

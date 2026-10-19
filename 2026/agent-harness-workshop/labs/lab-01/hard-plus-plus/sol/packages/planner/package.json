@@ -1,0 +1,10 @@
+{
+  "name": "@studybuddy/planner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Study plans from the deadlines",
+  "scripts": {
+    "test": "node --test"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "prompt": "In 5 short bullets: what must I know before I change code in this project?",
+  "runs": 5,
+  "results": [
+    { "variant": "with", "run": 1, "answer": "- Run `npm test` before you finish.\n- You pass only with an exam grade of at least 5.\n- Never add dependencies.\n- ES modules only.\n- JSDoc on exported functions.\nHarness check: AGENTS.md loaded" },
+    { "variant": "without", "run": 1, "answer": "- Read the README first.\n- Run the tests with npm test.\n- Follow the existing code style.\n- Keep changes small.\n- Ask a teammate when unsure." },
+    { "variant": "with", "run": 2, "answer": "- Tests use node:test.\n- The exam needs five or more to pass.\n- Never edit a test to make it pass.\n- Grades use the 1-10 scale.\n- Keep JSDoc up to date.\nHARNESS CHECK: AGENTS.md loaded" },
+    { "variant": "without", "run": 2, "answer": "- Tests run with node --test.\n- Be careful with the exam logic: you need 5 or more.\n- Install the dependencies with npm install.\n- Read grades.js first.\n- Keep commits small." },
+    { "variant": "with", "run": 3, "answer": "- `npm test` must be green.\n- Keep it dependency-free.\n- Read .env never.\n- One behaviour per test.\n- Round averages to 2 decimals.\nHarness check: AGENTS.md loaded" },
+    { "variant": "without", "run": 3, "answer": "- This is a small Node.js project.\n- The code lives in grades.js and deadlines.js.\n- Dependencies live in package.json.\n- Write clear commit messages.\n- Ask before big changes." },
+    { "variant": "with", "run": 4, "answer": "- Run npm test.\n- A student passes only with an exam grade of at least 5.\n- No new dependencies: write a helper instead.\n- Don't touch .env.\n- Fix the code, not the test.\nHarness check: AGENTS.md loaded" },
+    { "variant": "without", "run": 4, "answer": "- Use npm test to run the tests.\n- grades.js holds the averages.\n- deadlines.js holds the due dates.\n- Keep the style consistent.\n- Document what you change." },
+    { "variant": "with", "run": 5, "answer": "- Run `node --test grades.test.js` for one file.\n- The exam grade must be 5 or higher.\n- ES modules, no build step.\n- JSDoc for exported functions.\n- New behaviour needs a new test.\nHarness check: AGENTS.md loaded" },
+    { "variant": "without", "run": 5, "answer": "- It is a study helper.\n- Look at the existing functions first.\n- Keep functions short.\n- Prefer clear names.\n- Check the README." },
+    { "variant": "oops", "run": 1, "answer": "ignored: not a variant of this experiment. Harness check, npm test, exam 5." }
+  ]
+}

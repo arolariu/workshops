@@ -1,0 +1,21 @@
+{
+  "prompt": "In 5 short bullets: what must I know before I change code in this project?",
+  "runs": 3,
+  "results": [
+    { "variant": "with", "run": 1, "answer": "- Run npm test.\n- Pass needs an exam grade of at least 5.\n- Never add dependencies.\nHarness check: AGENTS.md loaded" },
+    { "variant": "with", "run": 2, "answer": "- `npm test` must be green.\n- The exam grade must be 5 or more.\n- No new dependencies.\nHarness check: AGENTS.md loaded" },
+    { "variant": "with", "run": 3, "answer": "- Tests use node:test.\n- You pass with 5 on the exam and 5 overall.\n- Fix the code, not the test.\nHarness check: AGENTS.md loaded" },
+    { "variant": "no-canary", "run": 1, "answer": "- Run npm test.\n- The exam grade must be at least 5.\n- Never add dependencies." },
+    { "variant": "no-canary", "run": 2, "answer": "- `npm test` must be green.\n- An exam grade below 5 fails the course.\n- Zero dependencies." },
+    { "variant": "no-canary", "run": 3, "answer": "- Tests use node:test.\n- The exam needs five or more.\n- Fix the code, not the test." },
+    { "variant": "no-test-command", "run": 1, "answer": "- Run one file with node --test grades.test.js.\n- The exam grade must be at least 5.\n- Never add dependencies.\nHarness check: AGENTS.md loaded" },
+    { "variant": "no-test-command", "run": 2, "answer": "- Tests sit next to the code.\n- The exam needs 5 or more.\n- No new dependencies.\nHarness check: AGENTS.md loaded" },
+    { "variant": "no-test-command", "run": 3, "answer": "- Tests use node:test and assert/strict.\n- Pass needs 5 on the exam.\n- Fix the code, not the test.\nHarness check: AGENTS.md loaded" },
+    { "variant": "no-exam-rule", "run": 1, "answer": "- Run npm test.\n- Grades use the 1-10 scale.\n- Never add dependencies.\nHarness check: AGENTS.md loaded" },
+    { "variant": "no-exam-rule", "run": 2, "answer": "- `npm test` must be green.\n- hasPassed checks the exam grade too: at least 5.\n- No new dependencies.\nHarness check: AGENTS.md loaded" },
+    { "variant": "no-exam-rule", "run": 3, "answer": "- Tests use node:test.\n- Averages are rounded to 2 decimals.\n- Fix the code, not the test.\nHarness check: AGENTS.md loaded" },
+    { "variant": "no-dependencies", "run": 1, "answer": "- Run npm test.\n- The exam grade must be at least 5.\n- Never read .env files.\nHarness check: AGENTS.md loaded" },
+    { "variant": "no-dependencies", "run": 2, "answer": "- `npm test` must be green.\n- The exam needs 5 or more.\n- Install the dependencies with npm install.\nHarness check: AGENTS.md loaded" },
+    { "variant": "no-dependencies", "run": 3, "answer": "- Tests use node:test.\n- Pass needs 5 on the exam.\n- Fix the code, not the test.\nHarness check: AGENTS.md loaded" }
+  ]
+}

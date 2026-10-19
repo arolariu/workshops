@@ -1,0 +1,6 @@
+{
+  "root": "- Run npm test before you finish.\n- Never add dependencies.\n- Fix the code, not the test.\nHarness check: AGENTS.md loaded",
+  "cli": "- run() returns { code, out }.\n- A user error exits with 1.\n- Output is one item per line.\nHARNESS CHECK: AGENTS.md loaded\nHarness check: cli rules loaded",
+  "portal": "- Escape every value with escapeHtml().\n- One <h1> per page.\n- No inline scripts.\nHarness check: AGENTS.md loaded",
+  "planner": "- Plans skip done work.\n- Start 2 days before the due date.\n- Never call new Date() without an argument.\nHarness check: AGENTS.md loaded\nHarness check: planner rules loaded\nHarness check: cli rules loaded"
+}

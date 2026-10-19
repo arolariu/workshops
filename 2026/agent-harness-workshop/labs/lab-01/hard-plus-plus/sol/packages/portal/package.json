@@ -1,0 +1,10 @@
+{
+  "name": "@studybuddy/portal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The HTML pages students see",
+  "scripts": {
+    "test": "node --test"
+  }
+}

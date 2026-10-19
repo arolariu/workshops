@@ -1,0 +1,29 @@
+{
+  "prompt": "In 3 short bullets: what must I know before I change code in this folder?",
+  "cases": [
+    {
+      "id": "root",
+      "cwd": ".",
+      "expect": ["Harness check: AGENTS.md loaded"],
+      "forbid": []
+    },
+    {
+      "id": "cli",
+      "cwd": "packages/cli",
+      "expect": ["Harness check: AGENTS.md loaded", "Harness check: cli rules loaded"],
+      "forbid": ["portal rules loaded", "planner rules loaded"]
+    },
+    {
+      "id": "portal",
+      "cwd": "packages/portal",
+      "expect": ["Harness check: AGENTS.md loaded", "Harness check: portal rules loaded"],
+      "forbid": ["cli rules loaded", "planner rules loaded"]
+    },
+    {
+      "id": "planner",
+      "cwd": "packages/planner",
+      "expect": ["Harness check: AGENTS.md loaded", "Harness check: planner rules loaded"],
+      "forbid": ["cli rules loaded", "portal rules loaded"]
+    }
+  ]
+}
