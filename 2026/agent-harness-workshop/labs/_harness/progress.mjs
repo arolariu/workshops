@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { milestoneStatus, nextFixName } from './milestones.mjs';
 
 export const PROGRESS_VERSION = 2;
 const HARNESS = path.dirname(fileURLToPath(import.meta.url));
@@ -264,12 +265,12 @@ export function progressStore(labsDir, { fileName = '.progress.json' } = {}) {
     recordChecks(key, result, evidence) {
       const attempt = { state: result.state, at: new Date().toISOString() };
       if (result.state === 'cancelled') { store.set(key, { lastAttempt: attempt }); return; }
-      const firstFail = result.results?.find((r) => r.status === 'fail' || r.status === 'blocked');
       store.set(key, {
         checks: result.state,
         passed: result.passed ?? 0,
         total: result.total ?? 0,
-        nextFix: firstFail?.name ?? null,
+        nextFix: nextFixName(result.results),
+        milestones: milestoneStatus(result.results),
         checksEvidence: evidence,
         lastAttempt: attempt,
         legacy: false,

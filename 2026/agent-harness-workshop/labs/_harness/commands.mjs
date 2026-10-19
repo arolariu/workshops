@@ -237,6 +237,17 @@ export async function run(ctx) {
         say(`   ${srcOk && solOk ? '✅' : '❌'} ${white(`${lab.id} ${ex.level.padEnd(6)}`)}  ${dim('src')} ${srcOk ? green(`fails ${s.failed}/${s.total}`) : red(!s.complete ? `could not run: ${s.fatal}` : 'passes - nothing to do!')}   ${dim('sol')} ${solOk ? green(`passes ${o.passed}/${o.total}`) : red(!o.complete ? `could not run: ${o.fatal}` : o.blocked ? `blocked ${o.blocked}` : `fails ${o.failed}`)}${skipped ? dim(` (${skipped} skipped)`) : ''}`);
         if (!solOk && o.complete) o.results.filter((r) => r.status === 'fail' || r.status === 'blocked').forEach((r) => say(`        ${red(r.status === 'blocked' ? 'sol blocked' : 'sol ✗')} ${r.name}: ${dim(r.message.slice(0, 220))}`));
         if (opt.verbose && s.results) s.results.filter((r) => r.status === 'fail').forEach((r) => say(`        ${dim('src ✗')} ${dim(r.name)}`));
+        if (o.complete) {
+          // Milestones must line up: every milestone a check names exists in todo.md, and every milestone has a check.
+          const defined = new Set((ex.milestones ?? []).map((m) => m.id));
+          const named = new Set((o.planMilestones ?? []).filter(Boolean));
+          const msIssues = [
+            ...[...named].filter((m) => !defined.has(m)).map((m) => `a check names ${m}, but todo.md has no "### ${m}" milestone`),
+            ...[...defined].filter((m) => !named.has(m)).map((m) => `todo.md's milestone ${m} has no check`),
+            ...[...new Set(ex.hints.filter((h) => h.milestone && !defined.has(h.milestone)).map((h) => h.milestone))].map((m) => `a hint belongs to ${m}, which is not a milestone`),
+          ];
+          if (msIssues.length) { problems++; msIssues.forEach((m) => say(`        ${red('milestones ✗')} ${dim(m)}`)); }
+        }
       }
     }
     const drift = starterDrift(ws, labsDir, catalog);

@@ -160,3 +160,24 @@ test('sync-seeds --dry-run shows the plan and writes nothing; verify --chain rep
   assert.match(clean.out, /The chain is in sync/);
   assert.equal(cli(labsDir, ['sync-seeds']).code, 0, 'a second sync has nothing to do');
 });
+
+const MILESTONE_TODO = '# 🔴 Hard · Milestones\n\n> 🕐 30 min · 🆓 free checks\n\n## 🎯 Mission\nGo.\n\n## 🧭 Milestones\n### M1 · First\n- one\n### M2 · Second\n- two\n\n## 💡 Hints\n### M1\n<details><summary>H1</summary>\n\nx\n\n</details>\n### M2\n<details><summary>H2</summary>\n\ny\n\n</details>\n';
+const MILESTONE_CHECKS = "export default (t) => [t.check('a', () => true, { milestone: 'M1' }), t.check('b', () => t.exists('done.txt') || 'no', { milestone: 'M2' })];\n";
+
+test('test groups results by milestone; hint follows the current milestone; verify checks they line up', () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.writeFileSync(path.join(labsDir, 'lab-05/hard/todo.md'), MILESTONE_TODO);
+  fs.writeFileSync(path.join(labsDir, 'lab-05/hard/tests/checks.mjs'), MILESTONE_CHECKS);
+  const out = cli(labsDir, ['test', 'lab-05', 'hard']).out;
+  assert.match(out, /🧭 M1 · First/);
+  assert.match(out, /✅ M1 · First\s+▰ 1\/1/);
+  assert.match(out, /⬜ M2 · Second\s+▱ 0\/1/);
+  assert.match(cli(labsDir, ['hint', 'lab-05', 'hard']).out, /M2 · Hint 1 of 2 · H2/, 'M1 passes, so the hint is for M2');
+  assert.match(cli(labsDir, ['hint', 'lab-05', 'hard']).out, /All hints for M2 are revealed/);
+  assert.match(cli(labsDir, ['verify', 'lab-05']).out, /✅ lab-05 hard/);
+  fs.writeFileSync(path.join(labsDir, 'lab-05/hard/tests/checks.mjs'), MILESTONE_CHECKS.replace("'M2'", "'M3'"));
+  const bad = cli(labsDir, ['verify', 'lab-05']);
+  assert.notEqual(bad.code, 0);
+  assert.match(bad.out, /a check names M3, but todo\.md has no "### M3" milestone/);
+  assert.match(bad.out, /milestone M2 has no check/);
+});

@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runProcess } from './process.mjs';
+import { milestoneStatus } from './milestones.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const STATUSES = new Set(['pass', 'fail', 'blocked', 'skip']);
@@ -56,7 +57,8 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
       case 'plan':
         if (plan) return violate('the plan was sent twice');
         if (!Number.isInteger(ev.total) || ev.total < 0 || !Array.isArray(ev.names) || ev.names.length !== ev.total || !ev.names.every((n) => typeof n === 'string')) return violate('an invalid plan');
-        plan = { total: ev.total, names: ev.names };
+        if (ev.milestones !== undefined && (!Array.isArray(ev.milestones) || ev.milestones.length !== ev.total || !ev.milestones.every((m) => m === null || typeof m === 'string'))) return violate('an invalid list of milestones');
+        plan = { total: ev.total, names: ev.names, milestones: ev.milestones ?? ev.names.map(() => null) };
         break;
       case 'start':
         if (!validIdx(ev.idx) || results[ev.idx] || current !== null) return violate('an unexpected start event');
@@ -78,6 +80,7 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
           status: ev.status,
           message: String(ev.message ?? ''),
           optional: Boolean(ev.optional),
+          milestone: plan.milestones[ev.idx] ?? null,
           ...(ev.needs ? { needs: ev.needs } : {}),
           detail: ev.detail && typeof ev.detail === 'object' ? ev.detail : {},
           files: Array.isArray(ev.files) ? ev.files.map(String) : [],
@@ -189,6 +192,8 @@ export async function runChecks({ exDir, target, onEvent = () => {}, env = {}, s
       skipped: count('skip'),
       blocked: count('blocked'),
       total,
+      planMilestones: plan ? plan.milestones : [],
+      milestones: milestoneStatus(list),
       fatal: reason,
       stdout,
       stderr: proc?.stderr ?? '',

@@ -168,6 +168,9 @@ function cancellable() {
 const CHECK_ICON = { pass: '✅', fail: '❌', blocked: '🚧', skip: '⏩' };
 async function printChecks(lab, ex, target, label, signal) {
   const { runChecks } = await import('./_harness/checks.mjs');
+  const { groupChecks, milestoneBar } = await import('./_harness/milestones.mjs');
+  const milestoneTitle = (id) => ex.milestones?.find((m) => m.id === id)?.title ?? '';
+  let lastMilestone = null;
   say();
   say(`  🧪 ${bold(bright(`Lab ${lab.num} · ${ex.badge} ${ex.label}`))} ${white('—')} ${white(ex.title)}`);
   say(`     ${dim(`checking ${label}:`)} ${cyan(rel(target))}`);
@@ -178,6 +181,10 @@ async function printChecks(lab, ex, target, label, signal) {
     signal,
     onEvent: (e) => {
       if (e.type !== 'result') return;
+      if (e.milestone && e.milestone !== lastMilestone) {
+        lastMilestone = e.milestone;
+        say(`   🧭 ${bold(white(`${e.milestone}${milestoneTitle(e.milestone) ? ` · ${milestoneTitle(e.milestone)}` : ''}`))}`);
+      }
       const icon = e.status === 'fail' && e.optional ? '🟠' : CHECK_ICON[e.status];
       say(`   ${icon} ${e.status === 'pass' ? green(e.name) : white(e.name)}${e.optional ? dim(' (optional)') : ''}`);
       if (e.status !== 'pass' && e.message) wrap(inline(e.message), 88).forEach((l, i) => say(`       ${i ? '  ' : dim('↳ ')}${e.status === 'skip' ? dim(l) : yellow(l)}`));
@@ -185,6 +192,12 @@ async function printChecks(lab, ex, target, label, signal) {
     },
   });
   if (opt.verbose) res.results.filter((r) => r.output?.trim()).forEach((r) => { say(`   ${dim(`output of "${r.name}":`)}`); r.output.trimEnd().split('\n').forEach((l) => say(`       ${dim(l)}`)); });
+  const groups = groupChecks({ names: res.results.map((r) => r.name), milestones: res.planMilestones ?? [], results: res.results, defined: ex.milestones ?? [] }).filter((g) => g.id);
+  if (res.complete && groups.length) {
+    say();
+    say(`   ${white('Milestones')}`);
+    for (const g of groups) say(`   ${g.done ? '✅' : g.total ? '⬜' : '·'} ${g.done ? green(`${g.id} · ${g.title}`) : white(`${g.id} · ${g.title}`)}  ${bright(milestoneBar(g.passed, g.total))} ${dim(`${g.passed}/${g.total}`)}`);
+  }
   say();
   if (res.state === 'pass') say(`   🎉 ${bold(bright('All checks passed!'))}`);
   else if (res.state === 'fail') say(`   💪 ${white(`${res.passed} of ${res.total} checks pass.`)} ${dim('Fix the ❌ ones and run it again.')}`);
@@ -321,12 +334,16 @@ if (cmd === '' || cmd === 'open') {
 } else if (cmd === 'hint') {
   const { lab, ex } = pickExercise();
   if (!ex.hints.length) fail('This exercise has no hints.', 1);
-  const n = Math.min((progress.get(ex.key).hints ?? 0) + 1, ex.hints.length);
-  progress.set(ex.key, { hints: n });
-  const h = ex.hints[n - 1];
+  const { revealNextHint } = await import('./_harness/milestones.mjs');
+  const r = revealNextHint(progress, ex);
   say();
-  say(`  💡 ${yellow(bold(`Lab ${lab.num} · ${ex.label} · Hint ${n} of ${ex.hints.length} · ${h.title}`))}`);
-  ui.renderMarkdown(h.body, 92).forEach((l) => say(`  ${l}`));
+  if (r.none) {
+    say(`  💡 ${yellow(r.milestone ? `All hints for ${r.milestone} are revealed.` : 'All hints are revealed.')} ${dim('Still stuck? Compare with the reference:')} ${cyan(`node labs/start.mjs diff ${lab.id} ${ex.level}`)}`);
+    say();
+    process.exit(0);
+  }
+  say(`  💡 ${yellow(bold(`Lab ${lab.num} · ${ex.label} · ${r.milestone ? `${r.milestone} · ` : ''}Hint ${r.shown} of ${r.total} · ${r.hint.title}`))}`);
+  ui.renderMarkdown(r.hint.body, 92).forEach((l) => say(`  ${l}`));
   say();
 } else if (cmd === 'test') {
   const { lab, ex } = pickExercise();

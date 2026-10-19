@@ -251,3 +251,20 @@ test('full diagnostics are preserved: per-check output, stderr and supplied evid
   assert.deepEqual(structured.detail, { expected: 42, actual: 41 });
   assert.deepEqual(structured.files, ['grades.js']);
 });
+
+test('milestones travel from the checks to the summary', async () => {
+  const { exDir, target } = fixture("export default (t) => [t.check('one', () => true, { milestone: 'M1' }), t.check('two', () => 'no', { milestone: 'M2' }), t.check('three', () => true)];\n");
+  const plans = [];
+  const res = await runChecks({ exDir, target, onEvent: (e) => { if (e.type === 'plan') plans.push(e); } });
+  assert.deepEqual(res.results.map((x) => x.milestone), ['M1', 'M2', null]);
+  assert.deepEqual(res.planMilestones, ['M1', 'M2', null]);
+  assert.deepEqual(plans[0].milestones, ['M1', 'M2', null]);
+  assert.deepEqual(res.milestones, { M1: 'pass', M2: 'fail' });
+});
+
+test('a milestone that is not text is ignored rather than trusted', async () => {
+  const { exDir, target } = fixture("export default (t) => [t.check('one', () => true, { milestone: 42 })];\n");
+  const res = await runChecks({ exDir, target });
+  assert.equal(res.state, 'pass');
+  assert.equal(res.results[0].milestone, null);
+});
