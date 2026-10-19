@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { DIFFICULTIES, normalizeLevel, loadCatalog, findExercise, parseDuration } from '../catalog.mjs';
+import { DIFFICULTIES, normalizeLevel, loadCatalog, findExercise, parseDuration, parseDurationRange, parseTodo } from '../catalog.mjs';
 import { progressStore, captureEvidence, evidenceTracker, deriveStatus, sourceFingerprint, PROGRESS_VERSION } from '../progress.mjs';
-import { tmpdir, writeTree } from './helpers.mjs';
+import { tmpdir, writeTree, fixtureWorkshop } from './helpers.mjs';
 
 const todo = (label, title, meta = '> 🕐 15 min · 🆓 free checks') => `# 🟢 ${label} · ${title}\n\n${meta}\n\n## 🎯 Mission\nDo ${title}.\n\n## ✅ Done when\n- it works\n`;
 
@@ -65,6 +65,64 @@ test('durations are parsed, and unknown when missing', () => {
   const catalog = loadCatalog(fixtureLabs());
   assert.equal(catalog[0].levels[0].minutes, 15);
   assert.equal(catalog[0].levels[3].minutes, null);
+});
+
+test('five tiers carry theme, time and mode, and accept h+, h++ and digits', () => {
+  assert.deepEqual(DIFFICULTIES.map((d) => d.badge), ['🟢', '🟡', '🔴', '🟣', '💎']);
+  assert.deepEqual(DIFFICULTIES.map((d) => d.theme), ['Use it', 'Shape it', 'Prove it', 'Break it', 'Scale it']);
+  assert.deepEqual(DIFFICULTIES.map((d) => d.mode), ['together', 'homework', 'homework', 'homework', 'homework']);
+  assert.equal(normalizeLevel('h+'), 'hard-plus');
+  assert.equal(normalizeLevel('H++'), 'hard-plus-plus');
+  assert.equal(normalizeLevel('4'), 'hard-plus');
+  assert.equal(normalizeLevel('1'), 'easy');
+  assert.equal(normalizeLevel('6'), null);
+});
+
+test('durations in hours, and ranges', () => {
+  assert.equal(parseDuration('> 🕐 1.5–2 h · 🏠 homework'), 120);
+  assert.equal(parseDuration('🕐 about 1 h'), 60);
+  assert.deepEqual(parseDurationRange('🕐 1.5–2 h'), [90, 120]);
+  assert.deepEqual(parseDurationRange('🕐 8–10 min'), [8, 10]);
+  assert.deepEqual(parseDurationRange('🕐 30 min'), [30, 30]);
+  assert.deepEqual(parseDurationRange('🕐 30 min · 🤖 optional agent check (about 2–4 prompts)'), [30, 30]);
+  assert.equal(parseDurationRange('free'), null);
+});
+
+test('milestones, requirements and hint milestones are parsed', () => {
+  const t = parseTodo([
+    '# 🟣 Hard+ · Policy as code', '', '> 🕐 1.5–2 h · 🏠 homework', '',
+    '## 🎯 Mission', 'Make it real.', '',
+    '## 📋 Requirements', '1. Deny wins.', '',
+    '## 🧭 Milestones', '### M1 · The policy file', '- `policy.json` exists', '### M2 · The engine', '- deny wins', '',
+    '## 💡 Hints', '<details><summary>General</summary>', '', 'Read the spec.', '', '</details>',
+    '### M1', '<details><summary>Shape</summary>', '', 'An array.', '', '</details>',
+    '### M2 · The engine', '<details><summary>Order</summary>', '', 'Deny first.', '', '</details>',
+  ].join('\n'));
+  assert.equal(t.title, 'Policy as code');
+  assert.deepEqual(t.milestones.map((m) => [m.id, m.title]), [['M1', 'The policy file'], ['M2', 'The engine']]);
+  assert.match(t.milestones[0].body, /policy\.json/);
+  assert.match(t.requirements, /Deny wins/);
+  assert.deepEqual(t.hints.map((h) => [h.title, h.milestone]), [['General', null], ['Shape', 'M1'], ['Order', 'M2']]);
+});
+
+test('levels know their tier theme, mode and time; the capstone lab is homework', () => {
+  const { labsDir } = fixtureWorkshop();
+  writeTree(labsDir, {
+    'lab-08/readme.md': '# Lab 08 · 🏛️ Capstone — Ship it\n',
+    'lab-08/easy/todo.md': '# 🟢 Easy · Assemble\n\n> 🆓 free checks\n\n## 🎯 Mission\nGo.\n',
+    'lab-08/easy/tests/checks.mjs': 'export default () => [];\n',
+  });
+  const catalog = loadCatalog(labsDir);
+  const easy0 = catalog[0].levels[0];
+  assert.equal(easy0.mode, 'together');
+  assert.equal(easy0.theme, 'Use it');
+  assert.equal(easy0.time, '10 min');
+  assert.deepEqual(easy0.milestones, []);
+  assert.equal(catalog[0].capstone, false);
+  const cap = catalog.find((l) => l.id === 'lab-08');
+  assert.equal(cap.capstone, true);
+  assert.equal(cap.levels[0].mode, 'homework');
+  assert.equal(cap.levels[0].time, 'about 1 h');
 });
 
 test('a pass is current only while the source and the grader are unchanged', () => {

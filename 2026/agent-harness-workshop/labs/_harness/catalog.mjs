@@ -1,14 +1,17 @@
-// Reads the labs: lab-XX/readme.md (title, intro) and <level>/todo.md (mission, where, done-when, hints).
-// The difficulty table below drives order, labels, keys, badges, counts and help everywhere.
+// Reads the labs: lab-XX/readme.md (title, intro) and <level>/todo.md (mission, where, done-when, milestones, hints).
+// The difficulty table below drives order, labels, keys, badges, themes, times, counts and help everywhere.
 import fs from 'node:fs';
 import path from 'node:path';
+import { loadCourse } from './course.mjs';
 
+// mode: 'together' levels are done live in the workshop; 'homework' levels are optional and go deeper.
+// time / capstoneTime: the suggested time budget for Labs 00-07 and for the capstone lab.
 export const DIFFICULTIES = [
-  { id: 'easy', label: 'Easy', aliases: ['e'], badge: '🟢', ascii: 'E', key: '1' },
-  { id: 'medium', label: 'Medium', aliases: ['m'], badge: '🟡', ascii: 'M', key: '2' },
-  { id: 'hard', label: 'Hard', aliases: ['h'], badge: '🔴', ascii: 'H', key: '3' },
-  { id: 'hard-plus', label: 'Hard+', aliases: ['hard+'], badge: '🟣', ascii: 'H+', key: '4' },
-  { id: 'hard-plus-plus', label: 'Hard++', aliases: ['hard++'], badge: '⚫', ascii: 'H++', key: '5' },
+  { id: 'easy', label: 'Easy', aliases: ['e'], badge: '🟢', ascii: 'E', key: '1', theme: 'Use it', time: '8–10 min', capstoneTime: 'about 1 h', mode: 'together' },
+  { id: 'medium', label: 'Medium', aliases: ['m'], badge: '🟡', ascii: 'M', key: '2', theme: 'Shape it', time: '30–45 min', capstoneTime: '1.5–2 h', mode: 'homework' },
+  { id: 'hard', label: 'Hard', aliases: ['h'], badge: '🔴', ascii: 'H', key: '3', theme: 'Prove it', time: '1–1.5 h', capstoneTime: '2–2.5 h', mode: 'homework' },
+  { id: 'hard-plus', label: 'Hard+', aliases: ['hard+', 'h+'], badge: '🟣', ascii: 'H+', key: '4', theme: 'Break it', time: '1.5–2 h', capstoneTime: 'about 3 h', mode: 'homework' },
+  { id: 'hard-plus-plus', label: 'Hard++', aliases: ['hard++', 'h++'], badge: '💎', ascii: 'H++', key: '5', theme: 'Scale it', time: '2–3 h', capstoneTime: '3–4 h', mode: 'homework' },
 ];
 export const LEVELS = DIFFICULTIES.map((d) => d.id);
 export const LEVEL_BADGE = Object.fromEntries(DIFFICULTIES.map((d) => [d.id, d.badge]));
@@ -17,21 +20,25 @@ export const difficulty = (id) => DIFFICULTIES.find((d) => d.id === id) ?? null;
 /** The difficulties as help text: "easy, medium, hard, hard+ (hard-plus), hard++ (hard-plus-plus)". */
 export const levelChoices = () => DIFFICULTIES.map((d) => (d.label.includes('+') ? `${d.label.toLowerCase()} (${d.id})` : d.id)).join(', ');
 
-/** Exact difficulty ID for an ID, label or alias ('hard+' → 'hard-plus'), or null. Prefixes are not accepted. */
+/** Exact difficulty ID for an ID, label, alias or key ('hard+' → 'hard-plus', '4' → 'hard-plus'), or null. Prefixes are not accepted. */
 export function normalizeLevel(input) {
   const s = String(input ?? '').trim().toLowerCase();
   if (!s) return null;
-  return DIFFICULTIES.find((d) => d.id === s || d.label.toLowerCase() === s || d.aliases.includes(s))?.id ?? null;
+  return DIFFICULTIES.find((d) => d.id === s || d.label.toLowerCase() === s || d.aliases.includes(s) || d.key === s)?.id ?? null;
 }
 
-/** Minutes from a todo.md meta line ("🕐 15 min", "🕐 10–15 min" → 15), or null when it does not say. */
-export function parseDuration(meta) {
+const UNIT = { min: 1, minutes: 1, h: 60, hour: 60, hours: 60 };
+/** [lower, upper] minutes from a todo.md meta line ("🕐 10–15 min" → [10, 15], "🕐 1.5–2 h" → [90, 120]), or null. */
+export function parseDurationRange(meta) {
   const s = String(meta ?? '');
-  const range = s.match(/(\d+)\s*[–-]\s*(\d+)\s*min/i);
-  if (range) return Number(range[2]);
-  const one = s.match(/(\d+)\s*(?:min|minutes)\b/i);
-  return one ? Number(one[1]) : null;
+  const part = s.match(/🕐([^·]*)/)?.[1] ?? s;
+  const m = part.match(/(\d+(?:\.\d+)?)(?:\s*[–-]\s*(\d+(?:\.\d+)?))?\s*(minutes|min|hours|hour|h)\b/i);
+  if (!m) return null;
+  const k = UNIT[m[3].toLowerCase()];
+  return [Math.round(Number(m[1]) * k), Math.round(Number(m[2] ?? m[1]) * k)];
 }
+/** Minutes from a todo.md meta line, using the upper bound ("🕐 10–15 min" → 15), or null when it does not say. */
+export const parseDuration = (meta) => parseDurationRange(meta)?.[1] ?? null;
 
 const read = (f) => { try { return fs.readFileSync(f, 'utf8').replace(/\r/g, ''); } catch { return ''; } };
 const LABEL_PREFIX = new RegExp(`^(${DIFFICULTIES.flatMap((d) => [d.id, d.label]).map((s) => s.replace(/\+/g, '\\+')).sort((a, b) => b.length - a.length).join('|')})\\s*·\\s*`, 'i');
@@ -54,19 +61,42 @@ const pick = (secs, ...names) => {
   return '';
 };
 
+// A milestone heading: "M2 · The engine" (also "M2: …", "M2 - …", or just "M2").
+const MILESTONE = /^(M\d+)\b\s*[·:.\-–—]?\s*(.*)$/i;
+/** "### M1 · Title" subsections of the Milestones section → [{ id, title, body }]. */
+function parseMilestones(block) {
+  const parts = block.split(/^###\s+(.+)$/m);
+  const out = [];
+  for (let i = 1; i < parts.length; i += 2) {
+    const m = parts[i].trim().match(MILESTONE);
+    if (m) out.push({ id: m[1].toUpperCase(), title: m[2].trim(), body: (parts[i + 1] ?? '').trim() });
+  }
+  return out;
+}
+/** <details> hints; the ones under a "### M2" subsection belong to milestone M2. */
+function parseHints(block) {
+  const parts = block.split(/^###\s+(.+)$/m);
+  const hints = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    const milestone = i === 0 ? null : (parts[i - 1].trim().match(MILESTONE)?.[1].toUpperCase() ?? null);
+    for (const m of parts[i].matchAll(/<details>\s*<summary>([\s\S]*?)<\/summary>([\s\S]*?)<\/details>/g)) hints.push({ title: m[1].trim(), body: m[2].trim(), milestone });
+  }
+  return hints;
+}
+
 export function parseTodo(md) {
   const title = (md.match(/^#\s+(.*)$/m)?.[1] ?? '').replace(/^\S+\s+/, '').replace(LABEL_PREFIX, '').trim();
   const meta = (md.match(/^>\s*(.*)$/m)?.[1] ?? '').trim();
   const secs = sections(md);
-  const hintsBlock = pick(secs, 'hint');
-  const hints = [...hintsBlock.matchAll(/<details>\s*<summary>([\s\S]*?)<\/summary>([\s\S]*?)<\/details>/g)].map((m) => ({ title: m[1].trim(), body: m[2].trim() }));
   return {
     title,
     meta,
     mission: pick(secs, 'mission'),
+    requirements: pick(secs, 'requirements'),
+    milestones: parseMilestones(pick(secs, 'milestones')),
     where: pick(secs, 'work here', 'where'),
     done: pick(secs, 'done when'),
-    hints,
+    hints: parseHints(pick(secs, 'hint')),
     further: pick(secs, 'going further', 'bonus'),
   };
 }
@@ -74,7 +104,7 @@ export function parseTodo(md) {
 /** An exercise is authored when its folder has a todo.md (its src/ may be missing if a learner deleted it: recovery still works). */
 const authored = (dir) => fs.existsSync(path.join(dir, 'todo.md'));
 
-export function loadCatalog(labsDir) {
+export function loadCatalog(labsDir, { course = loadCourse(labsDir) } = {}) {
   return fs.readdirSync(labsDir)
     .filter((n) => /^lab-\d\d$/.test(n) && fs.statSync(path.join(labsDir, n)).isDirectory())
     .sort()
@@ -84,6 +114,7 @@ export function loadCatalog(labsDir) {
       const m = h1.match(/^Lab\s+(\d+)\s*·\s*(\S+)\s+(.*?)(?:\s+—\s+(.*))?$/);
       const secs = sections(readme);
       const num = m?.[1] ?? id.slice(4);
+      const capstone = id === course.capstone;
       const levels = DIFFICULTIES.filter((d) => authored(path.join(labsDir, id, d.id))).map((d) => {
         const dir = path.join(labsDir, id, d.id);
         const todo = parseTodo(read(path.join(dir, 'todo.md')));
@@ -91,6 +122,8 @@ export function loadCatalog(labsDir) {
           level: d.id,
           label: d.label,
           badge: d.badge,
+          theme: d.theme,
+          mode: capstone ? 'homework' : d.mode,
           key: `${id}/${d.id}`,
           labId: id,
           labNum: num,
@@ -99,7 +132,9 @@ export function loadCatalog(labsDir) {
           sol: path.join(dir, 'sol'),
           todoPath: path.join(dir, 'todo.md'),
           ...todo,
+          time: todo.meta.match(/🕐\s*([^·]+)/)?.[1].trim() || (capstone ? d.capstoneTime : d.time),
           minutes: parseDuration(todo.meta),
+          minutesRange: parseDurationRange(todo.meta),
           hasAgent: fs.existsSync(path.join(dir, 'tests', 'agent.mjs')),
         };
       });
@@ -111,6 +146,7 @@ export function loadCatalog(labsDir) {
         tagline: m?.[4] ?? '',
         intro: pick(secs, 'in one minute', 'idea'),
         readmePath: path.join(labsDir, id, 'readme.md'),
+        capstone,
         levels,
       };
     });
