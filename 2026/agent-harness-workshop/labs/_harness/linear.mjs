@@ -12,23 +12,29 @@ import { PATHS, pathById, progressView, describeSelection, nextExercise, chooseP
 import { statusWord, stripAnsi, inline, isAscii, asciiFold } from './ui.mjs';
 import { runInteractive as realRunInteractive } from './system.mjs';
 import { copilotBin } from './kit.mjs';
+import { courseOrder, predecessorOf, loadManifest } from './chain.mjs';
+import { loadCourse } from './course.mjs';
+import { bringPlan, applyBring } from './bring.mjs';
+import { revealNextHint, revealedHints, groupChecks, milestoneBar } from './milestones.mjs';
+import { bringLines } from './screens/bring.mjs';
 
 const HELP = `Commands (type one and press Enter):
   list [path=ID] [level=L] [status=S] [minutes=N] [bookmarked] [words…]   numbered exercises, filtered
-  open N            open exercise number N from the last list (or: open lab-01 easy)
-  show              the mission, where to work and when it is done
+  open N            open exercise number N from the last list (or: open lab-01 easy, open lab-01 hard+)
+  show              the mission, where it starts from, the milestones, and when it is done
   checks            run the free checks (Ctrl+C cancels)
   details N         the requirement, files, evidence and output of check N
   output            the full output of the last check run
-  hint              reveal the next hint
+  hint              reveal the next hint (for the milestone you are on)
   agent             run the agent checks: real Copilot, uses AI credits (asks first)
+  bring             bring your own harness forward from the earlier levels you passed (asks first)
   history           agent run history for this exercise
   compare [FILE]    compare your work with the reference solution
   recovery          the starter, your checkpoints and backups
   checkpoint NAME   save your current work as a checkpoint
   restore starter | restore checkpoint:NAME | restore backup:NAME | restore commit
   bookmark          bookmark this exercise (or remove the bookmark)
-  next              open the next unfinished exercise on your path
+  next              open the next exercise: on an easy level the next lab's easy level, else your next unfinished one
   path [ID]         show or choose your learning path (${PATHS.map((p) => p.id).join(', ')})
   doctor            what is installed, what is missing and how to fix it
   export [md|json]  save a learning summary in labs/.reports (stays on this computer)
@@ -66,6 +72,26 @@ export function runLinear({
   };
   const need = () => { if (!current) { say('No exercise is open. Type "list", then "open N".'); return false; } return true; };
   const label = (lab, ex) => `Lab ${lab.num} ${lab.title}, ${ex.label}: ${ex.title}`;
+  const order = courseOrder(catalog);
+  const PLAIN = { dim: (s) => s, white: (s) => s, yellow: (s) => s, bright: (s) => s };
+
+  async function bring() {
+    if (!need()) return;
+    const { ex } = current;
+    view.refresh();
+    const target = order.find((n) => n.key === ex.key);
+    const plan = bringPlan({ catalog, course: loadCourse(labsDir), manifest: loadManifest(labsDir), view, target });
+    say(`Bring your work into ${label(current.lab, ex)}:`);
+    bringLines(plan, { W: 100, fmt: PLAIN }).forEach((l) => say(l));
+    if (plan.error || !plan.items.length) return;
+    const answer = (await ask(`Bring ${plan.items.length} file(s) in? Your current files are backed up first. Type yes to continue.`)).trim().toLowerCase();
+    if (answer !== 'yes' && answer !== 'y') { say('Nothing was changed.'); return; }
+    const r = applyBring({ labsDir, target, plan });
+    if (!r.ok) { say(r.reason); return; }
+    store.set(ex.key, { brought: { at: new Date().toISOString(), files: r.files } });
+    view.tracker.invalidate(ex.key);
+    say(`Done. Brought ${r.files.length} file(s) in. Backup of what you had: ${rel(r.backup.dir)}. Type "checks" to check your work.`);
+  }
 
   function list(args) {
     const opts = { path: pathId };
@@ -104,13 +130,27 @@ export function runLinear({
     if (!need()) return;
     const { lab, ex } = current;
     view.refresh();
+    const entry = view.entry(ex);
     say(`Open: ${label(lab, ex)}.`);
     if (ex.meta) say(`  ${stripAnsi(ex.meta)}`);
+    say(`${ex.theme}. ${ex.mode === 'together' ? 'Done together in the workshop.' : 'Optional homework.'}`);
+    const pred = predecessorOf(order, ex.key);
+    say(pred ? `Starts from: Lab ${pred.lab.num}, ${pred.ex.label} (${entry.brought ? `the reference, plus your work brought in on ${String(entry.brought.at).slice(0, 10)}` : 'reference'}).` : 'Starts from: the plain app, the start of the chain.');
     say(`Status: checks ${statusWord(view.checks(ex))}; agent check ${statusWord(view.agent(ex))}.`);
     say('Mission:'); say(plain(ex.mission));
+    if (ex.requirements) { say('Requirements:'); say(plain(ex.requirements)); }
+    if (ex.milestones.length) {
+      const fresh = ['pass', 'fail'].includes(view.checks(ex));
+      say(`Milestones${fresh ? ', from your last check run' : ''}:`);
+      for (const m of ex.milestones) {
+        const st = fresh ? entry.milestones?.[m.id] : null;
+        say(`  ${m.id}, ${m.title}: ${st === 'pass' ? 'done' : st === 'fail' ? 'not done yet' : 'not checked yet'}.`);
+        say(plain(m.body));
+      }
+    }
     say(`Work here: ${rel(ex.src)}`);
-    say('Done when:'); say(plain(ex.done));
-    say(`Hints revealed: ${Math.min(view.hints(ex), ex.hints.length)} of ${ex.hints.length}.`);
+    if (ex.done) { say('Done when:'); say(plain(ex.done)); }
+    say(`Hints revealed: ${revealedHints(ex, entry).size} of ${ex.hints.length}.`);
   }
 
   async function checks() {
@@ -122,14 +162,24 @@ export function runLinear({
     active = controller;
     say(`Running the free checks on ${rel(ex.src)}. Press Ctrl+C to cancel.`);
     const evidence = captureEvidence(ex);
+    let lastMilestone = null;
     const res = await deps.runChecks({
       exDir: ex.dir, target: ex.src, signal: controller.signal,
-      onEvent: (e) => { if (e.type === 'result') say(`  ${e.idx + 1}. ${e.status === 'skip' ? 'skipped' : e.status === 'blocked' ? 'blocked' : e.status === 'pass' ? 'passed' : 'failed'}: ${e.name}${e.status !== 'pass' && e.message ? `. ${stripAnsi(inline(e.message))}` : ''}`); },
+      onEvent: (e) => {
+        if (e.type !== 'result') return;
+        if (e.milestone && e.milestone !== lastMilestone) { lastMilestone = e.milestone; say(`Milestone ${e.milestone}${ex.milestones.find((m) => m.id === e.milestone)?.title ? `, ${ex.milestones.find((m) => m.id === e.milestone).title}` : ''}:`); }
+        say(`  ${e.idx + 1}. ${e.status === 'skip' ? 'skipped' : e.status === 'blocked' ? 'blocked' : e.status === 'pass' ? 'passed' : 'failed'}: ${e.name}${e.status !== 'pass' && e.message ? `. ${stripAnsi(inline(e.message))}` : ''}`);
+      },
     });
     active = null;
     lastRun = res;
     store.recordChecks(ex.key, res, evidence);
     view.tracker.invalidate(ex.key);
+    if (res.complete) {
+      for (const g of groupChecks({ names: res.results.map((r) => r.name), milestones: res.planMilestones ?? [], results: res.results, defined: ex.milestones }).filter((x) => x.id)) {
+        say(`Milestone ${g.id}${g.title ? `, ${g.title}` : ''}: ${g.done ? 'done' : 'not done yet'} (${g.passed} of ${g.total} checks). ${isAscii() ? '' : milestoneBar(g.passed, g.total)}`.trim());
+      }
+    }
     if (res.state === 'pass') say(`All ${res.total} checks passed.`);
     else if (res.state === 'fail') say(`${res.passed} of ${res.total} checks passed. Type "details N" for a failing check.`);
     else say(`Result: ${statusWord(res.state)}. ${res.fatal ?? ''}`.trim());
@@ -226,13 +276,14 @@ export function runLinear({
       case 'hint': {
         if (!need()) return;
         const { ex } = current;
-        const n = Math.min(view.hints(ex) + 1, ex.hints.length);
-        if (!n) { say('This exercise has no hints.'); return; }
-        store.set(ex.key, { hints: n });
-        say(`Hint ${n} of ${ex.hints.length}: ${ex.hints[n - 1].title}`);
-        say(plain(ex.hints[n - 1].body));
+        if (!ex.hints.length) { say('This exercise has no hints.'); return; }
+        const r = revealNextHint(store, ex);
+        if (r.none) { say(r.milestone ? `All hints for ${r.milestone} are revealed. Still stuck? Type "compare".` : 'All hints are revealed. Still stuck? Type "compare".'); return; }
+        say(`${r.milestone ? `${r.milestone}, ` : ''}Hint ${r.shown} of ${r.total}: ${r.hint.title}`);
+        say(plain(r.hint.body));
         return;
       }
+      case 'bring': await bring(); return;
       case 'agent': await agent(); return;
       case 'history': {
         if (!need()) return;
@@ -260,9 +311,11 @@ export function runLinear({
       }
       case 'next': {
         view.refresh();
-        const nu = nextExercise(catalog, view, { path: pathId });
+        const ui = store.get('_ui');
+        const nu = nextExercise(catalog, view, { path: pathId, current: current?.ex.key ?? null, last: ui.lab && ui.level ? `${ui.lab}/${ui.level}` : null });
         if (!nu) { say(pathId === 'all' ? 'Every exercise passes.' : `Your ${pathById(pathId).label} path is complete.`); return; }
         current = { lab: nu.lab, ex: nu.ex };
+        store.set('_ui', { lab: current.lab.id, level: current.ex.level });
         show();
         return;
       }

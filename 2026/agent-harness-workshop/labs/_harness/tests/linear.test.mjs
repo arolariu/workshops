@@ -4,7 +4,11 @@ import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { test } from 'node:test';
 import { runLinear } from '../linear.mjs';
-import { fixtureWorkshop } from './helpers.mjs';
+import { loadCatalog, exerciseByKey } from '../catalog.mjs';
+import { loadCourse } from '../course.mjs';
+import { computeChain, writeChain } from '../chain.mjs';
+import { progressStore, captureEvidence } from '../progress.mjs';
+import { fixtureWorkshop, chainCourse } from './helpers.mjs';
 
 function session(lines, opts = {}) {
   const { labsDir } = opts.labsDir ? opts : fixtureWorkshop();
@@ -91,4 +95,43 @@ test('--ascii keeps the linear mode to plain ASCII', async () => {
   } finally {
     setAscii(false);
   }
+});
+
+const M_TODO = '# 🔴 Hard · M\n\n> 🕐 30 min\n\n## 🎯 Mission\nGo.\n\n## 🧭 Milestones\n### M1 · First\n- one\n### M2 · Second\n- two\n\n## 💡 Hints\n### M1\n<details><summary>Hint for one</summary>\n\nx\n\n</details>\n### M2\n<details><summary>Hint for two</summary>\n\ny\n\n</details>\n';
+
+test('show says where a level starts and lists its milestones; hint follows the current milestone', async () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.writeFileSync(path.join(labsDir, 'lab-05/hard/todo.md'), M_TODO);
+  const { text } = await session(['open lab-01 medium', 'show', 'open lab-00 easy', 'open lab-05 hard', 'hint', 'hint', 'quit'], { labsDir });
+  assert.match(text, /Starts from: Lab 01, Easy \(reference\)/);
+  assert.match(text, /Shape it\. Optional homework\./);
+  assert.match(text, /Starts from: the plain app, the start of the chain/);
+  assert.match(text, /Milestones:/);
+  assert.match(text, /M1, First: not checked yet/);
+  assert.match(text, /M1, Hint 1 of 2: Hint for one/);
+  assert.match(text, /All hints for M1 are revealed/);
+  assert.doesNotMatch(text, /Hint for two/);
+});
+
+test('bring shows the plan and asks first; nothing changes without yes', async () => {
+  const none = await session(['open lab-01 easy', 'bring', 'quit']);
+  assert.match(none.text, /no seed record/);
+  const labsDir = chainCourse({
+    'lab-00/easy': { src: { 'app.js': 'v1\n' }, sol: { 'app.js': 'v1\n', 'done.txt': 'x\n' } },
+    'lab-01/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+  });
+  writeChain({ labsDir, result: computeChain({ catalog: loadCatalog(labsDir), course: loadCourse(labsDir), manifest: null, bootstrap: true }) });
+  const { ex } = exerciseByKey(loadCatalog(labsDir), 'lab-00/easy');
+  fs.writeFileSync(path.join(ex.src, 'done.txt'), 'x\n');
+  fs.writeFileSync(path.join(ex.src, 'AGENTS.md'), 'mine\n');
+  progressStore(labsDir).recordChecks(ex.key, { state: 'pass', allPass: true, passed: 1, total: 1, results: [] }, captureEvidence(ex));
+  const declined = await session(['open lab-01 easy', 'bring', 'no', 'quit'], { labsDir });
+  assert.match(declined.text, /AGENTS\.md\s+← lab-00 easy/);
+  assert.match(declined.text, /Nothing was changed/);
+  const target = path.join(labsDir, 'lab-01', 'easy', 'src', 'AGENTS.md');
+  assert.ok(!fs.existsSync(target));
+  const accepted = await session(['open lab-01 easy', 'bring', 'yes', 'show', 'quit'], { labsDir });
+  assert.match(accepted.text, /Brought 1 file\(s\) in/);
+  assert.match(accepted.text, /plus your work brought in on/);
+  assert.equal(fs.readFileSync(target, 'utf8'), 'mine\n');
 });

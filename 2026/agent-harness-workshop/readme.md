@@ -41,16 +41,17 @@ A green-on-dark terminal app that guides you through every level. On a level you
 |---|---|
 | **t** | run the free checks: ✅ or ❌, each with a reason; select one and press **⏎** for the requirement, the files involved, expected and actual values when the check provides them, and its full output |
 | **c** | start Copilot in the level's folder; type `/exit` to come back, and your checks run automatically |
-| **h** | reveal the next hint (there are three per level) |
+| **h** | reveal the next hint (on long levels: a hint for the milestone you are on) |
 | **a** | 🤖 agent check: the real Copilot on a copy of your folder (uses AI credits; shows the credit cap, or says when it cannot be known; **c** cancels) |
-| **m** | more: watch, guide, compare, bookmark, start over, run history, doctor, export |
+| **i** | 🧳 bring your own harness forward: the harness files you changed in earlier levels that pass (your files are backed up first) |
+| **m** | more: watch, guide, compare, bring, bookmark, start over, run history, doctor, export |
 | **w** | watch: the checks run again every time you save a file |
 | **g** | read the lab guide: concepts, examples, links |
 | **s** | compare your work with the reference solution (a real diff; the reference is one possible answer) |
 | **x** | start over: restore the original starter, a checkpoint or a backup, or discard changes since your latest commit |
 | **f** / **H** | bookmark the level / agent run history |
 | **o** / **y** | open the folder (VS Code or your file manager) / copy its `cd` command |
-| **1 2 3** | switch between easy, medium and hard · **n** next unfinished level on your path · **?** all keys |
+| **1 2 3 4 5** | switch tier: easy, medium, hard, hard+, hard++ · **n** next up (on an easy level: the next lab's easy level) · **?** all keys |
 
 Everywhere: **/** searches every exercise (and filters by level, status, time and bookmarks), **p** picks a learning
 path, **d** opens the setup doctor and **e** exports a learning summary.
@@ -72,17 +73,24 @@ labs/
 ├── start.mjs              ← 🧠 the lab companion: run this
 ├── lab-00 … lab-07/
 │   ├── readme.md          ← the concept: why it matters, how it works, examples, links
-│   ├── easy/              ← 🟢 we do it together
-│   ├── medium/            ← 🟡 on your own
-│   └── hard/              ← 🔴 on your own
-│       ├── todo.md        ← your mission: short on purpose, with hints you reveal one by one
+│   ├── easy/              ← 🟢 Use it: we do it together
+│   ├── medium/            ← 🟡 Shape it: homework, optional
+│   ├── hard/              ← 🔴 Prove it: homework, optional
+│   ├── hard-plus/         ← 🟣 Break it: homework, optional (when a lab has it)
+│   └── hard-plus-plus/    ← 💎 Scale it: homework, optional (when a lab has it)
+│       ├── todo.md        ← your mission: long levels are split into milestones, each with its checks and hints
 │       ├── src/           ← where you work: start `copilot` in here
 │       ├── tests/         ← the checks
 │       └── sol/           ← a reference solution, for when you're really stuck
 └── _harness/              ← the engine behind start.mjs (no need to touch it; its tests: node --test "labs/_harness/tests/*.test.mjs")
 ```
-Every level is a **standalone mini-project**: it doesn't depend on any other lab, so you can start
-anywhere. Your work stays in `src/`. Commit early (`git add -A && git commit -m "lab 01 easy"`).
+The labs **build on each other**. Every level's `src/` starts from the reference result of the level before it:
+down the easy column for the live session (Lab 02 easy starts where Lab 01 easy ended), and along each lab's row for
+the homework (Lab 05 hard starts where Lab 05 medium ended). Because every start is the *reference* result, you can
+skip a level or start anywhere. Want your **own** harness to grow instead? Press **i** on a level (or run
+`node labs/start.mjs bring lab-05 hard`): the harness files you changed in earlier levels that pass (`AGENTS.md`,
+`.github/…`, `.mcp.json`, `mcp/…`, `apm.yml`, `scripts/…`) come with you; app code never does. Your work stays in
+`src/`. Commit early (`git add -A && git commit -m "lab 01 easy"`).
 
 ### ♻️ Starting over (with or without git)
 Press **x** in the app, or use the commands below. Your current files are always backed up first (to
@@ -115,6 +123,7 @@ node labs/start.mjs test lab-01 easy --watch      # free checks, again on every 
 node labs/start.mjs test lab-01 easy --agent      # + agent checks
 node labs/start.mjs hint lab-01 easy              # next hint
 node labs/start.mjs diff lab-01 easy              # compare with the reference solution
+node labs/start.mjs bring lab-05 hard --dry-run   # what bringing your own harness forward would do (drop --dry-run to do it)
 node labs/start.mjs checkpoint lab-01 easy NAME   # save a checkpoint
 node labs/start.mjs recovery lab-01 easy          # starter, checkpoints and backups
 node labs/start.mjs restore lab-01 easy --starter --yes        # back to the original starter (or --checkpoint=NAME)
@@ -127,8 +136,8 @@ node labs/start.mjs open lab-01 easy              # the app, straight into one l
 node labs/start.mjs --linear                      # the app one line at a time (screen readers)
 node labs/start.mjs help                          # every command
 ```
-Difficulty names: `easy`, `medium`, `hard` (or `e`, `m`, `h`), and `hard+` / `hard++` (`hard-plus`,
-`hard-plus-plus`) for extra levels, which appear automatically when a lab has them.
+Difficulty names: `easy`, `medium`, `hard` (or `e`, `m`, `h`), and `hard+` / `hard++` (`h+`, `h++`, `hard-plus`,
+`hard-plus-plus`) for the deeper homework levels, which appear automatically when a lab has them. `1`–`5` work too.
 
 ## 📚 The labs
 | Lab | Topic | 🟢 Easy (together) | 🟡 Medium | 🔴 Hard |
@@ -167,6 +176,8 @@ It never guesses what you actually spent: `/usage` and your GitHub billing page 
 ## 🧑‍🏫 For facilitators
 ```bash
 node labs/start.mjs verify          # every src/ must fail its checks, every sol/ must pass them, starters.json must be current
+node labs/start.mjs verify --chain --bring   # …and the seeded chain is in sync, and bringing work forward breaks nothing
+node labs/start.mjs sync-seeds --dry-run     # after changing a level: what the chain would update in every later level
 node labs/start.mjs test lab-03 easy --sol --agent   # try a reference solution with the real agent
 node labs/start.mjs open lab-03 easy --no-intro      # jump straight to a level during the live demo
 node labs/start.mjs --path=builder --no-intro        # start everyone on a learning path
@@ -174,8 +185,11 @@ node labs/start.mjs starters        # is labs/_harness/starters.json (the publis
 start.cmd --full --setup-only       # prepare a classroom machine (see SETUP.md for shared offline caches)
 ```
 Each lab's `readme.md` is the script for its 5-minute slot: the concept, a demo, the easy level. After changing a
-level's `src/`, run `node labs/start.mjs starters --write` and commit the updated manifest, so "restore the starter"
-keeps giving students the published version.
+level's `src/` or `sol/`, run `node labs/start.mjs sync-seeds`: it carries the change down the chain (every later
+level that starts from it), refuses to overwrite anything it can't merge safely, backs up what it replaces, and
+updates `labs/_harness/starters.json`. Commit everything together, so "restore the starter" keeps giving students
+the published version. The chain's rules (which files travel with `bring`, and per-level exceptions) are in
+`labs/_harness/course.json`.
 
 Everything the companion stores stays in the workshop folder and is ignored by git: `labs/.progress.json`
 (progress, bound to fingerprints of the work and the checks), `labs/.recovery/` (starters, checkpoints, backups),
