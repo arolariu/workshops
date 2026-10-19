@@ -480,3 +480,38 @@ test('v shows your changes since the last commit, file by file; without git it e
   assert.match(text(t2.output), /❯ a\.js/);
   t2.quit();
 });
+const QUIZ_TODO = '# 🟢 Easy · Q\n\n> 🕐 10 min · 👥 together\n\n## 🎯 Mission\nGo.\n\n## ✅ Done when\n- done\n\n## 🧠 Takeaway\nA tool list is a guarantee.\n\n## ❓ Check yourself\nWhy read-only?\n1. A wish.\n2. A guarantee.\n3. A prompt.\n\n<details><summary>Answer</summary>\n\n**2.** The schema never reaches the model.\n\n</details>\n';
+const passAll = async () => ({ state: 'pass', allPass: true, complete: true, results: [res(0, 'done.txt exists', 'pass', null)], passed: 1, failed: 0, skipped: 0, blocked: 0, total: 1, fatal: null, stdout: '', stderr: '', planMilestones: [null], milestones: {} });
+
+test('after the first pass: the takeaway and the question; 1-3 answer; the first answer is recorded', async () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.writeFileSync(path.join(labsDir, 'lab-03/easy/todo.md'), QUIZ_TODO);
+  const t = await app({ labsDir, open: 'lab-03/easy', size: { columns: 100, rows: 70 }, deps: { runChecks: passAll } });
+  assert.doesNotMatch(text(t.output), /TAKEAWAY|Why read-only/, 'nothing before a pass');
+  press(t.input, 'l');
+  assert.equal(t.state.screen, 'exercise');
+  assert.match(text(t.output), /unlock when your checks pass/);
+  press(t.input, 't');
+  await waitFor(() => t.state.run && !t.state.run.running);
+  let s = text(t.output);
+  assert.match(s, /A L L {3}C H E C K S|ALL CHECKS PASSED/);
+  assert.match(s, /TAKEAWAY[\s\S]*A tool list is a guarantee/);
+  assert.match(s, /Why read-only\?[\s\S]*press 1-3 to answer/);
+  press(t.input, '2');
+  s = text(t.output);
+  assert.match(s, /✅ Right\./);
+  assert.match(s, /never reaches the model/);
+  assert.equal(progressStore(labsDir).get('lab-03/easy').quiz, 'right');
+  press(t.input, 'b');
+  assert.match(text(t.output), /TAKEAWAY[\s\S]*You answered this one right/, 'the mission screen shows it again');
+  press(t.input, 'l');
+  assert.equal(t.state.screen, 'learn');
+  press(t.input, '1');
+  assert.match(text(t.output), /💡 Not quite: the answer is 2/);
+  assert.equal(progressStore(labsDir).get('lab-03/easy').quiz, 'right', 'learning, not grading');
+  press(t.input, 'b');
+  assert.equal(t.state.screen, 'exercise');
+  press(t.input, '2');
+  assert.equal(t.catalog[t.state.lab].levels[t.state.level].level, 'medium', 'digits still switch tiers on the mission screen');
+  t.quit();
+});

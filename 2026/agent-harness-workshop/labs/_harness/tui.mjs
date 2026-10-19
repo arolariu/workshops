@@ -24,6 +24,7 @@ import { bringPlan, applyBring } from './bring.mjs';
 import { revealNextHint, revealedHints, nextFixName, groupChecks } from './milestones.mjs';
 import { bringLines } from './screens/bring.mjs';
 import { changesLines } from './screens/changes.mjs';
+import { answerQuiz, quizLines, takeawayLines, quizUnlocked } from './screens/learn.mjs';
 import { KEYMAP, MENU_KEYS, binding } from './keys.mjs';
 import { checkGroupLines, milestoneListLines, hintDots } from './screens/milestones.mjs';
 
@@ -115,6 +116,7 @@ export async function startTui({
     exported: null,
     bring: null,
     diff: null,
+    quizChoice: null,
     tip: Math.floor(Math.random() * TIPS.length),
   };
 
@@ -257,7 +259,7 @@ export async function startTui({
     return { done, agents, stale, workshop, homework };
   }
   const labDone = (lab) => lab.levels.length > 0 && lab.levels.every((ex) => view.checks(ex) === 'pass');
-  const ON_LEVEL = new Set(['exercise', 'checks', 'checkDetail', 'output', 'agent', 'history', 'solution', 'confirmSolution', 'menu', 'recovery', 'bring', 'changes']);
+  const ON_LEVEL = new Set(['exercise', 'checks', 'checkDetail', 'output', 'agent', 'history', 'solution', 'confirmSolution', 'menu', 'recovery', 'bring', 'changes', 'learn']);
   const lastKey = () => { const u = store.get('_ui'); return u.lab && u.level ? `${u.lab}/${u.level}` : null; };
   const nextUp = () => nextExercise(catalog, view, { path: S.path, current: ON_LEVEL.has(S.screen) ? exObj()?.key ?? null : null, last: lastKey() });
   const fmt = { green, bright, dim, white, yellow, bold, cyan };
@@ -286,6 +288,22 @@ export async function startTui({
   const keepStarter = (ex) => {
     const r = ensureStarter(labsDir, ex);
     if (r.problem) toast(`♻️ ${yellow('Could not keep a starter copy:')} ${dim(r.problem)}`, 8000);
+  };
+  /** The takeaway and the check-yourself question. `answering`: digits answer here (checks and learn screens). */
+  const learnBlock = (ex, { answering }) => {
+    const recorded = view.entry(ex).quiz ?? null;
+    const chosen = answering && S.quizChoice?.key === ex.key ? S.quizChoice.choice : null;
+    const n = ex.quiz?.options.length ?? 0;
+    const prompt = answering ? `press 1-${n} to ${recorded ? 'answer again' : 'answer'}` : recorded ? null : 'press l to answer';
+    return [...takeawayLines(ex, { W: W(), fmt }), ...quizLines(ex, { W: W(), fmt, recorded, chosen, prompt })];
+  };
+  const answer = (str) => {
+    const ex = exObj();
+    const n = Number(str);
+    if (!ex.quiz || !(n >= 1 && n <= ex.quiz.options.length)) return;
+    answerQuiz(store, ex, n);
+    S.quizChoice = { key: ex.key, choice: n };
+    render();
   };
 
   // ---------- screens ----------
@@ -582,6 +600,7 @@ export async function startTui({
     section('📂', 'WORK HERE', ex.where);
     L.push(...para(`💻 ${keycap('c')} ${dim('start Copilot here')}   📂 ${keycap('o')} ${dim('open the folder')}   📋 ${keycap('y')} ${dim('copy the cd command')}   🧳 ${keycap('i')} ${dim('bring your work')}`));
     section('✅', 'DONE WHEN', ex.done);
+    if (quizUnlocked(view, ex)) L.push(...learnBlock(ex, { answering: false }));
     L.push('');
     const dots = hintDots(ex, entry, fmt);
     L.push(...para(`💡 ${bold(white('HINTS'))}  ${dots}  ${dim(shown < ex.hints.length ? `${shown} of ${ex.hints.length} revealed — press h for ${ex.milestones?.length ? 'a hint for the milestone you are on' : shown ? 'the next one' : 'the first one'}` : 'all revealed')}`));
@@ -603,7 +622,7 @@ export async function startTui({
     L.push('');
     return {
       lines: L,
-      footer: footer([['t', 'checks'], ['c', 'Copilot here'], ['h', 'hint'], ['a', 'agent check'], ['v', 'your changes'], ['i', 'bring your work'], ['m', 'more'], ['b', 'back'], ['?', 'help'], ['q', 'quit']]),
+      footer: footer([['t', 'checks'], ['c', 'Copilot here'], ['h', 'hint'], ['a', 'agent check'], ['v', 'your changes'], ...(quizUnlocked(view, ex) ? [['l', 'learn']] : []), ['i', 'bring your work'], ['m', 'more'], ['b', 'back'], ['?', 'help'], ['q', 'quit']]),
     };
   }
 
@@ -669,7 +688,7 @@ export async function startTui({
     const s = R.summary;
     const say = (text) => L.push('', ...para(text, '   ', '      '));
     if (s.state === 'pass') {
-      if (R.firstPass) celebration(L, lab, ex);
+      if (R.firstPass) { celebration(L, lab, ex); L.push(...learnBlock(ex, { answering: true })); }
       else say(`✅ ${bold(bright('Still green.'))} ${dim('All checks pass on your current files.')}`);
     } else if (s.state === 'fail') {
       say(`💪 ${white(`${s.passed} of ${s.total} checks pass.`)} ${dim('Fix the ❌ ones, then press t again')}${S.watch ? dim(' (or just save a file)') : dim('.')} ${dim('Select a check and press ⏎ for details.')}`);
@@ -700,9 +719,10 @@ export async function startTui({
     const focus = resultLines(R, L);
     if (!R.running && R.summary) verdictLines(R, lab, ex, L);
     L.push('');
+    const answering = R.firstPass && exObj().quiz ? [[`1-${exObj().quiz.options.length}`, 'answer']] : [];
     const keys = R.running
       ? [['…', 'checking'], ['c/Esc', 'cancel']]
-      : [['↑↓', 'select'], ['⏎', 'details'], ['t', 'run again'], ['o', 'full output'], ['w', S.watch ? 'stop watching' : 'watch'], ['c', 'Copilot here'], ['a', 'agent check'], ['n', 'next up'], ['b', 'back'], ['q', 'quit']];
+      : [...answering, ['↑↓', 'select'], ['⏎', 'details'], ['t', 'run again'], ['o', 'full output'], ['w', S.watch ? 'stop watching' : 'watch'], ['c', 'Copilot here'], ['a', 'agent check'], ['n', 'next up'], ['b', 'back'], ['q', 'quit']];
     return { lines: L, focus, footer: footer(keys) };
   }
 
@@ -932,6 +952,17 @@ export async function startTui({
     return { lines: L, footer: footer([...(many ? [['←→', 'switch file']] : []), ['↑↓', 'scroll'], ['b', 'back'], ['q', 'quit']]) };
   }
 
+  function learnScreen() {
+    const lab = labObj();
+    const ex = exObj();
+    const L = [''];
+    L.push(...header(`🧠 ${bold(bright(`LEARN · Lab ${lab.num} · ${LABEL(ex)}`))}`, dim(ex.title)));
+    L.push(...learnBlock(ex, { answering: true }));
+    L.push('');
+    const n = ex.quiz?.options.length ?? 0;
+    return { lines: L, footer: footer([...(n ? [[`1-${n}`, 'answer']] : []), ['↑↓', 'scroll'], ['b', 'back'], ['q', 'quit']]) };
+  }
+
   const MENU = [
     { key: 'w', icon: '👀', label: () => (S.watch ? 'Stop watching src/' : 'Watch src/: run the checks every time you save') },
     { key: 'g', icon: '📖', label: () => 'Read the lab guide' },
@@ -1131,7 +1162,7 @@ ${levelKeyRows()}
     splash: splashScreen, home: homeScreen, lab: labScreen, readme: readmeScreen, browse: browseScreen, exercise: exerciseScreen,
     checks: checksScreen, checkDetail: checkDetailScreen, output: outputScreen, agent: agentScreen, history: historyScreen,
     solution: solutionScreen, confirmSolution: confirmSolutionScreen, menu: menuScreen, recovery: recoveryScreen,
-    doctor: doctorScreen, export: exportScreen, help: helpScreen, bring: bringScreen, changes: changesScreen,
+    doctor: doctorScreen, export: exportScreen, help: helpScreen, bring: bringScreen, changes: changesScreen, learn: learnScreen,
   };
   function render() {
     if (S.suspended || quitting) return;
@@ -1173,6 +1204,7 @@ ${levelKeyRows()}
     const doneBefore = counts().done;
     const controller = new AbortController();
     S.run = { running: true, results: [], plan: [], planMilestones: [], fatal: null, summary: null, firstPass: false, controller };
+    S.quizChoice = null;
     S.detail.idx = 0;
     if (!silent || S.screen === 'checks') go('checks');
     else render();
@@ -1646,6 +1678,9 @@ ${levelKeyRows()}
       agent: () => openAgent(),
       bring: () => openBring(),
       changes: () => { S.diff = { result: deps.changesDiff(exObj().src), idx: 0 }; go('changes'); },
+      learn: () => {
+        if (quizUnlocked(view, exObj())) { S.quizChoice = null; go('learn'); } else toast('🧠 The takeaway and a check-yourself question unlock when your checks pass (press t).');
+      },
       more: () => { S.menu.idx = 0; go('menu'); },
       watch: () => toggleWatch(),
       guide: () => go('readme'),
@@ -1682,6 +1717,7 @@ ${levelKeyRows()}
       next: () => jumpNext(),
       doctor: toDoctor,
       back: () => go('exercise'),
+      answer: ({ str }) => { if (S.run?.firstPass) answer(str); },
     },
     checksRunning: { cancel: () => cancelChecks() },
     checkDetail: {
@@ -1735,6 +1771,7 @@ ${levelKeyRows()}
       scroll,
       back: () => go('exercise'),
     },
+    learn: { answer: ({ str }) => answer(str), scroll, back: () => go('exercise') },
   };
   /** Bindings in keys.mjs without a handler here ([] when complete). */
   const unhandled = () => Object.entries(KEYMAP).flatMap(([state, list]) => list.filter((b) => typeof HANDLERS[state]?.[b.id] !== 'function').map((b) => `${state}.${b.id}`));

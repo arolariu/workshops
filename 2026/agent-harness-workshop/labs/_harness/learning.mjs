@@ -155,6 +155,7 @@ export function learningReport(catalog, view, { path: pathId = 'all' } = {}) {
       hints: e.hints ?? 0,
       solutionViewed: Boolean(e.peeked),
       bookmarked: Boolean(e.bookmarked),
+      quiz: e.quiz === 'right' || e.quiz === 'wrong' ? e.quiz : null,
     };
   });
   const count = (fn) => exercises.filter(fn).length;
@@ -191,9 +192,9 @@ export function reportMarkdown(report) {
     '',
     `**${t.passed} of ${t.exercises}** exercises pass on their current files${t.stale ? ` · ${t.stale} stale (changed since they were checked)` : ''}${t.agentPassed ? ` · ${t.agentPassed} agent check(s) passed` : ''} · ${t.hintsViewed} hint(s) revealed.`,
     '',
-    '| Exercise | Title | Checks | Agent | Last checked | Hints | Solution viewed | Bookmarked |',
-    '|---|---|---|---|---|---|---|---|',
-    ...report.exercises.map((x) => `| ${x.key} | ${cell(x.title)} | ${x.checks}${x.passed !== null && x.total ? ` (${x.passed}/${x.total})` : ''} | ${x.agent} | ${cell(x.lastChecked)} | ${x.hints} | ${x.solutionViewed ? 'yes' : ''} | ${x.bookmarked ? '⭐' : ''} |`),
+    '| Exercise | Title | Checks | Agent | Last checked | Hints | Solution viewed | Bookmarked | Check yourself |',
+    '|---|---|---|---|---|---|---|---|---|',
+    ...report.exercises.map((x) => `| ${x.key} | ${cell(x.title)} | ${x.checks}${x.passed !== null && x.total ? ` (${x.passed}/${x.total})` : ''} | ${x.agent} | ${cell(x.lastChecked)} | ${x.hints} | ${x.solutionViewed ? 'yes' : ''} | ${x.bookmarked ? '⭐' : ''} | ${x.quiz === 'right' ? '✅' : x.quiz === 'wrong' ? '💡' : ''} |`),
     '',
     `> ${report.note}`,
     '',

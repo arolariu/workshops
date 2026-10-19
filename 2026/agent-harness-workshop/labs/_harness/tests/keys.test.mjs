@@ -59,3 +59,9 @@ test('v views your changes on the mission screen, and the more menu offers it to
   assert.equal(binding('changes', 'right', '').id, 'nextFile');
   assert.equal(binding('changes', 'b', 'b').id, 'back');
 });
+test('l opens the takeaway and question; 1-4 answer on the checks and learn screens', () => {
+  assert.equal(binding('exercise', 'l', 'l').id, 'learn');
+  assert.equal(binding('checks', '3', '3').id, 'answer');
+  assert.equal(binding('learn', '1', '1').id, 'answer');
+  assert.equal(binding('learn', 'return', '\r').id, 'back');
+});

@@ -145,3 +145,16 @@ test('changes lists your changes since the last commit, or says why it cannot', 
   assert.match(some.text, /Changed: a\.js\n[\s\S]*-old\n\+new/);
   assert.match(some.text, /New: logo\.png\. A binary file/);
 });
+test('after a pass: the takeaway and the question; answer N gives feedback; quiz asks again', async () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.writeFileSync(path.join(labsDir, 'lab-03/easy/todo.md'), '# 🟢 Easy · Q\n\n> 🕐 10 min\n\n## 🎯 Mission\nGo.\n\n## 🧠 Takeaway\nA tool list is a guarantee.\n\n## ❓ Check yourself\nWhy read-only?\n1. A wish.\n2. A guarantee.\n\n<details><summary>Answer</summary>\n\n**2.** The schema never reaches the model.\n\n</details>\n');
+  const passAll = async () => ({ state: 'pass', allPass: true, complete: true, results: [{ idx: 0, name: 'done', status: 'pass', message: '' }], passed: 1, failed: 0, skipped: 0, blocked: 0, total: 1, fatal: null, stdout: '', stderr: '', planMilestones: [null], milestones: {} });
+  const locked = await session(['open lab-03 easy', 'quiz', 'quit'], { labsDir });
+  assert.match(locked.text, /unlock when your checks pass/);
+  const { text } = await session(['open lab-03 easy', 'checks', 'answer 1', 'answer 2', 'quiz', 'answer 9', 'quit'], { labsDir, deps: { runChecks: passAll } });
+  assert.match(text, /Takeaway: A tool list is a guarantee\.[\s\S]*Check yourself: Why read-only\?\n {2}1\. A wish\.\n {2}2\. A guarantee\.\nType "answer N"/);
+  assert.match(text, /Not quite: the answer is 2\. The schema never reaches the model\./);
+  assert.match(text, /Right\. The schema never reaches the model\./);
+  assert.match(text, /There is no option 9/);
+  assert.equal(progressStore(labsDir).get('lab-03/easy').quiz, 'wrong', 'the first answer is the one recorded');
+});

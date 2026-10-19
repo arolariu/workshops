@@ -17,6 +17,7 @@ import { loadCourse } from './course.mjs';
 import { bringPlan, applyBring } from './bring.mjs';
 import { revealNextHint, revealedHints, groupChecks, milestoneBar } from './milestones.mjs';
 import { bringLines } from './screens/bring.mjs';
+import { answerQuiz, quizUnlocked } from './screens/learn.mjs';
 
 const HELP = `Commands (type one and press Enter):
   list [path=ID] [level=L] [status=S] [minutes=N] [bookmarked] [words…]   numbered exercises, filtered
@@ -26,6 +27,8 @@ const HELP = `Commands (type one and press Enter):
   details N         the requirement, files, evidence and output of check N
   output            the full output of the last check run
   hint              reveal the next hint (for the milestone you are on)
+  quiz              the takeaway and a check-yourself question (after your checks pass)
+  answer N          answer the check-yourself question
   agent             run the agent checks: real Copilot, uses AI credits (asks first)
   bring             bring your own harness forward from the earlier levels you passed (asks first)
   history           agent run history for this exercise
@@ -162,6 +165,7 @@ export function runLinear({
     const controller = new AbortController();
     active = controller;
     say(`Running the free checks on ${rel(ex.src)}. Press Ctrl+C to cancel.`);
+    const before = view.checks(ex);
     const evidence = captureEvidence(ex);
     let lastMilestone = null;
     const res = await deps.runChecks({
@@ -184,6 +188,37 @@ export function runLinear({
     if (res.state === 'pass') say(`All ${res.total} checks passed.`);
     else if (res.state === 'fail') say(`${res.passed} of ${res.total} checks passed. Type "details N" for a failing check.`);
     else say(`Result: ${statusWord(res.state)}. ${res.fatal ?? ''}`.trim());
+    if (res.state === 'pass' && before !== 'pass' && (ex.takeaway || ex.quiz)) learnText(ex);
+  }
+
+  /** The takeaway and the check-yourself question, as plain lines. */
+  function learnText(ex, { recorded = null } = {}) {
+    if (ex.takeaway) say(`Takeaway: ${inline(ex.takeaway)}`);
+    if (!ex.quiz) return;
+    say(`Check yourself: ${inline(ex.quiz.question)}`);
+    ex.quiz.options.forEach((o, i) => say(`  ${i + 1}. ${inline(o)}`));
+    if (recorded) say(`You answered this one ${recorded === 'right' ? 'right' : 'differently'} the first time.`);
+    say(`Type "answer N"${recorded ? ' to answer again' : ' to answer'}.`);
+  }
+  const LOCKED = 'The takeaway and a check-yourself question unlock when your checks pass. Type "checks".';
+  function quiz() {
+    if (!need()) return;
+    view.refresh();
+    const { ex } = current;
+    if (!ex.quiz && !ex.takeaway) { say('This exercise has no takeaway or check-yourself question.'); return; }
+    if (!quizUnlocked(view, ex)) { say(LOCKED); return; }
+    learnText(ex, { recorded: view.entry(ex).quiz ?? null });
+  }
+  function answer(arg) {
+    if (!need()) return;
+    view.refresh();
+    const { ex } = current;
+    if (!ex.quiz) { say('This exercise has no check-yourself question.'); return; }
+    if (!quizUnlocked(view, ex)) { say(LOCKED); return; }
+    const n = Number(arg);
+    if (!(Number.isInteger(n) && n >= 1 && n <= ex.quiz.options.length)) { say(`There is no option ${arg ?? ''}. Choose 1 to ${ex.quiz.options.length}.`); return; }
+    const { right } = answerQuiz(store, ex, n);
+    say(`${right ? 'Right.' : `Not quite: the answer is ${ex.quiz.answer}.`} ${inline(ex.quiz.why)}`);
   }
 
   function details(n) {
@@ -309,6 +344,8 @@ export function runLinear({
       }
       case 'compare': case 'diff': compare(args[0]); return;
       case 'changes': changes(); return;
+      case 'quiz': case 'takeaway': quiz(); return;
+      case 'answer': answer(args[0]); return;
       case 'recovery': recovery(); return;
       case 'checkpoint': {
         if (!need()) return;

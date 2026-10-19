@@ -76,6 +76,7 @@ export const KEYMAP = {
     b('a', 'agent', '🤖 agent check: the real Copilot on a copy of your folder (uses AI credits; c cancels)'),
     b('i', 'bring', '🧳 bring your own harness forward from the earlier levels you passed (your files are backed up first)'),
     b('v', 'changes', '📝 view your changes since your latest commit, file by file'),
+    b('l', 'learn', '🧠 the takeaway and a check-yourself question (after your checks pass)'),
     b('m', 'more', 'more: watch, guide, compare, bring, your changes, bookmark, start over, history, doctor, export'),
     b('w', 'watch', 'watch: run the checks again every time you save a file'),
     b(['g', 'r'], 'guide', 'read the lab guide: concepts, under the hood, examples, links'),
@@ -112,6 +113,7 @@ export const KEYMAP = {
     b('n', 'next', 'next up'),
     b('d', 'doctor', 'setup doctor'),
     b(BACK, 'back', 'back to the mission'),
+    b(digits(1, 4), 'answer', 'answer the check-yourself question (after a pass)'),
   ],
   checksRunning: [b(['c', 'escape'], 'cancel', 'cancel the run')],
   checkDetail: [
@@ -144,6 +146,7 @@ export const KEYMAP = {
     b(SCROLL, 'scroll', 'scroll'),
     b(['b', 'escape', 'backspace', 'v'], 'back', 'back'),
   ],
+  learn: [b(digits(1, 4), 'answer', 'answer the question'), b(SCROLL, 'scroll', 'scroll'), b([...BACK, 'return', 'l'], 'back', 'back')],
   recovery: [
     b(PREV, 'prev', 'choose'),
     b(NEXT, 'nextItem', 'choose'),

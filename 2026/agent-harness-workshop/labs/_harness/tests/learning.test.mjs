@@ -132,3 +132,18 @@ test('other paths keep their own order, whatever the current level', () => {
   const { catalog, view } = setup();
   assert.equal(nextExercise(catalog, view, { path: 'security', current: 'lab-02/easy' }).key, 'lab-05/medium');
 });
+
+test('the learning summary includes each check-yourself answer', () => {
+  const { catalog, store, view } = setup();
+  store.set('lab-03/easy', { quiz: 'right' });
+  store.set('lab-04/easy', { quiz: 'wrong' });
+  view.refresh();
+  const report = learningReport(catalog, view, { path: 'all' });
+  assert.equal(report.exercises.find((x) => x.key === 'lab-03/easy').quiz, 'right');
+  assert.equal(report.exercises.find((x) => x.key === 'lab-04/easy').quiz, 'wrong');
+  assert.equal(report.exercises.find((x) => x.key === 'lab-05/easy').quiz, null);
+  const md = reportMarkdown(report);
+  assert.match(md, /\| Check yourself \|/);
+  assert.match(md, /\| lab-03\/easy \|[^\n]*\| ✅ \|/);
+  assert.match(md, /\| lab-04\/easy \|[^\n]*\| 💡 \|/);
+});
