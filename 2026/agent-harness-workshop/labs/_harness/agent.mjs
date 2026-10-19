@@ -21,8 +21,10 @@ export async function loadAgentChecks(exDir) {
 const resolveField = (v, kit) => (typeof v === 'function' ? (kit ? v(kit) : ['<from your files>']) : v);
 export function copilotArgs(specIn, kit) {
   const spec = { ...specIn, allow: resolveField(specIn.allow, kit), deny: resolveField(specIn.deny, kit) };
+  // A plugin's agent is named <plugin>:<agent>, and the plugin's name is in the learner's plugin.json.
+  const agent = typeof specIn.agent === 'function' ? (kit ? specIn.agent(kit) : '<from your files>') : specIn.agent;
   const args = [];
-  if (spec.agent) args.push('--agent', spec.agent);
+  if (agent) args.push('--agent', agent);
   for (const dir of spec.pluginDirs ?? []) args.push('--plugin-dir', dir);
   args.push('-p', spec.prompt, '-s', '--no-ask-user', `--max-ai-credits=${spec.credits ?? 30}`);
   // JSON events give the agent screen a timeline; trace.mjs turns them back into the text `-s` prints.

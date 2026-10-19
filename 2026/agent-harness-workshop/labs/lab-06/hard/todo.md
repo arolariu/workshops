@@ -86,8 +86,9 @@ Agents in `agents/` and skills in `skills/` are found without path fields. Hooks
 <details><summary>Renaming, everywhere</summary>
 
 An agent's ID is its **file name** (`sb-reviewer.agent.md`), and a skill's name is the `name:` in its frontmatter,
-which must match its folder. Rename the file or folder **and** the frontmatter. If the project and the plugin both
-have a `reviewer`, Copilot uses the project's and silently ignores the plugin's: that's why plugins prefix.
+which must match its folder. Rename the file or folder **and** the frontmatter. Copilot names a plugin's agents
+after the plugin (`studybuddy-harness:sb-reviewer`), but a plugin's skills keep their own names next to the
+project's (`copilot --plugin-dir ./studybuddy-plugin skill list` shows both): that's why plugins prefix.
 
 </details>
 
@@ -167,7 +168,8 @@ this shadowing.
 </details>
 
 ## 🚀 Going further
-- Run `copilot --plugin-dir ./studybuddy-plugin --agent sb-reviewer` and review `report.js`. Then look at
+- Run `copilot --plugin-dir ./studybuddy-plugin --agent studybuddy-harness:sb-reviewer` (a plugin's agents are
+  named `<plugin>:<agent>`) and review `report.js`. Then look at
   `.agent-logs/sb-guard.jsonl`: every call the reviewer made went past your packaged guard.
 - `copilot plugin install ./studybuddy-plugin` works, but warns that direct installs are deprecated: only
   `plugin@marketplace` installs will stay. Lab 06 hard++ builds the marketplace.

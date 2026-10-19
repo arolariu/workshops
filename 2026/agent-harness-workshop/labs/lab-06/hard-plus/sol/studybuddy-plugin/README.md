@@ -15,12 +15,12 @@ collides with a project's own agents, skills or servers.
 ```bash
 copilot plugin install <owner>/<repo>:labs/lab-06/hard/sol/studybuddy-plugin
 ```
-Then start a new session, and use `/agent sb-reviewer`, `/sb-explain-error <file>` or ask about your deadlines.
+Then start a new session, and use `/agent studybuddy-harness:sb-reviewer` (a plugin's agents carry its name), `/sb-explain-error <file>` or ask about your deadlines.
 
 ## Try it without installing
 ```bash
 copilot --plugin-dir ./studybuddy-plugin
-copilot --plugin-dir ./studybuddy-plugin --agent sb-reviewer
+copilot --plugin-dir ./studybuddy-plugin --agent studybuddy-harness:sb-reviewer
 ```
 
 ## Good to know

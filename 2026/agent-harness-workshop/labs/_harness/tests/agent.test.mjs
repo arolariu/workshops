@@ -173,6 +173,14 @@ test('Copilot runs with JSON events by default; trace: false or an explicit --ou
   assert.deepEqual(fmt(copilotArgs({ ...base, trace: false })), []);
   assert.deepEqual(fmt(copilotArgs({ ...base, extraArgs: ['--output-format', 'text'] })), ['--output-format', 'text']);
 });
+test('an agent can come from your files: a plugin agent is named <plugin>:<agent>', () => {
+  const spec = { name: 'x', prompt: 'hi', expect: () => true, agent: (t) => `${JSON.parse(t.read('p/plugin.json')).name}:sb-reviewer` };
+  const kit = { read: () => '{"name":"studybuddy-harness"}' };
+  const args = copilotArgs(spec, kit);
+  assert.equal(args[args.indexOf('--agent') + 1], 'studybuddy-harness:sb-reviewer');
+  const shown = copilotArgs(spec);
+  assert.equal(shown[shown.indexOf('--agent') + 1], '<from your files>', 'before the copy exists, the command says where the name comes from');
+});
 
 /** A stand-in for the Copilot CLI: prints JSON events when the prompt says TRACE, else plain text. */
 function fakeCopilot(root) {
