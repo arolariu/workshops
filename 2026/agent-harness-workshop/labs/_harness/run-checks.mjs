@@ -97,6 +97,7 @@ for (const [idx, c] of checks.entries()) {
     message = 'Depends on your machine (skipped in verify mode).';
   } else {
     let timer;
+    const mark = kit.mark();
     try {
       const res = await Promise.race([
         Promise.resolve().then(() => c.run()),
@@ -117,10 +118,11 @@ for (const [idx, c] of checks.entries()) {
       if (known) { detail = evidence(e.detail); supplied = e.detail?.files; }
     } finally {
       clearTimeout(timer);
-      kit.cleanup();
+      kit.cleanup(mark);
     }
   }
   emit({ type: 'result', idx, name: String(c.name), status, message, optional: Boolean(c.optional), milestone: milestoneOf(c), ...(needs ? { needs } : {}), detail, files: status === 'pass' ? [] : filesFor(c, message, supplied) });
 }
+kit.cleanup();
 emit({ type: 'done' });
 process.exit(0);

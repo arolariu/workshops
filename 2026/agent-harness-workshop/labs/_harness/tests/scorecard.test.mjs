@@ -69,6 +69,19 @@ test('agents: an explicit tool list reaches L3; a reviewer that can edit does no
   assert.equal(none.rule('agent-readonly').ok, true);
 });
 
+test('workflows: settings from an imported shared file count (gh-aw imports), and its own win', () => {
+  const shared = '---\nmax-ai-credits: 200\nsafe-outputs:\n  add-comment:\n    max: 1\n---\nFleet rules.\n';
+  const wf = (own) => `---\non: issues\npermissions: read-all\nimports:\n  - shared/fleet.md\ntimeout-minutes: 10\n${own}---\nGo.\n`;
+  const fleet = run({ '.github/workflows/shared/fleet.md': shared, '.github/workflows/triage.md': wf('') });
+  assert.equal(fleet.scan.workflows.length, 1, 'a shared file is not a workflow');
+  assert.equal(fleet.rule('workflow-limits').ok, true, fleet.rule('workflow-limits').message);
+  assert.equal(fleet.rule('workflow-safe-outputs').ok, true, fleet.rule('workflow-safe-outputs').message);
+  assert.ok(fleet.scan.artifacts.some((a) => a.layer === 'workflows' && a.path === '.github/workflows/shared/fleet.md'), 'the shared file shows in the tree');
+  const missing = run({ '.github/workflows/triage.md': wf('') });
+  assert.equal(missing.rule('workflow-limits').ok, false, 'an import that is not there gives nothing');
+  const own = run({ '.github/workflows/shared/fleet.md': shared, '.github/workflows/triage.md': wf('safe-outputs:\n  add-labels:\n    allowed: [bug]\n') });
+  assert.match(own.rule('workflow-safe-outputs').message, /add-labels has no max/);
+});
 test('workflows: global safe-output options are not handlers, so they need no max', () => {
   const wf = (outputs) => `---\non: issues\npermissions: read-all\nsafe-outputs:\n${outputs}timeout-minutes: 10\nmax-ai-credits: 50\n---\nGo.\n`;
   const global = run({ '.github/workflows/t.md': wf('  add-comment:\n    max: 1\n  mentions:\n    allowed: [maintainer]\n  allowed-domains: [example.com]\n  messages:\n    footer: "x"\n  report-failure-as-issue:\n    labels: [ci]\n  missing-tool:\n    create-issue: true\n') });

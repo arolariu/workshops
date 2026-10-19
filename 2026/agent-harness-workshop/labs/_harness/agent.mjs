@@ -211,7 +211,9 @@ async function runSuite({ exDir, target, labsDir, labId, level, signal, onEvent 
     fs.mkdirSync(caseDir);
     c.runDir = work;
     c.startedAt = new Date().toISOString();
+    let kit = null;
     const done = (status, message = '', extra = {}) => {
+      kit?.cleanup();
       Object.assign(c, { status, message, finishedAt: new Date().toISOString() }, extra);
       persist();
       onEvent({ type: 'result', ...c });
@@ -220,7 +222,7 @@ async function runSuite({ exDir, target, labsDir, labId, level, signal, onEvent 
     if (prep.cancelled || signal?.aborted) { cancelled = true; done('cancelled', 'Cancelled while preparing the copy.'); break; }
     if (prep.blocked) { done('blocked', prep.blocked); continue; }
     if (prep.note) c.note = prep.note;
-    const kit = makeKit({ dir: work, exDir });
+    kit = makeKit({ dir: work, exDir });
     try {
       if (spec.setup) {
         onEvent({ type: 'setup', idx, name: spec.name });
@@ -235,9 +237,16 @@ async function runSuite({ exDir, target, labsDir, labId, level, signal, onEvent 
     if (trouble) { done('blocked', trouble); continue; }
     if (signal?.aborted) { cancelled = true; done('cancelled', 'Cancelled before the agent started.'); break; }
 
-    const [cmd, args, shown] = spec.command
-      ? [spec.command[0] === 'node' ? process.execPath : spec.command[0], spec.command.slice(1), spec.command[0]]
-      : [copilot, copilotArgs(spec, kit), 'copilot'];
+    let launch;
+    try {
+      launch = spec.command
+        ? [spec.command[0] === 'node' ? process.execPath : spec.command[0], spec.command.slice(1), spec.command[0]]
+        : [copilot, copilotArgs(spec, kit), 'copilot'];
+    } catch (e) {
+      done('fail', `The check could not build its command: ${e?.message ?? e}`);
+      continue;
+    }
+    const [cmd, args, shown] = launch;
     c.command = displayCommand(shown, args);
     c.launched = true;
     persist();

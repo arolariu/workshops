@@ -199,3 +199,34 @@ test('support files never replace a file the target has, never beat real work, a
   const next = bringPlan({ ...c, target: c.node('lab-01/easy') });
   assert.deepEqual(next.items.map((i) => [i.file, i.from, i.buf.toString()]), [['.github/policies/org.json', 'lab-00/easy', 'my own org\n'], ['scripts/audit.mjs', 'lab-00/medium', 'mine\n']], 'your own org.json beats a later level\'s untouched support file');
 });
+
+test('a level whose only harness files are untouched starters is not a source: support files travel with work, never alone', async () => {
+  const labsDir = synced({
+    'lab-00/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+    'lab-00/medium': { src: { 'done.txt': 'x\n', '.github/skills/explain/SKILL.md': 'given\n', 'plugin/x.js': 'todo\n' }, sol: { 'done.txt': 'x\n', '.github/skills/explain/SKILL.md': 'given\n', 'plugin/x.js': 'done\n' } },
+    'lab-01/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+  });
+  const c = ctx(labsDir);
+  write(labsDir, 'lab-00/easy/src/done.txt', 'x\n');
+  await pass(c.store, c.ex('lab-00/easy'));
+  write(labsDir, 'lab-00/medium/src/plugin/x.js', 'mine\n');
+  await pass(c.store, c.ex('lab-00/medium'));
+  c.view.refresh();
+  const plan = bringPlan({ ...c, target: c.node('lab-01/easy') });
+  assert.deepEqual(plan.sources, [], 'lab-00/medium has no harness work of yours (plugin/ is not a harness path)');
+  assert.deepEqual(plan.items, []);
+  assert.deepEqual(perfectLearnerPlan({ ...c, target: c.node('lab-01/easy') }).items, [], 'the perfect learner agrees');
+});
+
+test('a support file is never "also changed in" a level, and never lands in "kept"', () => {
+  const labsDir = synced({
+    'lab-00/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+    'lab-00/medium': { src: { 'done.txt': 'x\n', ...SUPPORT }, sol: { 'done.txt': 'x\n', ...SUPPORT, 'scripts/audit.mjs': 'done\n' } },
+    'lab-00/hard': { src: { 'done.txt': 'x\n', ...SUPPORT, 'scripts/audit.mjs': 'done\n' }, sol: { 'done.txt': 'x\n', ...SUPPORT, 'scripts/audit.mjs': 'done\n', 'scripts/report.mjs': 'r\n' } },
+    'lab-01/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+  }, { 'lab-01/easy': { drop: ['.github/policies/**'] } });
+  const c = ctx(labsDir);
+  const plan = perfectLearnerPlan({ ...c, target: c.node('lab-01/easy') });
+  assert.ok(plan.items.every((i) => !i.alsoIn.length), JSON.stringify(plan.items.map((i) => [i.file, i.alsoIn])));
+  assert.deepEqual(plan.kept, [], 'a dropped support file is simply not brought');
+});

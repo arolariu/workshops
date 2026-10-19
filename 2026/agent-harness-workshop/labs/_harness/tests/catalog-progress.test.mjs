@@ -167,6 +167,7 @@ test('generated output, dependencies and logs do not change the source fingerpri
     'runs/1.json': '{}',
     'ab-results.json': '{}',
     'mcp/state.json': '{}',
+    'mcp/state.json.4242.1760900000000.tmp': '{}',
     'debug.log': 'x',
   });
   assert.equal(sourceFingerprint(ex.src), before);

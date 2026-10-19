@@ -12,6 +12,8 @@ export const FIXES = {
   invalid: [/export function daysBetween\(from, to\) \{\n/, "export function daysBetween(from, to) {\n  for (const d of [from, to]) {\n    const t = Date.parse(d);\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(d)) || Number.isNaN(t) || new Date(t).toISOString().slice(0, 10) !== d) {\n      throw new RangeError(`Not a valid YYYY-MM-DD date: ${d}`);\n    }\n  }\n"],
 };
 export const FIX_NAMES = Object.keys(FIXES);
+/** Where REVIEW.md places each finding. */
+export const LOCATION = { done: 'deadlines.js:23', utc: 'deadlines.js:7', invalid: 'deadlines.js:12' };
 
 /** `source` (the reference deadlines.js) with the named fixes applied. */
 export function applyFixes(source, names = FIX_NAMES) {

@@ -19,7 +19,7 @@ export function bringLines(plan, { W = 96, fmt }) {
   if (plan.error) { put(`⚠️  ${fmt.yellow(plan.error)}`); return L; }
   if (!plan.items.length && !plan.kept.length) {
     put(`🧳 ${fmt.white('Nothing to bring yet.')}`);
-    put(fmt.dim('Your work is the harness files (AGENTS.md, *.instructions.md, .github/…, .mcp.json, mcp/…, apm.yml, scripts/…) that you changed or added in an earlier level whose checks pass on its current files. App code never travels.'), '      ', '      ');
+    put(fmt.dim('Your work is the harness files (AGENTS.md, *.instructions.md, .github/…, .mcp.json, mcp/…, apm.yml, scripts/…) that you changed or added in an earlier level whose checks pass on its current files, plus the files that level gave you and your work uses (only where this level has none). App code never travels.'), '      ', '      ');
   }
   const fileW = Math.min(36, Math.max(10, ...plan.items.map((i) => width(i.file))));
   for (const it of plan.items) {

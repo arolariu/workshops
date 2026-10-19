@@ -115,7 +115,18 @@ export function scanHarness(dir) {
   });
   scan.workflows = files.filter((f) => /^\.github\/workflows\/[^/]+\.md$/.test(f)).map((f) => {
     art('workflows', f);
-    return { path: f, frontmatter: front(f)?.data ?? null };
+    const own = front(f)?.data ?? null;
+    // gh-aw imports: a shared file's settings reach the workflow (its own values win). Paths are relative to the
+    // workflow's folder; `file.md#Section` and `owner/repo/…@ref` imports from elsewhere are not followed.
+    const shared = (Array.isArray(own?.imports) ? own.imports : []).map((i) => String(typeof i === 'object' ? i?.path ?? '' : i).split('#')[0])
+      .map((i) => path.posix.normalize(path.posix.join('.github/workflows', i))).filter((i) => files.includes(i));
+    let effective = own;
+    for (const i of shared) {
+      art('workflows', i);
+      const d = front(i)?.data ?? {};
+      effective = { ...d, ...effective, 'safe-outputs': { ...(d['safe-outputs'] ?? {}), ...(effective?.['safe-outputs'] ?? {}) } };
+    }
+    return { path: f, frontmatter: own, effective, imports: shared };
   });
   scan.harnessMd = files.includes('HARNESS.md') ? { path: 'HARNESS.md', text: read('HARNESS.md') ?? '' } : null;
   if (scan.harnessMd) art('governance', 'HARNESS.md');
@@ -238,7 +249,7 @@ export function scorecard(scan, { mcpTools } = {}) {
   // Workflows
   if (!scan.workflows.length) ['workflow-readonly', 'workflow-safe-outputs', 'workflow-limits'].forEach(none('workflows', 'agentic workflows'));
   else {
-    const fm = scan.workflows.map((w) => ({ w, d: w.frontmatter ?? {} }));
+    const fm = scan.workflows.map((w) => ({ w, d: w.frontmatter ?? {}, e: w.effective ?? w.frontmatter ?? {} }));
     const writes = fm.filter(({ d }) => {
       const p = d.permissions;
       if (p == null) return true;
@@ -246,10 +257,10 @@ export function scorecard(scan, { mcpTools } = {}) {
       return Object.values(p).some((v) => /write/i.test(String(v)));
     });
     add('workflow-readonly', 'workflows', !writes.length, writes.length ? list(writes.map(({ w, d }) => `${w.path}: ${d.permissions == null ? 'no permissions block, so the default token may write' : 'the agent has write permission'}`)) : "The agents' permissions are read-only.", writes.map(({ w }) => w.path));
-    const unbounded = fm.flatMap(({ w, d }) => Object.entries(d['safe-outputs'] ?? {}).filter(([k, v]) => !SAFE_OUTPUT_OPTIONS.has(k) && v && typeof v === 'object' && !(Number(v.max) > 0)).map(([k]) => `${w.path}: ${k} has no max`));
+    const unbounded = fm.flatMap(({ w, e }) => Object.entries(e['safe-outputs'] ?? {}).filter(([k, v]) => !SAFE_OUTPUT_OPTIONS.has(k) && v && typeof v === 'object' && !(Number(v.max) > 0)).map(([k]) => `${w.path}: ${k} has no max`));
     add('workflow-safe-outputs', 'workflows', !unbounded.length, unbounded.length ? list(unbounded) : 'Every safe output has a max.', scan.workflows.map((w) => w.path));
-    const limits = fm.filter(({ d }) => d['timeout-minutes'] == null || d['max-ai-credits'] == null);
-    add('workflow-limits', 'workflows', !limits.length, limits.length ? list(limits.map(({ w, d }) => `${w.path}: needs ${[d['timeout-minutes'] == null && 'timeout-minutes', d['max-ai-credits'] == null && 'max-ai-credits'].filter(Boolean).join(' and ')}`)) : 'Every workflow has a timeout and a credit limit.', scan.workflows.map((w) => w.path));
+    const limits = fm.filter(({ e }) => e['timeout-minutes'] == null || e['max-ai-credits'] == null);
+    add('workflow-limits', 'workflows', !limits.length, limits.length ? list(limits.map(({ w, e }) => `${w.path}: needs ${[e['timeout-minutes'] == null && 'timeout-minutes', e['max-ai-credits'] == null && 'max-ai-credits'].filter(Boolean).join(' and ')}`)) : 'Every workflow has a timeout and a credit limit.', scan.workflows.map((w) => w.path));
   }
 
   // Governance

@@ -30,6 +30,19 @@ test('each run gets its own directory; earlier runs survive', async () => {
   assert.ok(runs.every((r) => r.state === 'pass' && r.finishedAt && r.cases[0].command));
 });
 
+test('a spec function that throws fails its case (the run never rejects), and the case kit\'s temp folders are removed', async () => {
+  const record = path.join(tmpdir(), 'made.txt');
+  const { base } = fixture(`import fs from 'node:fs';
+export default [
+  { name: 'agent from files', prompt: 'hi', agent: () => { throw new Error('no plugin.json'); }, expect: () => true },
+  { name: 'uses a temp folder', command: ['node', '-e', '0'], setup: (t) => fs.writeFileSync(${JSON.stringify(record)}, t.tmp()), expect: () => true },
+];`);
+  const result = await runAgentChecks(base);
+  assert.equal(result.results[0].status, 'fail');
+  assert.match(result.results[0].message, /no plugin\.json/);
+  assert.equal(result.results[1].status, 'pass');
+  assert.equal(fs.existsSync(fs.readFileSync(record, 'utf8')), false, 'the temp folder made in setup is gone');
+});
 test('aborting the first case stops the suite before the next case launches', async () => {
   const { base } = fixture(`export default [
     { name: 'first', command: ${hang}, expect: () => true },

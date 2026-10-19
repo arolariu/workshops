@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { loadCatalog } from '../catalog.mjs';
-import { courseOrder, predecessorOf } from '../chain.mjs';
+import { courseOrder, predecessorOf, loadManifest, chainEntry } from '../chain.mjs';
 import { quizProblems } from '../quiz.mjs';
 import { LAYERS, scanHarness, scorecard, maturity } from '../scorecard.mjs';
 import { DIFFICULTIES } from '../catalog.mjs';
@@ -110,6 +110,10 @@ const tierRange = (d) => {
   const unit = /\bh\b/.test(d.time) ? 60 : 1;
   return [lo * unit, hi * unit];
 };
+test('the grown labs are labs that exist (a typo in CONTENT_TEST_LABS would test nothing)', () => {
+  const ids = new Set(catalog.map((l) => l.id));
+  for (const id of GROWN) assert.ok(ids.has(id), `${id} is not a lab`);
+});
 test('every homework level of a grown lab follows the ticket format, fits its tier, and keeps agent checks cheap', async () => {
   for (const lab of catalog.filter((l) => GROWN.has(l.id))) {
     assert.deepEqual(lab.levels.map((e) => e.level), DIFFICULTIES.map((d) => d.id), `${lab.id}: all five tiers`);
@@ -140,6 +144,7 @@ test('every homework level of a grown lab follows the ticket format, fits its ti
 });
 
 // Hard+ and hard++ starters are skeletons: a TODO(Mn) marker shows where each milestone's work goes.
+const manifest = loadManifest(labsDir);
 const textOf = (dir) => {
   if (!fs.existsSync(dir)) return '';
   return fs.readdirSync(dir, { withFileTypes: true }).map((e) => {
@@ -151,7 +156,9 @@ const textOf = (dir) => {
 test('every milestone of a grown lab\'s hard+ and hard++ level has a TODO(Mn) marker in its starter', () => {
   for (const lab of catalog.filter((l) => GROWN.has(l.id))) {
     for (const ex of lab.levels.filter((e) => e.level === 'hard-plus' || e.level === 'hard-plus-plus')) {
-      const text = textOf(ex.src);
+      // Only this level's own starter files: a marker inherited from the level before doesn't say where *this* work goes.
+      const own = Object.keys(chainEntry(manifest, ex.key)?.starter ?? {});
+      const text = own.length ? own.map((f) => { try { return fs.readFileSync(path.join(ex.src, f), 'utf8'); } catch { return ''; } }).join('\n') : textOf(ex.src);
       const missing = ex.milestones.filter((m) => !text.includes(`TODO(${m.id})`)).map((m) => m.id);
       assert.deepEqual(missing, [], `${ex.key}: src/ has no TODO(Mn) marker for ${missing.join(', ')}`);
     }

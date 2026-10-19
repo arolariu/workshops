@@ -12,7 +12,8 @@ const HARNESS = path.dirname(fileURLToPath(import.meta.url));
 // ---------- fingerprints ----------
 const SKIP_DIRS = new Set(['node_modules', '.git', '.agent-logs', 'apm_modules']);
 const SKIP_ROOT = new Set(['runs', 'ab-results.json', 'mcp/state.json']);
-const SKIP_FILE = /(^|\/)(\.DS_Store|Thumbs\.db)$|\.log$/i;
+// A crash between writing and renaming leaves the MCP server's temp state file behind (mcp/state.json.<pid>.<ts>.tmp).
+const SKIP_FILE = /(^|\/)(\.DS_Store|Thumbs\.db)$|\.log$|^mcp\/state\.json\.[^/]*\.tmp$/i;
 const hashCache = new Map();
 
 function fileHash(abs, st) {

@@ -306,3 +306,36 @@ export default (t) => [
   assert.equal(made.length, 3);
   for (const dir of made) assert.equal(fs.existsSync(dir), false, `${dir} is left behind`);
 });
+test('a temp folder made while the check list is built lives until the last check; one made in a check, until it ends', async () => {
+  const record = path.join(tmpdir(), 'made.txt');
+  const { exDir, target } = fixture(`import fs from 'node:fs';
+export default (t) => {
+  const shared = t.tmp();
+  return [
+    t.check('one', () => { fs.appendFileSync(${JSON.stringify(record)}, shared + '\\n' + t.tmp() + '\\n'); return true; }),
+    t.check('two', () => fs.existsSync(shared) || 'the shared folder is gone'),
+  ];
+};`);
+  const result = await runChecks({ exDir, target });
+  assert.equal(result.passed, 2, JSON.stringify(result.checks?.map((c) => c.message)));
+  const [shared, own] = fs.readFileSync(record, 'utf8').trim().split('\n');
+  assert.equal(fs.existsSync(own), false, 'the check\'s own folder is removed when it ends');
+  assert.equal(fs.existsSync(shared), false, 'the shared folder is removed at the end');
+});
+test('t.tmp() gives the real path, even when the temp folder is reached through a link (macOS /var, junctions, 8.3 names)', async () => {
+  const real = fs.realpathSync.native(tmpdir());
+  const link = path.join(tmpdir(), 'linked-temp');
+  fs.symlinkSync(real, link, process.platform === 'win32' ? 'junction' : 'dir');
+  const record = path.join(real, 'made.txt');
+  const { exDir, target } = fixture(`import fs from 'node:fs';
+export default (t) => [t.check('makes a temp folder', () => { fs.writeFileSync(${JSON.stringify(record)}, t.tmp()); return true; })];`);
+  const saved = Object.fromEntries(['TMP', 'TEMP', 'TMPDIR'].map((k) => [k, process.env[k]]));
+  try {
+    for (const k of Object.keys(saved)) process.env[k] = link;
+    await runChecks({ exDir, target });
+  } finally {
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
+  const made = fs.readFileSync(record, 'utf8');
+  assert.ok(made.startsWith(real), `${made} should be under the real path ${real}`);
+});

@@ -425,14 +425,19 @@ export function makeKit({ dir, exDir }) {
       };
     },
     tmp() {
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-'));
+      // The real path: through a symlink (macOS /var → /private/var), a junction or an 8.3 name, a script's
+      // "am I the main module?" test compares a different spelling of the same folder and silently does nothing.
+      let dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-'));
+      try { dir = fs.realpathSync.native(dir); } catch { /* keep the path we have */ }
       temps.push(dir);
       return dir;
     },
-    /** Remove the temp folders made so far (run-checks calls this after every check). */
-    cleanup() {
-      for (const dir of temps.splice(0)) {
-        try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 }); } catch { /* a locked file on Windows: the OS cleans temp */ }
+    /** How many temp folders exist now: pass it to cleanup() to remove only the ones made after it. */
+    mark: () => temps.length,
+    /** Remove the temp folders made since `from` (run-checks: each check's own after it, the rest at the end). */
+    cleanup(from = 0) {
+      for (const dir of temps.splice(from)) {
+        try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 }); } catch { /* a locked file on Windows: left in temp */ }
       }
     },
     copy(dest) {

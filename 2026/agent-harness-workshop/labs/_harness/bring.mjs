@@ -43,14 +43,15 @@ export function planFor({ sources, target, manifest, course }) {
     for (const [file, e] of s.work) {
       const prev = merged.get(file);
       if (e.support && prev && !prev.support) continue;
-      merged.set(file, { file, from: s.key, id: e.id, buf: e.buf, support: Boolean(e.support), alsoIn: prev ? [...prev.alsoIn, prev.from] : [] });
+      const alsoIn = prev ? [...prev.alsoIn, ...(prev.support ? [] : [prev.from])] : [];
+      merged.set(file, { file, from: s.key, id: e.id, buf: e.buf, support: Boolean(e.support), alsoIn });
     }
   }
   const now = snapshot(target.ex.src);
   const items = [];
   const kept = [];
   for (const it of [...merged.values()].sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0))) {
-    if (it.support && now.has(it.file)) continue;
+    if (it.support && (now.has(it.file) || matchAny(rules.drop, it.file) || matchAny(rules.keep, it.file) || starter.has(it.file))) continue;
     if (matchAny(rules.drop, it.file)) { kept.push({ ...it, reason: 'drop' }); continue; }
     if (matchAny(rules.keep, it.file)) { kept.push({ ...it, reason: 'keep' }); continue; }
     if (starter.has(it.file) && !matchAny(rules.overrides, it.file)) { kept.push({ ...it, reason: 'starter' }); continue; }
@@ -80,9 +81,9 @@ export function bringPlan({ catalog, course, manifest, view, target }) {
     const status = view.checks(node.ex);
     if (!seed) { if (status === 'pass') skipped.push({ key: node.key, node, reason: 'it has no seed record in starters.json' }); continue; }
     const work = workIn(node.ex.src, seed, course, levelRules(course, node.key).local, supportFiles(manifest, course, node.key));
-    if (!work.size) continue;
+    // Support files travel with your work, never alone: a level with no harness work of yours is not a source.
+    if (![...work.values()].some((e) => !e.support)) continue;
     if (status !== 'pass') {
-      if (![...work.values()].some((e) => !e.support)) continue;
       const wasPass = status === 'stale' && view.entry(node.ex).checks === 'pass';
       skipped.push({ key: node.key, node, reason: wasPass ? 'changed since its checks last passed: run them again to bring it' : WHY_NOT[status] ?? 'its checks have not passed' });
       continue;
@@ -120,7 +121,7 @@ export function perfectLearnerPlan({ catalog, course, manifest, target }) {
   const sources = order.slice(0, Math.max(0, idx))
     .filter((n) => manifest?.exercises?.[n.key])
     .map((n) => ({ key: n.key, node: n, work: workIn(n.ex.sol, manifest.exercises[n.key], course, levelRules(course, n.key).local, supportFiles(manifest, course, n.key)) }))
-    .filter((s) => s.work.size);
+    .filter((s) => [...s.work.values()].some((e) => !e.support));
   return { sources: sources.map((s) => s.key), ...planFor({ sources, target, manifest, course }) };
 }
 

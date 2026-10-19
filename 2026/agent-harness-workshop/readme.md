@@ -204,7 +204,8 @@ a mandate: every level starts from its own reference starting point, so you can 
 | 🟣 hard-plus (hard+) | **Break it.** Attacks, failure modes and edge cases. | 1.5–2 h | 🏠 homework |
 | 💎 hard-plus-plus (hard++) | **Scale it.** Make it work at org scale, or build the mechanism yourself. | 2–3 h | 🏠 homework |
 
-Labs 00–07 have all five tiers (Lab 08, the capstone, comes next); each level's own 🕐 says how long it takes. Suggested paths (press **p** in the app, or use
+Labs 00–07 have all five tiers (Lab 08, the capstone, comes next); each level's own 🕐 says how long it takes.
+Suggested paths (press **p** in the app, or use
 `--path=`; **n** always goes to the path's next unfinished level, and `node labs/start.mjs path` shows each path's time):
 
 | Path | Levels |
