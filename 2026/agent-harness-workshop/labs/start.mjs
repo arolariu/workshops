@@ -316,7 +316,8 @@ if (cmd === '' || cmd === 'open') {
 } else if (cmd === 'next') {
   const L = await learningView();
   let nu;
-  try { nu = L.nextExercise(catalog, L.view, { path: opt.path ?? progress.get('_ui').path ?? 'all' }); } catch (e) { fail(e.message); }
+  const ui = progress.get('_ui');
+  try { nu = L.nextExercise(catalog, L.view, { path: opt.path ?? ui.path ?? 'all', last: ui.lab && ui.level ? `${ui.lab}/${ui.level}` : null }); } catch (e) { fail(e.message); }
   if (opt.json) { process.stdout.write(`${JSON.stringify(nu ? { key: nu.key, title: nu.ex.title, checks: nu.progress.checks } : null)}\n`); process.exit(0); }
   say();
   if (!nu) say(`  🏁 ${bright('Everything on this path passes on your current files.')}`);

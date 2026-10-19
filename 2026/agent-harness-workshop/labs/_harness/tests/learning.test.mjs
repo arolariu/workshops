@@ -108,3 +108,27 @@ test('reports show current evidence, stale work, history, hints and bookmarks, a
   assert.match(fs.readFileSync(second.file, 'utf8'), /Learning summary/);
   assert.ok(!JSON.stringify(report).includes('stdout'), 'no raw logs are attached');
 });
+
+test('next up on the "all" path: the live track first, then the homework ladder', () => {
+  const { catalog, view, pass } = setup();
+  const next = (o) => nextExercise(catalog, view, { path: 'all', ...o })?.key ?? null;
+  assert.equal(next({ current: 'lab-02/easy' }), 'lab-03/easy', 'n on an easy level moves down the live track, finished or not');
+  assert.equal(next({ last: 'lab-04/medium' }), 'lab-04/medium', 'from the home screen: back to where you were');
+  assert.equal(next({ current: 'lab-04/medium' }), 'lab-00/easy', 'then the first unfinished easy level');
+  for (const lab of catalog) pass(lab.levels[0].key);
+  view.refresh();
+  assert.equal(next({ current: 'lab-04/medium' }), 'lab-04/hard', 'then the next tier in the same lab');
+  pass('lab-04/hard');
+  view.refresh();
+  assert.equal(next({ current: 'lab-04/medium' }), 'lab-05/medium', 'then the lowest unfinished tier of the next lab');
+  assert.equal(next({ current: 'lab-07/easy' }), 'lab-07/medium', 'the last easy level continues along its row');
+  assert.equal(next({}), 'lab-00/medium', 'with no history: the first unfinished level');
+  pass('lab-04/medium');
+  view.refresh();
+  assert.equal(next({ last: 'lab-04/medium' }), 'lab-05/medium', 'a finished last level is not suggested again');
+});
+
+test('other paths keep their own order, whatever the current level', () => {
+  const { catalog, view } = setup();
+  assert.equal(nextExercise(catalog, view, { path: 'security', current: 'lab-02/easy' }).key, 'lab-05/medium');
+});

@@ -93,10 +93,37 @@ export function describeSelection(catalog, view, opts = {}) {
 
 export const selectExercises = (catalog, view, opts) => describeSelection(catalog, view, opts).matches;
 
-/** The first exercise of the selection that is not currently passing, or null when the selection is complete. */
+/**
+ * The exercise "Next" suggests, or null when the selection is complete. On a learning path: the first exercise of the
+ * path that is not passing. On the default "all" path, the workshop's own rule (spec: the live track, then homework):
+ *   1. on an easy level (`current`): the next lab's easy level, finished or not, so nobody falls behind the room;
+ *   2. not on a level: the level you were last on (`last`), if it is unfinished;
+ *   3. the first unfinished easy level;
+ *   4. the next unfinished tier in the lab of your last level;
+ *   5. the lowest unfinished tier of a later lab;
+ *   6. any unfinished level, in course order.
+ * `current` and `last` are exercise keys ("lab-02/easy").
+ */
 export function nextExercise(catalog, view, opts = {}) {
-  const { status: _ignored, ...rest } = opts;
-  return selectExercises(catalog, view, rest).find((m) => m.progress.checks !== 'pass') ?? null;
+  const { status: _ignored, current = null, last = null, ...rest } = opts;
+  const matches = selectExercises(catalog, view, rest);
+  const filtered = ['query', 'level', 'maxMinutes', 'bookmarked'].some((k) => rest[k]);
+  if ((rest.path ?? 'all') !== 'all' || filtered) return matches.find((m) => m.progress.checks !== 'pass') ?? null;
+  const byKey = new Map(matches.map((m) => [m.key, m]));
+  const order = catalog.flatMap((lab, li) => lab.levels.map((ex) => ({ m: byKey.get(ex.key), li, tier: DIFFICULTIES.findIndex((d) => d.id === ex.level) }))).filter((n) => n.m);
+  const open = (n) => n.m.progress.checks !== 'pass' && n.m.key !== current;
+  const cur = order.find((n) => n.m.key === current);
+  if (cur && cur.tier === 0) {
+    const down = order.find((n) => n.li > cur.li && n.tier === 0);
+    if (down) return down.m;
+  }
+  const mine = order.find((n) => n.m.key === (current ?? last));
+  if (!current && mine && open(mine)) return mine.m;
+  const pick = (fn) => order.find((n) => open(n) && fn(n))?.m ?? null;
+  return pick((n) => n.tier === 0)
+    ?? (mine && pick((n) => n.li === mine.li && n.tier > mine.tier))
+    ?? (mine && pick((n) => n.li > mine.li))
+    ?? pick(() => true);
 }
 
 /** Remember the chosen learning path. */
