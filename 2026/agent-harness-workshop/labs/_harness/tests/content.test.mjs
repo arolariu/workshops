@@ -104,7 +104,7 @@ test('every reference solution passes the scorecard rules of the layers earlier 
 
 // Labs whose homework ladder is complete (Phase 4). Their levels above easy follow the ticket format of spec §5.3.
 // CONTENT_TEST_LABS=lab-01,lab-02 checks other labs while their ladders are being written.
-const GROWN = new Set(process.env.CONTENT_TEST_LABS ? process.env.CONTENT_TEST_LABS.split(',').map((s) => s.trim()) : ['lab-05']);
+const GROWN = new Set(process.env.CONTENT_TEST_LABS ? process.env.CONTENT_TEST_LABS.split(',').map((s) => s.trim()) : ['lab-00', 'lab-01', 'lab-02', 'lab-03', 'lab-04', 'lab-05', 'lab-06', 'lab-07']);
 const tierRange = (d) => {
   const [lo, hi = lo] = d.time.match(/[\d.]+/g).map(Number);
   const unit = /\bh\b/.test(d.time) ? 60 : 1;

@@ -19,6 +19,10 @@
       "_why": "Think first plans a new feature, so it starts with the red build already fixed (hasPassed checks the exam grade too)."
     },
     "lab-01/easy": { "local": ["FINDINGS.md", "team-notes.md"] },
+    "lab-02/hard-plus": {
+      "local": ["VERDICT.md", "vendor/**"],
+      "_why": "The verdict and the three vendor samples are this level's evidence: the routing level after it doesn't need them."
+    },
     "lab-02/easy": {
       "overrides": ["README.md"],
       "_why": "The README gets a Modules list: the new-module recipe adds a line to it."

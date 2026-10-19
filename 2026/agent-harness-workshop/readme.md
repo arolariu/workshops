@@ -196,7 +196,7 @@ reference result, so they keep up with the room.
 Every level above easy is optional and goes deeper. Doing all of them takes many hours, so the homework is a menu, not
 a mandate: every level starts from its own reference starting point, so you can skip levels or start anywhere.
 
-| Tier | Theme | Target time | Where |
+| Tier | Theme | Time | Where |
 |---|---|---|---|
 | 🟢 easy | **Use it.** Apply the layer once, with guidance. | 8–10 min | 👥 together, live |
 | 🟡 medium | **Shape it.** Design the layer well for a real need. | 30–45 min | 🏠 homework |
@@ -204,16 +204,15 @@ a mandate: every level starts from its own reference starting point, so you can 
 | 🟣 hard-plus (hard+) | **Break it.** Attacks, failure modes and edge cases. | 1.5–2 h | 🏠 homework |
 | 💎 hard-plus-plus (hard++) | **Scale it.** Make it work at org scale, or build the mechanism yourself. | 2–3 h | 🏠 homework |
 
-The 🟣 and 💎 tiers appear in a lab as soon as they are written, and the 🟡 and 🔴 levels grow toward these target
-times; each level's own 🕐 says how long it takes today. Suggested paths (press **p** in the app, or use
+Labs 00–07 have all five tiers (Lab 08, the capstone, comes next); each level's own 🕐 says how long it takes. Suggested paths (press **p** in the app, or use
 `--path=`; **n** always goes to the path's next unfinished level, and `node labs/start.mjs path` shows each path's time):
 
 | Path | Levels |
 |---|---|
 | **One level deeper** (`deeper`) | every 🟡 medium level, Lab 00 to Lab 07 |
-| **Security** (`security`) | 🟡 🔴 🟣 Lab 05 (guardrails, then policy as code); the other attack levels join it as they ship |
-| **Platform** (`platform`) | 🔴 Lab 02 (a skill with a script) and 🔴 Lab 06 (ship it as a plugin) |
-| **Internals** (`internals`) | 🔴 Lab 00 (the agent in a script); the build-the-loop levels join it as they ship |
+| **Security** (`security`) | 🟡 🔴 🟣 Lab 05 (guardrails, then policy as code), 🟣 Lab 04 (untrusted tool output) and 🟣 Lab 07 (hostile input in CI); Lab 08's red team joins it when it ships |
+| **Platform** (`platform`) | 🔴 🟣 Lab 02 (a skill with a script, then vetting other people's skills) and 🔴 🟣 Lab 06 (ship it as a plugin, then the supply chain) |
+| **Internals** (`internals`) | 🔴 🟣 💎 Lab 00 (the agent in a script, the flight recorder, your own agent loop) and 💎 Lab 04 (MCP from the protocol up) |
 
 **Done early?** Harness your own project with what you built.
 

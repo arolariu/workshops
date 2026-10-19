@@ -1223,12 +1223,12 @@ export async function startTui({
   function helpScreen() {
     const L = [''];
     L.push(...header(`❓ ${bold(bright('HOW THE LABS WORK'))}`, dim(`${BRAND.title} · lab companion`)));
-    const levels = tiers.map((d) => `- ${d.badge} **${d.label}** · ${d.theme} · target ${d.time} · ${d.mode === 'together' ? '👥 together, live' : '🏠 homework (optional)'}`).join('\n');
+    const levels = tiers.map((d) => `- ${d.badge} **${d.label}** · ${d.theme} · ${d.time} · ${d.mode === 'together' ? '👥 together, live' : '🏠 homework (optional)'}`).join('\n');
     L.push(...renderMarkdown(`
-Each lab has up to five tiers. Only 🟢 easy is done together in the workshop; every other tier is optional homework that goes deeper:
+Each lab has five tiers. Only 🟢 easy is done together in the workshop; every other tier is optional homework that goes deeper:
 ${levels}
 
-The times are the targets each tier grows into; a level's own 🕐 says how long it takes today.
+Each tier's time is how long its levels take; a level's own 🕐 says how long it takes.
 
 Every level starts from the reference result of the level before it (down the easy column, and along each lab's row), so you can start anywhere. Each level has:
 - \`todo.md\` - your mission. Long levels are split into milestones, each with its own checks and hints.
