@@ -15,7 +15,7 @@ const DEPS_DENY = [
 ];
 const DEPS_ALLOW = [shell('npm install'), shell('npm ci'), shell('npm i'), shell('npm test'), shell('npm install --no-audit'), tool('view', { path: 'package.json' }), shell('cat package.json')];
 
-const ENV_DENY = [tool('view', { path: '.env' }), shell('cat .env'), shell('cat config/.env.local'), ps('Get-Content .env'), tool('edit', { path: '.env', old_str: 'A=1', new_str: 'A=2' })];
+const ENV_DENY = [tool('view', { path: '.env' }), shell('cat .env'), shell('cat config/.env.local'), shell('cat .env.production.local'), ps('Get-Content .env'), tool('edit', { path: '.env', old_str: 'A=1', new_str: 'A=2' })];
 const ENV_ALLOW = [tool('view', { path: '.env.example' }), shell('cat .env.example'), tool('edit', { path: 'grades.js', old_str: 'x', new_str: 'const home = process.env.HOME;' }), shell('echo $HOME')];
 const HOOKS_DENY = [
   tool('edit', { path: '.github/hooks/guardrails.json', old_str: 'a', new_str: 'b' }), tool('create', { path: '.github/hooks/scripts/guard.mjs', file_text: '' }),
@@ -24,7 +24,7 @@ const HOOKS_DENY = [
 const HOOKS_ALLOW = [tool('view', { path: '.github/hooks/guardrails.json' }), shell('cat .github/hooks/guardrails.json'), shell('ls .github/hooks')];
 
 // A denial is read by the model: it should say what to do instead, so the next try is a good one.
-const INSTEAD = /instead|ask the human|use /i;
+const INSTEAD = /instead|ask the human|\buse\b/i;
 function explainsItself(t, calls) {
   const seen = calls.map((p) => ({ p, r: t.hook(GUARD, p) }));
   const open = seen.filter(({ r }) => r.decision !== 'deny');

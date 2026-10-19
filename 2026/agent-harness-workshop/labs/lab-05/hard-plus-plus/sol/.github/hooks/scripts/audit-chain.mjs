@@ -18,7 +18,8 @@ export function canonical(value) {
 }
 export const sha256 = (text) => crypto.createHash('sha256').update(text).digest('hex');
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-/** Run fn while holding <file>.lock, so two hooks running at once can't both append after the same entry. */
+/** Run fn while holding <file>.lock, so two hooks running at once can't both append after the same entry. It waits about
+ * a second at most (a hook must stay fast), and breaks a lock older than two seconds (its holder crashed). */
 export function withLock(file, fn) {
   const lock = `${file}.lock`;
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -28,8 +29,8 @@ export function withLock(file, fn) {
       break;
     } catch (e) {
       if (e.code !== 'EEXIST') throw e;
-      try { if (Date.now() - fs.statSync(lock).mtimeMs > 5000) fs.rmSync(lock, { force: true }); } catch { /* gone already */ }
-      if (i > 400) throw new Error(`${lock} is held by someone else`);
+      try { if (Date.now() - fs.statSync(lock).mtimeMs > 2000) fs.rmSync(lock, { force: true }); } catch { /* gone already */ }
+      if (i >= 100) throw new Error(`${lock} is held by someone else`);
       sleep(10);
     }
   }
@@ -44,20 +45,28 @@ export function readLines(file) {
 }
 
 // ---------- M4 · append and verify ----------
+/** The last entry that parses (a torn or damaged last line must not stop the log: verify() still reports it). */
+function lastEntry(lines) {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const e = JSON.parse(lines[i]);
+      if (Number.isInteger(e?.seq) && typeof e.hash === 'string') return e;
+    } catch { /* keep looking */ }
+  }
+  return null;
+}
+
 /** Append one entry (an object without seq, prev or hash): link it to the last one, and update the head file. */
 export function append(file, entry) {
   return withLock(file, () => {
-    const last = readLines(file).at(-1);
-    let prev = GENESIS;
-    let seq = 0;
-    if (last) {
-      const e = JSON.parse(last);
-      prev = e.hash;
-      seq = e.seq;
-    }
+    const last = lastEntry(readLines(file));
+    const prev = last?.hash ?? GENESIS;
+    const seq = last?.seq ?? 0;
     const body = { ...entry, seq: seq + 1, prev };
     const hash = sha256(`${prev}\n${canonical(body)}`);
-    fs.appendFileSync(file, `${JSON.stringify({ ...body, hash })}\n`);
+    // A last line without its newline (a write that was cut off) gets one, so the new entry starts on its own line.
+    const torn = fs.existsSync(file) && fs.statSync(file).size > 0 && !fs.readFileSync(file, 'utf8').endsWith('\n');
+    fs.appendFileSync(file, `${torn ? '\n' : ''}${JSON.stringify({ ...body, hash })}\n`);
     fs.writeFileSync(`${file}.head`, `${body.seq} ${hash}\n`);
     return { seq: body.seq, hash };
   });
@@ -81,9 +90,8 @@ export function verify(file) {
     seq = body.seq;
     entries.push(e);
   });
-  if (lines.length) {
-    const head = fs.existsSync(`${file}.head`) ? fs.readFileSync(`${file}.head`, 'utf8').trim() : null;
-    if (head !== `${seq} ${prev}`) problems.push({ line: lines.length, kind: 'head' });
-  }
+  // The head file catches a cut-off tail, and a chain emptied after it was written.
+  const head = fs.existsSync(`${file}.head`) ? fs.readFileSync(`${file}.head`, 'utf8').trim() : null;
+  if ((lines.length || head !== null) && head !== `${seq} ${prev}`) problems.push({ line: lines.length, kind: 'head' });
   return { ok: problems.length === 0, entries, problems };
 }

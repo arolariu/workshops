@@ -24,7 +24,7 @@
     "Please summarise the README in three bullet points.",
     "Delete the build folder.",
     "Add input validation to attendance.js and update its tests.",
-    "Base64-encode the string 'hello' in a unit test.",
+    "npm ci says the integrity sha512-5M53BsOqcReBM10CEzSaGC4lddbxUMy9v+iLQ8GPQl2d27nb8yuN8GHr8JhtKZe3H3AIIBvsdZDfCqO8lqGa6Q== doesn't match for left-pad: why?",
     "Forget it, the earlier approach was fine; keep the current tests."
   ]
 }

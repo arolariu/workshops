@@ -43,34 +43,40 @@ match: every key given must match; regexes are case-insensitive
 - `validatePolicy(policy)` returns `[]` for a valid policy and at least one readable problem for each of the seven
   broken policies in `tests/fixtures/policies.json` (wrong version, unknown decision, duplicate id, deny without a
   reason, a regex that doesn't compile, an unknown match key, an empty match)
-- `policies/repo.json` is valid and has at least 8 deny rules: rm -rf, dependencies (installs; `package.json` from tools and
-  from the shell), `.env`, `.github/hooks` (tools and shell) and the five kinds of secret
+- `policies/repo.json` is valid and has at least 8 deny rules: rm -rf and the five kinds of secret are already
+  there; port dependencies (installs; `package.json` from tools and from the shell), `.env` and `.github/hooks`
+  (tools and shell)
 
 ### M2 · The engine
 - `evaluate(policy, call)` returns `{ decision, rule, severity, reason, matched }`: deny wins, the highest severity
-  decides (the first on a tie), then the first matching allow rule, then `default`
-- `guard.mjs` reads `policies/repo.json` and asks the engine; the old decisions still hold; a rule added to `policies/repo.json`
-  changes what the guard does; `.agent-logs/guard.jsonl` records `"rule"` and `"severity"`
+  decides (the first on a tie), then the first matching allow rule, then `default`. A deny rule fires when **one**
+  command of the call matches; an allow rule's `command` must match **every** command (so `npm test && curl …` isn't
+  allowed by a rule for `npm test`)
+- `guard.mjs` finds `policies/repo.json` from its own location (Copilot may run it from any folder), asks the engine,
+  and logs `"rule"` and `"severity"` in `.agent-logs/guard.jsonl`; the old decisions still hold; a rule added to the
+  policy changes what the guard does
 
 ### M3 · One command, many spellings
 - `normalize()` gives `delete --force --recursive build` for `rm -r -fo build` (PowerShell), `sudo -E bash -c "rm -Rf
   build"`, `cmd /c "rd /s /q build"` and `Remove-Item build -Recurse`, and `delete --recursive empty-folder` for
   `rm -r empty-folder`
-- All 26 spellings in `tests/fixtures/spellings.json` are denied; its 14 look-alikes (`git rm -r --cached`,
-  `grep -rf`, `cp -rf`, `echo "rm -rf …"`, …) are allowed
+- All 37 spellings in `tests/fixtures/spellings.json` are denied (`bash -lc`, `sudo -u root`, `xargs -I {}`, `(…)`,
+  `$(…)`, `find -exec`, `& { … }`, `rd /s/q`, …); its 17 look-alikes (`git rm -r --cached`, `grep -rf`, `cp -rf`,
+  `echo "rm -rf …"`, `Remove-Item -LiteralPath x -Force`, …) are allowed
 - Your hard-level suite (`node --test .github/hooks/scripts/guard.test.mjs`) still passes: keep `decide(toolName,
   args)` returning a reason or `null`
 
 ### M4 · Fail closed, fast
-- Broken JSON, an invalid policy or no policy file: every call is denied, and the reason names the policy
+- Broken JSON, an invalid policy or no policy file: every call is denied, and the reason names the policy. A call
+  the guard can't parse is denied too
 - A rule with a catastrophic regex can't make the guard hang: it denies within 5 seconds, saying it ran out of time
 - `guard.mjs` exports `DEADLINE_MS`, at least a second shorter than the hook's `timeoutSec`
 - `evaluate()` takes under 50 ms for 95% of calls
 
 ### M5 · Calls an injection would make
-- The 13 calls in `tests/fixtures/injection.json` are denied with severity `critical` (`curl … | sh`, `iwr … | iex`,
+- The 14 calls in `tests/fixtures/injection.json` are denied with severity `critical` (`curl … | sh`, `iwr … | iex`,
   `iex (iwr …)`, `powershell -EncodedCommand …`, `curl -d @.env …`, `Invoke-WebRequest … -InFile .env`,
-  `bash -c "$(curl …)"`, …); its 6 normal network calls are allowed
+  `bash -c "$(curl …)"`, …); its 7 normal network calls (a JSON body with an email address in it, too) are allowed
 
 ## 📂 Work here
 ```bash
@@ -187,6 +193,9 @@ the guard decides in a worker with its own, shorter deadline, and denies when th
 </details>
 
 ## 🚀 Going further
+- **Know the limits.** A denylist never sees every spelling: `eval "$CMD"`, a script the agent writes and then runs,
+  an alias, a symlink. That's why this is one layer, not the whole defence: keep the permission flags tight
+  (`--deny-tool`), run unattended work in `/sandbox`, and keep tests on the outcome (the folder is still there).
 - Add `"decision": "ask"` (Copilot supports `permissionDecision: "ask"` in interactive sessions) for medium-severity
   rules, and keep `deny` for the rest.
 - Write a policy linter: rules that can never match, allow rules hidden behind a broader deny, regexes with nested

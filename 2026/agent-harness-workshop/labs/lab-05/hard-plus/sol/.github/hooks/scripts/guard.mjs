@@ -16,8 +16,9 @@ export const POLICY = path.join(HERE, '..', 'policies', 'repo.json');
 // through. So the guard keeps its own, much shorter deadline, and denies when it passes.
 export const DEADLINE_MS = 1500;
 
-const SECRETS = [/\bghp_[A-Za-z0-9]{36}\b/g, /\bgithub_pat_[A-Za-z0-9_]{22,}/g, /\bAKIA[0-9A-Z]{16}\b/g, /-----BEGIN [A-Z ]*PRIVATE KEY-----/g, /\bsk-[A-Za-z0-9]{32,}\b/g];
-// Mask secrets before anything is written to a log: the audit trail must not become the leak.
+// Mask secrets before anything is written to a log: the audit trail must not become the leak. A private key is masked
+// from its BEGIN line to its END line: the body is the secret.
+const SECRETS = [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g, /\bghp_[A-Za-z0-9]{36}\b/g, /\bgithub_pat_[A-Za-z0-9_]{22,}/g, /\bAKIA[0-9A-Z]{16}\b/g, /\bsk-[A-Za-z0-9]{32,}\b/g];
 export const redact = (text) => SECRETS.reduce((acc, re) => acc.replace(re, '[REDACTED]'), String(text));
 
 /** The policy, or a reason why there is none that can be used. */
@@ -46,8 +47,12 @@ export function decide(toolName, args) {
 }
 
 // ---------- plumbing ----------
+/** The call Copilot sent: an object, or null when stdin is empty, or undefined when it can't be read (deny that). */
 function readInput() {
-  try { return JSON.parse(fs.readFileSync(0, 'utf8') || 'null'); } catch { return null; }
+  let raw = '';
+  try { raw = fs.readFileSync(0, 'utf8'); } catch { return undefined; }
+  if (!raw.trim()) return null;
+  try { return JSON.parse(raw); } catch { return undefined; }
 }
 function log(entry) {
   try {
@@ -77,6 +82,12 @@ if (!isMainThread && workerData?.guardWorker) {
 
 const isMain = isMainThread && process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const input = isMain ? readInput() : null;
+if (isMain && (input === undefined || (input !== null && typeof input !== 'object'))) {
+  const reason = 'The guard could not read this tool call, so it is blocked to be safe.';
+  log({ tool: 'unknown', decision: 'deny', rule: 'unreadable-call', severity: 'critical', reason });
+  process.stdout.write(JSON.stringify({ permissionDecision: 'deny', permissionDecisionReason: reason }));
+  process.exit(0);
+}
 if (input && typeof input === 'object') {
   let args = input.toolArgs ?? {};
   if (typeof args === 'string') {

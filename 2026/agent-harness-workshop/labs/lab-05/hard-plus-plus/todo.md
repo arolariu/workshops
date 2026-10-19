@@ -13,12 +13,14 @@ for: what was denied, by which rule, in which session.
 ## 📋 Requirements
 1. `effectivePolicy(org, repo)` layers the organisation's policy over the repository's: an org deny always wins; a
    repository allow rule marked `"override": true` can make an exception to the repository's own denies, never the
-   org's. A missing or invalid org policy denies every call. `.github/CODEOWNERS` gives the guardrails an owner.
+   org's (and, like every allow rule, only when it covers every command of the call). A missing or invalid org policy
+   denies every call. `.github/CODEOWNERS` gives the guardrails an owner.
 2. A `sessionStart` hook adds context that names every org deny rule, and records the session and the sha256 of both
    policy files in the audit chain.
-3. A `userPromptSubmitted` hook flags injection-shaped prompts; the guard puts a flagged session in lockdown.
-4. Every hook writes to a hash-chained audit log; `verify()` catches edits, deletions, reordering, a cut-off tail and
-   broken lines, and names the line.
+3. A `userPromptSubmitted` hook flags injection-shaped prompts; the guard puts a flagged session in lockdown, an
+   allow-list: reads, and calls an allow rule marked `"lockdown": true` covers, and nothing else.
+4. Every hook writes to a hash-chained audit log the agent may read but not change; `verify()` catches edits,
+   deletions, reordering, a cut-off or emptied chain and broken lines, and names every problem's line.
 5. `scripts/governance-report.mjs` reports denials by rule and by session from a verified chain, and refuses a broken one.
 
 ## 🧭 Milestones
@@ -26,10 +28,12 @@ for: what was denied, by which rule, in which session.
 - `effectivePolicy(org, repo)` in `engine.mjs` returns `{ policy, problems }`: every rule gets `layer: "org"` or
   `"repo"`; a repository rule named `org-…` or setting `layer` is a problem; only allow rules may say `"override": true`
 - `evaluate(policy, call, { lockdown })` returns `layer` too, deciding in this order: org deny → lockdown → repository
-  override → any other deny (highest severity) → first allow → `default`
+  override → any other deny (highest severity) → first allow → `default`. Overrides are allow rules, so
+  `rm -rf dist && rm -rf src` isn't covered by an override for `dist`
 - The guard loads `HARNESS_ORG_POLICY` (or `.github/hooks/policies/org.json`) and `policies/repo.json`; an org deny like
   `git push --force` holds, `"layer"` is logged, and no usable org policy means every call is denied
-- `.github/CODEOWNERS` has a line for `/.github/hooks/` with an owner
+- `.github/CODEOWNERS` has a line for `/.github/hooks/` with an owner (on GitHub it only has teeth with a branch
+  rule that turns on *Require review from Code Owners*)
 
 ### M2 · Session start
 - `session-start.mjs` is registered for `sessionStart` (bash and powershell)
@@ -43,14 +47,20 @@ for: what was denied, by which rule, in which session.
   none of the 12 ordinary ones
 - `prompt-scan.mjs` is registered for `userPromptSubmitted`; for a flagged prompt it writes
   `.agent-logs/flags/<sessionId>.json` and a `prompt-flag` chain entry, and it prints nothing
-- With a flag file for the session, the guard denies shell commands and file changes (reason: the session is in
-  lockdown), except allow rules marked `"lockdown": true` (add one for `npm test`); reading stays allowed
+- With a flag file for the session, lockdown is an **allow-list**: reads (`view`, `grep`, `glob`) stay allowed;
+  everything else (shell commands, file changes, `web_fetch`, MCP tools, sub-agents) is denied, reason: the session
+  is in lockdown, unless an allow rule marked `"lockdown": true` covers the whole call (add one for `npm test`)
 
 ### M4 · A tamper-evident audit log
 - `append(file, entry)` writes `{ ...entry, seq, prev, hash }` with `hash = sha256(prev + "\n" + canonical(entry
   without hash))`, `prev` the previous hash (64 zeros for the first), and `<file>.head` = `"<seq> <hash>"`
 - `verify(file)` returns `{ ok, entries, problems: [{ line, kind }] }` with kinds `unreadable`, `hash`, `link`, `seq`
-  and `head`; a file that doesn't exist yet is an empty, intact chain
+  and `head`, reporting every problem, not just the first; the head file is checked even when the chain is empty;
+  neither a file nor a head is an empty, intact chain
+- `append()` survives a damaged last line: it links to the last entry that parses (and starts a new line), and
+  `verify()` still reports the damaged one
+- A repository rule denies changing `.agent-logs/` (from tools and from the shell: `rm`, `>>`, `sed -i`, …); reading
+  it, or naming it in `.gitignore`, stays allowed
 - The guard, the session hook and the prompt hook all append to `.agent-logs/audit-chain.jsonl`;
   `node scripts/verify-audit.mjs` exits 0 on an intact chain and 1 (naming the line) on a tampered one
 
@@ -97,8 +107,9 @@ command-line part are given. In a real organisation the org layer would be a pol
 <details><summary>Precedence, step by step</summary>
 
 Collect the matching rules once (`hits`), then return at the first step that applies: an org `deny` in `hits`; in
-lockdown, a shell or write call with no matching allow rule marked `lockdown: true`; a repository allow rule with
-`override: true`; any deny (highest severity); the first allow; the default. Each return says its `layer`.
+lockdown, any call that isn't a read (`call.kind !== 'read'`) with no matching allow rule marked `lockdown: true`; a
+repository allow rule with `override: true`; any deny (highest severity); the first allow; the default. Each return
+says its `layer`. Match allow rules the way hard+ does: every command of the call, or it doesn't fire.
 
 </details>
 
@@ -124,8 +135,9 @@ hook fires *before* `sessionStart`: don't rely on the session hook having run fi
 Each signal is one regex: `override` (ignore/disregard/forget … previous/your … instructions/rules), `role` (you are
 now, developer mode, jailbreak, DAN), `system-prompt` (reveal/print … system prompt/hidden instructions),
 `hidden-characters` (zero-width `\u200B-\u200D`, `\u2060`, `\uFEFF`, bidi `\u202A-\u202E`, `\u2066-\u2069`),
-`encoded` (a base64 run of 80+ characters), `exfiltration` (send/post/upload … `https://`). Test the ordinary
-prompts too: "Ignore the lint warning" is not an attack.
+`encoded` (a base64 run of 100+ characters: a sha512 integrity hash is 88, and one is in the ordinary prompts),
+`exfiltration` (send/post/upload … `https://`). Test the ordinary prompts too: "Ignore the lint warning" is not an
+attack.
 
 </details>
 
@@ -147,9 +159,9 @@ hash after reading. `verify()` recomputes each hash from the line without its `h
 
 <details><summary>Why a head file</summary>
 
-Cutting off the last lines leaves a chain whose links are all fine. The head file remembers the last seq and hash,
-so a shorter chain no longer matches it. (In production, send the head somewhere the agent can't write: a server, a
-signed commit.)
+Cutting off the last lines (or all of them) leaves a chain whose links are all fine. The head file remembers the
+last seq and hash, so a shorter chain, or an empty one, no longer matches it. (In production, send the head
+somewhere the agent can't write: a server, a signed commit.)
 
 </details>
 

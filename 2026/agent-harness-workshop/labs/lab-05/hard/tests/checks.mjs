@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { GUARD, shell, tool, expectDecisions, hookConfig, runs } from './helpers.mjs';
 import { ghp, pat, aws, key, sk } from './secrets.mjs';
+import { MUTANTS, mutant } from './mutants.mjs';
 
 // Accept both "--flag=value" and "--flag", "value" (two array items).
 const VALUE_FLAGS = new Set(['-p', '--prompt', '--agent', '--allow-tool', '--deny-tool', '--max-ai-credits', '--output-format', '--model', '--plugin-dir']);
@@ -24,7 +25,6 @@ const flag = (args, name) => {
 const SUITE = '.github/hooks/scripts/guard.test.mjs';
 const CASES = '.github/hooks/scripts/guard-cases.json';
 const GUARD_FILE = path.join('.github', 'hooks', 'scripts', 'guard.mjs');
-const MUTANTS = ['no-rm', 'no-deps', 'no-env', 'no-hooks', 'no-secrets', 'over-blocking'];
 const FAMILIES = [
   ['rm -rf', /\b(rm|remove-item)\b/i],
   ['dependencies', /package\.json|\b(npm|yarn|pnpm)\b/i],
@@ -32,10 +32,10 @@ const FAMILIES = [
   ['.github/hooks', /\.github[\\/]+hooks/i],
   ['secrets', /\{\{secret:\w+\}\}|ghp_\w{20}|AKIA[0-9A-Z]{16}|PRIVATE KEY/],
 ];
-/** Run the learner's suite in a copy of their folder, with `guardFile` in place of their guard. */
-function suiteWith(t, guardFile) {
+/** Run the learner's suite in a copy of their folder, with `source` in place of their guard. */
+function suiteWith(t, source) {
   const copy = t.copy(t.tmp());
-  fs.copyFileSync(guardFile, path.join(copy, GUARD_FILE));
+  fs.writeFileSync(path.join(copy, GUARD_FILE), source);
   return t.unitTests({ cwd: copy, files: [SUITE] });
 }
 
@@ -53,7 +53,9 @@ export default (t) => [
     const file = path.join(r.cwd, '.agent-logs', 'guard.jsonl');
     if (!fs.existsSync(file)) return 'The guard did not write its log.';
     const log = fs.readFileSync(file, 'utf8');
-    return (!log.includes(ghp) && !log.includes(aws)) || 'guard.jsonl contains the secret. Redact before logging.';
+    if (log.includes(ghp) || log.includes(aws)) return 'guard.jsonl contains the secret. Redact before logging.';
+    t.hook(GUARD, tool('create', { path: 'id_rsa', file_text: key }), { cwd: r.cwd });
+    return !fs.readFileSync(file, 'utf8').includes('MIIEowIBAAKCAQEA') || "guard.jsonl contains a private key's body. Mask the whole key, from its BEGIN line to its END line: the header alone is not the secret.";
   }, { milestone: 'M1' }),
   t.check('The audit log never contains a secret', () => {
     const r = t.hook('.github/hooks/scripts/audit.mjs', { toolName: 'bash', toolArgs: { command: `echo ${ghp}` }, toolResult: { resultType: 'denied' } });
@@ -99,9 +101,10 @@ export default (t) => [
     return r.fail === 0 || `Your suite fails on your own guard: ${r.failing.slice(0, 2).join(' | ')}`;
   }, { timeout: 120000, milestone: 'M3' }),
   t.check('It agrees with the reference guard, and catches all six mutants', () => {
-    const control = suiteWith(t, path.join(t.solDir, GUARD_FILE));
-    if (control.fail > 0) return `Your suite fails on the reference guard, so some rows expect something the rules don't say: ${control.failing.slice(0, 2).join(' | ')}`;
-    const survived = MUTANTS.filter((m) => suiteWith(t, path.join(t.exDir, 'tests', 'mutants', `${m}.mjs`)).fail === 0);
+    const reference = fs.readFileSync(path.join(t.solDir, GUARD_FILE), 'utf8');
+    const control = suiteWith(t, reference);
+    if (control.fail > 0) return `Your suite fails on the reference guard, so some rows expect something this lab's rules don't say: ${control.failing.slice(0, 2).join(' | ')}`;
+    const survived = MUTANTS.filter((m) => suiteWith(t, mutant(m, reference)).fail === 0);
     return !survived.length || `These broken guards pass your suite (the suite would not notice the regression): ${survived.join(', ')}. Add rows that only a working guard gets right.`;
   }, { timeout: 240000, milestone: 'M3' }),
   t.check('leashArgs(): least privilege and a budget', async () => {

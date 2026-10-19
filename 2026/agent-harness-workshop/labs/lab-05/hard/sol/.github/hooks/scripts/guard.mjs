@@ -44,10 +44,10 @@ function writesPackageJson(segment) {
   return WRITES_FILE.test(cmd ?? '') || />>?\s*\S*package\.json/i.test(segment);
 }
 
-// ".env" or ".env.local" as a file name, but not ".env.example", and not "process.env".
+// ".env", ".env.local" or ".env.production.local" as a file name, but not ".env.example", and not "process.env".
 function mentionsEnvFile(text) {
-  for (const m of String(text).matchAll(/(^|[\s"'`/\\=:])\.env(\.[\w-]+)?(?=$|[\s"'`/\\,;)}])/g)) {
-    if (!/^\.(example|sample|template)$/i.test(m[2] ?? '')) return true;
+  for (const m of String(text).matchAll(/(^|[\s"'`/\\=:])\.env((?:\.[\w-]+)*)(?=$|[\s"'`/\\,;)}])/g)) {
+    if (!/^\.(example|sample|template)(\.|$)/i.test(m[2] ?? '')) return true;
   }
   return false;
 }
@@ -69,8 +69,13 @@ const SECRETS = [
   ['API key', /\bsk-[A-Za-z0-9]{32,}\b/],
 ];
 const findSecret = (text) => SECRETS.find(([, re]) => re.test(text))?.[0] ?? null;
-// Mask secrets before anything is written to a log: the audit trail must not become the leak.
-export const redact = (text) => SECRETS.reduce((acc, [, re]) => acc.replace(new RegExp(re.source, 'g'), '[REDACTED]'), String(text));
+// Mask secrets before anything is written to a log: the audit trail must not become the leak. A private key is masked
+// from its BEGIN line to its END line (or to the end of the text): the body is the secret, not the header.
+const REDACT = [
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g,
+  ...SECRETS.filter(([name]) => name !== 'private key').map(([, re]) => new RegExp(re.source, 'g')),
+];
+export const redact = (text) => REDACT.reduce((acc, re) => acc.replace(re, '[REDACTED]'), String(text));
 
 // Every reason says what to do instead: the model reads it and picks its next move from it.
 const NO_DEPS = 'No new dependencies: StudyBuddy is dependency-free on purpose (see AGENTS.md). Write a small helper instead, or ask the human.';

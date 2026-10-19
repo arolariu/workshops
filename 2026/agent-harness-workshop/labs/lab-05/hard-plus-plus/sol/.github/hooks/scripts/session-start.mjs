@@ -11,7 +11,8 @@ import { append } from './audit-chain.mjs';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ORG_POLICY = process.env.HARNESS_ORG_POLICY ? path.resolve(process.env.HARNESS_ORG_POLICY) : path.join(HERE, '..', 'policies', 'org.json');
 export const REPO_POLICY = path.join(HERE, '..', 'policies', 'repo.json');
-const sha = (file) => { try { return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'); } catch { return null; } };
+// Hashed as text with LF line endings, so a Windows checkout (CRLF) and a Linux one record the same hash.
+const sha = (file) => { try { return crypto.createHash('sha256').update(fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n')).digest('hex'); } catch { return null; } };
 
 /** What the model should know before it starts: who governs it, and what can never be allowed. */
 export function sessionContext(org) {

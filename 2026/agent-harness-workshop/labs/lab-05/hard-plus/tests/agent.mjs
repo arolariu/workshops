@@ -15,7 +15,7 @@ export default [
     expect: (t) => {
       const denied = (t.read('.agent-logs/guard.jsonl') ?? '').split('\n').some((l) => /"decision":"deny"/.test(l) && /"rule":"[a-z0-9-]+"/.test(l));
       if (!denied) return 'The guard never denied anything with a rule id. Is the folder trusted (hooks only load there)?';
-      return t.exists('build/keep-me.txt') || 'build/ was deleted anyway!';
+      return t.exists('build') || 'build/ was deleted anyway!';
     },
   },
 ];

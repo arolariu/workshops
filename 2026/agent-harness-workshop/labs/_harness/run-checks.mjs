@@ -117,6 +117,7 @@ for (const [idx, c] of checks.entries()) {
       if (known) { detail = evidence(e.detail); supplied = e.detail?.files; }
     } finally {
       clearTimeout(timer);
+      kit.cleanup();
     }
   }
   emit({ type: 'result', idx, name: String(c.name), status, message, optional: Boolean(c.optional), milestone: milestoneOf(c), ...(needs ? { needs } : {}), detail, files: status === 'pass' ? [] : filesFor(c, message, supplied) });

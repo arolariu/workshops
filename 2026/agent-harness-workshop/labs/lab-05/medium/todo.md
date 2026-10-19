@@ -27,8 +27,8 @@ call, and a small report that answers "what did the agent do, and what did we st
 - The denials say what to do instead ("write a small helper instead, or ask the human")
 
 ### M2 · Off-limits files
-- `.env` and `.env.local` are off-limits to every tool (`view`, `cat`, `Get-Content`, edits); `.env.example`,
-  `process.env.HOME` and `echo $HOME` are fine
+- `.env`, `.env.local` and `.env.production.local` are off-limits to every tool (`view`, `cat`, `Get-Content`, edits);
+  `.env.example`, `process.env.HOME` and `echo $HOME` are fine
 - Editing, creating, deleting, moving or overwriting anything in `.github/hooks/` is denied; reading it is fine
 - Both denials say what to do instead
 
@@ -48,17 +48,20 @@ call, and a small report that answers "what did the agent do, and what did we st
 ## 📂 Work here
 ```bash
 cd labs/lab-05/medium/src
-code .github/hooks/scripts/guard.mjs scripts/audit-report.mjs
+code .github/hooks/scripts/guard.mjs .github/hooks/scripts/audit.mjs
+code scripts/audit-report.mjs
 node labs/start.mjs test lab-05 medium      # from the workshop folder
 ```
-The `rm -rf` rule from the easy level is already there. The checks feed fake tool calls to your guard, like Copilot does.
+The `rm -rf` rule from the easy level is already there. `audit.mjs` and `audit-report.mjs` come with their plumbing:
+you write the part marked TODO. The checks feed fake tool calls to your guard, like Copilot does.
 
 ## 💡 Hints
 ### M1
 <details><summary>Install vs. install a package</summary>
 
-The difference between `npm install` and installing a package is a package name after the verb (flags like `-D` start
-with `-`). One regex handles npm, pnpm and yarn: `/\b(npm|pnpm|yarn)\s+(install|i|add)\b(\s+-\S+)*\s+[^-\s]/`.
+`npm install` installs what `package.json` already lists; `npm install lodash` adds something new. The difference is
+a package name after the verb, and flags like `-D` start with `-`, so they don't count as a name. Write one regex for
+npm, pnpm and yarn, and test it on both lists in M1.
 
 </details>
 

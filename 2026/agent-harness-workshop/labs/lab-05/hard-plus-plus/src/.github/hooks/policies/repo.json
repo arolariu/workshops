@@ -6,7 +6,7 @@
       "id": "no-recursive-force-delete",
       "decision": "deny",
       "severity": "critical",
-      "reason": "Recursive force-deletes (rm -rf, Remove-Item -Recurse, rd /s /q) are blocked in this project. Delete specific files instead, or ask the human.",
+      "reason": "Recursive force-deletes (rm -rf, Remove-Item -Recurse, rd /s /q) are blocked in this project. Don't work around it by deleting the files one by one: ask the human to remove the folder.",
       "match": {
         "tool": "shell",
         "command": "^delete --force --recursive\\b"
@@ -48,7 +48,7 @@
       "severity": "high",
       "reason": ".env files hold secrets and are off-limits for the agent. Use .env.example for the variable names instead, and ask the human for values.",
       "match": {
-        "text": "(^|[\\s\"'`/\\\\=:])\\.env(?!\\.(example|sample|template)\\b)(\\.[\\w-]+)?(?=$|[\\s\"'`/\\\\,;)}])"
+        "text": "(^|[\\s\"'`/\\\\=:])\\.env(?!\\.(example|sample|template)\\b)((?:\\.[\\w-]+)*)(?=$|[\\s\"'`/\\\\,;)}])"
       }
     },
     {
@@ -173,7 +173,7 @@
       "reason": "This looks like a call a prompt injection would make: it sends a local file to the network. Nothing leaves this machine without the human.",
       "match": {
         "tool": "shell",
-        "commandLine": "\\bcurl\\b.*\\s(-d|--data(-binary|-raw|-urlencode)?|-F|--form)\\s+\\S*@|\\bcurl\\b.*\\s(-T|--upload-file)\\s|\\bwget\\b.*--post-file|\\b(iwr|irm|invoke-webrequest|invoke-restmethod)\\b.*\\s-infile\\b|\\s-body\\s*\\(?\\s*(get-content|gc|cat|type)\\b"
+        "commandLine": "\\bcurl\\b.*\\s(-d|--data(-binary|-raw|-urlencode)?)\\s*@|\\bcurl\\b.*\\s(-F|--form)\\s*\\S*=@|\\bcurl\\b.*\\s(-T|--upload-file)\\s|\\bwget\\b.*--post-file|\\b(iwr|irm|invoke-webrequest|invoke-restmethod)\\b.*\\s-infile\\b|\\s-body\\s*\\(?\\s*(get-content|gc|cat|type)\\b"
       }
     }
   ]

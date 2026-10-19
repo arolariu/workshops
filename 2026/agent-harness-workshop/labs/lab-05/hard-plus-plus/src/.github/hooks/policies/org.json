@@ -52,7 +52,7 @@
       "reason": "This looks like a call a prompt injection would make: it sends a local file to the network. Nothing leaves this machine without the human.",
       "match": {
         "tool": "shell",
-        "commandLine": "\\bcurl\\b.*\\s(-d|--data(-binary|-raw|-urlencode)?|-F|--form)\\s+\\S*@|\\bcurl\\b.*\\s(-T|--upload-file)\\s|\\bwget\\b.*--post-file|\\b(iwr|irm|invoke-webrequest|invoke-restmethod)\\b.*\\s-infile\\b|\\s-body\\s*\\(?\\s*(get-content|gc|cat|type)\\b"
+        "commandLine": "\\bcurl\\b.*\\s(-d|--data(-binary|-raw|-urlencode)?)\\s*@|\\bcurl\\b.*\\s(-F|--form)\\s*\\S*=@|\\bcurl\\b.*\\s(-T|--upload-file)\\s|\\bwget\\b.*--post-file|\\b(iwr|irm|invoke-webrequest|invoke-restmethod)\\b.*\\s-infile\\b|\\s-body\\s*\\(?\\s*(get-content|gc|cat|type)\\b"
       }
     },
     {

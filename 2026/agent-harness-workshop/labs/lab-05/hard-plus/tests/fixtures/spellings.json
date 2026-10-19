@@ -1,46 +1,222 @@
 {
   "deny": [
-    ["bash", "rm -rf build"],
-    ["bash", "rm -fr build"],
-    ["bash", "rm -r -f build"],
-    ["bash", "rm -R -f build"],
-    ["bash", "rm --recursive --force build"],
-    ["bash", "rm -Rfv build"],
-    ["bash", "sudo rm -rf /"],
-    ["bash", "sudo -E rm -rf build"],
-    ["bash", "env DEBUG=1 rm -rf build"],
-    ["bash", "cd build && rm -rf *"],
-    ["bash", "find . -name '*.tmp' | xargs rm -rf"],
-    ["bash", "bash -c \"rm -rf build\""],
-    ["bash", "sh -c 'rm -r -f build'"],
-    ["powershell", "Remove-Item -Recurse -Force build"],
-    ["powershell", "Remove-Item build -Recurse"],
-    ["powershell", "remove-item -rec -fo build"],
-    ["powershell", "ri -r build"],
-    ["powershell", "rm -r -fo build"],
-    ["powershell", "del /s /q build"],
-    ["bash", "rd /s /q build"],
-    ["bash", "rmdir /S /Q build"],
-    ["bash", "cmd /c \"rd /s /q build\""],
-    ["powershell", "cmd.exe /c del /s /q build"],
-    ["powershell", "powershell -NoProfile -Command \"Remove-Item -Recurse -Force build\""],
-    ["bash", "pwsh -c 'rm -r -fo build'"],
-    ["powershell", "Invoke-Expression \"Remove-Item build -Recurse\""]
+    [
+      "bash",
+      "rm -rf build"
+    ],
+    [
+      "bash",
+      "rm -fr build"
+    ],
+    [
+      "bash",
+      "rm -r -f build"
+    ],
+    [
+      "bash",
+      "rm -R -f build"
+    ],
+    [
+      "bash",
+      "rm --recursive --force build"
+    ],
+    [
+      "bash",
+      "rm -Rfv build"
+    ],
+    [
+      "bash",
+      "sudo rm -rf /"
+    ],
+    [
+      "bash",
+      "sudo -E rm -rf build"
+    ],
+    [
+      "bash",
+      "env DEBUG=1 rm -rf build"
+    ],
+    [
+      "bash",
+      "cd build && rm -rf *"
+    ],
+    [
+      "bash",
+      "find . -name '*.tmp' | xargs rm -rf"
+    ],
+    [
+      "bash",
+      "bash -c \"rm -rf build\""
+    ],
+    [
+      "bash",
+      "sh -c 'rm -r -f build'"
+    ],
+    [
+      "powershell",
+      "Remove-Item -Recurse -Force build"
+    ],
+    [
+      "powershell",
+      "Remove-Item build -Recurse"
+    ],
+    [
+      "powershell",
+      "remove-item -rec -fo build"
+    ],
+    [
+      "powershell",
+      "ri -r build"
+    ],
+    [
+      "powershell",
+      "rm -r -fo build"
+    ],
+    [
+      "powershell",
+      "del /s /q build"
+    ],
+    [
+      "bash",
+      "rd /s /q build"
+    ],
+    [
+      "bash",
+      "rmdir /S /Q build"
+    ],
+    [
+      "bash",
+      "cmd /c \"rd /s /q build\""
+    ],
+    [
+      "powershell",
+      "cmd.exe /c del /s /q build"
+    ],
+    [
+      "powershell",
+      "powershell -NoProfile -Command \"Remove-Item -Recurse -Force build\""
+    ],
+    [
+      "bash",
+      "pwsh -c 'rm -r -fo build'"
+    ],
+    [
+      "powershell",
+      "Invoke-Expression \"Remove-Item build -Recurse\""
+    ],
+    [
+      "bash",
+      "bash -lc \"rm -rf build\""
+    ],
+    [
+      "bash",
+      "sh -ec 'rm -r -f build'"
+    ],
+    [
+      "bash",
+      "sudo -u root rm -rf build"
+    ],
+    [
+      "bash",
+      "ls | xargs -I {} rm -rf {}"
+    ],
+    [
+      "bash",
+      "(rm -rf build)"
+    ],
+    [
+      "bash",
+      "echo $(rm -rf build)"
+    ],
+    [
+      "bash",
+      "find . -name '*.tmp' -exec rm -rf {} +"
+    ],
+    [
+      "bash",
+      "timeout 5 rm -rf build"
+    ],
+    [
+      "bash",
+      "powershell \"Remove-Item -Recurse -Force build\""
+    ],
+    [
+      "powershell",
+      "& { Remove-Item build -Recurse }"
+    ],
+    [
+      "bash",
+      "rd /s/q build"
+    ]
   ],
   "allow": [
-    ["bash", "rm notes.txt"],
-    ["bash", "rm -f notes.txt"],
-    ["bash", "rm -r empty-folder"],
-    ["powershell", "Remove-Item notes.txt"],
-    ["powershell", "del notes.txt"],
-    ["bash", "rmdir empty-folder"],
-    ["bash", "echo \"rm -rf is dangerous\""],
-    ["bash", "git rm -r --cached build"],
-    ["bash", "grep -rf patterns.txt ."],
-    ["bash", "cp -rf src backup"],
-    ["bash", "ls -R"],
-    ["powershell", "Get-ChildItem -Recurse"],
-    ["bash", "npm test"],
-    ["bash", "bash -c \"npm test\""]
+    [
+      "bash",
+      "rm notes.txt"
+    ],
+    [
+      "bash",
+      "rm -f notes.txt"
+    ],
+    [
+      "bash",
+      "rm -r empty-folder"
+    ],
+    [
+      "powershell",
+      "Remove-Item notes.txt"
+    ],
+    [
+      "powershell",
+      "del notes.txt"
+    ],
+    [
+      "bash",
+      "rmdir empty-folder"
+    ],
+    [
+      "bash",
+      "echo \"rm -rf is dangerous\""
+    ],
+    [
+      "bash",
+      "git rm -r --cached build"
+    ],
+    [
+      "bash",
+      "grep -rf patterns.txt ."
+    ],
+    [
+      "bash",
+      "cp -rf src backup"
+    ],
+    [
+      "bash",
+      "ls -R"
+    ],
+    [
+      "powershell",
+      "Get-ChildItem -Recurse"
+    ],
+    [
+      "bash",
+      "npm test"
+    ],
+    [
+      "bash",
+      "bash -c \"npm test\""
+    ],
+    [
+      "powershell",
+      "Remove-Item -LiteralPath notes.txt -Force"
+    ],
+    [
+      "powershell",
+      "Remove-Item notes.txt -ErrorAction SilentlyContinue"
+    ],
+    [
+      "bash",
+      "find . -name '*.log' -print"
+    ]
   ]
 }

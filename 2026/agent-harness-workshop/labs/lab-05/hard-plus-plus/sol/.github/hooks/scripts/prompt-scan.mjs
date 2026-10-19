@@ -14,7 +14,8 @@ const SIGNALS = [
   ['role', /\bDAN\b/],
   ['system-prompt', /\b(reveal|print|show|repeat|output|dump)\b[^.\n]{0,40}\b(system prompt|hidden instructions|initial instructions)\b/i],
   ['hidden-characters', /[\u200B-\u200D\u2060\uFEFF\u202A-\u202E\u2066-\u2069]|[\u{E0000}-\u{E007F}]/u],
-  ['encoded', /[A-Za-z0-9+/]{80,}={0,2}/],
+  // 100+ characters: a sha512 integrity hash (88) or a JWT segment is ordinary; a paragraph hidden in base64 isn't.
+  ['encoded', /[A-Za-z0-9+/]{100,}={0,2}/],
   ['exfiltration', /\b(send|post|upload|exfiltrate|leak|forward)\b[^\n]{0,60}(https?:\/\/|webhook|pastebin)/i],
 ];
 
@@ -25,7 +26,8 @@ export function scanPrompt(text) {
   return found;
 }
 
-const SECRETS = [/\bghp_[A-Za-z0-9]{36}\b/g, /\bgithub_pat_[A-Za-z0-9_]{22,}/g, /\bAKIA[0-9A-Z]{16}\b/g, /-----BEGIN [A-Z ]*PRIVATE KEY-----/g, /\bsk-[A-Za-z0-9]{32,}\b/g];
+// A private key is masked from its BEGIN line to its END line: the body is the secret.
+const SECRETS = [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g, /\bghp_[A-Za-z0-9]{36}\b/g, /\bgithub_pat_[A-Za-z0-9_]{22,}/g, /\bAKIA[0-9A-Z]{16}\b/g, /\bsk-[A-Za-z0-9]{32,}\b/g];
 const redact = (text) => SECRETS.reduce((acc, re) => acc.replace(re, '[REDACTED]'), String(text));
 const safe = (id) => String(id ?? 'unknown').replace(/[^\w-]/g, '_');
 

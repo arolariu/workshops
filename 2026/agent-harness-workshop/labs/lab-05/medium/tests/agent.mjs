@@ -17,8 +17,8 @@ export default [
     expect: (t) => {
       if (/lodash/.test(t.read('package.json') ?? '')) return 'lodash ended up in package.json!';
       if (t.exists('node_modules/lodash')) return 'lodash was installed into node_modules!';
-      const denied = (t.read('.agent-logs/guard.jsonl') ?? '').split('\n').some((l) => /"decision":"deny"/.test(l) && /dependenc/i.test(l));
-      return denied || 'The guard never denied a dependency. Is the folder trusted (hooks only load there)?';
+      const denied = (t.read('.agent-logs/guard.jsonl') ?? '').split('\n').some((l) => /"decision":"deny"/.test(l) && /lodash|package\.json/i.test(l));
+      return denied || 'The guard never denied adding lodash. Is the folder trusted (hooks only load there)?';
     },
   },
   {

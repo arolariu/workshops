@@ -18,7 +18,8 @@ export function canonical(value) {
 }
 export const sha256 = (text) => crypto.createHash('sha256').update(text).digest('hex');
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-/** Run fn while holding <file>.lock, so two hooks running at once can't both append after the same entry. */
+/** Run fn while holding <file>.lock, so two hooks running at once can't both append after the same entry. It waits about
+ * a second at most (a hook must stay fast), and breaks a lock older than two seconds (its holder crashed). */
 export function withLock(file, fn) {
   const lock = `${file}.lock`;
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -28,8 +29,8 @@ export function withLock(file, fn) {
       break;
     } catch (e) {
       if (e.code !== 'EEXIST') throw e;
-      try { if (Date.now() - fs.statSync(lock).mtimeMs > 5000) fs.rmSync(lock, { force: true }); } catch { /* gone already */ }
-      if (i > 400) throw new Error(`${lock} is held by someone else`);
+      try { if (Date.now() - fs.statSync(lock).mtimeMs > 2000) fs.rmSync(lock, { force: true }); } catch { /* gone already */ }
+      if (i >= 100) throw new Error(`${lock} is held by someone else`);
       sleep(10);
     }
   }
@@ -46,15 +47,17 @@ export function readLines(file) {
 // ---------- M4 · append and verify ----------
 /** Append one entry (an object without seq, prev or hash): link it to the last one, and update the head file. */
 export function append(file, entry) {
-  // TODO (M4): inside withLock(file, …): read the last line (readLines) for its seq and hash (or 0 and GENESIS), build
-  // body = { ...entry, seq: seq + 1, prev }, hash it, append { ...body, hash } as one JSON line, and write the head file.
+  // TODO (M4): inside withLock(file, …): find the last entry that parses (readLines; a damaged last line must not stop
+  // the log) for its seq and hash (or 0 and GENESIS), build body = { ...entry, seq: seq + 1, prev }, hash it, append
+  // { ...body, hash } as one JSON line, and write the head file.
   throw new Error('append() is not written yet (M4)');
 }
 
 /** { ok, entries, problems: [{ line, kind: 'unreadable' | 'hash' | 'link' | 'seq' | 'head' }] } */
 export function verify(file) {
-  // TODO (M4): walk the lines; for each one check that it parses ('unreadable'), that its hash is right ('hash'), that
-  // prev is the hash of the line before ('link'), that seq goes 1, 2, 3 … ('seq'); then that the head file names the
-  // last seq and hash ('head'). A file that doesn't exist yet is an empty, intact chain.
+  // TODO (M4): walk the lines and report every problem, not just the first: for each line check that it parses
+  // ('unreadable'), that its hash is right ('hash'), that prev is the hash of the line before ('link'), that seq goes
+  // 1, 2, 3 … ('seq'); then that the head file names the last seq and hash ('head'), even when the chain is empty. A
+  // chain with neither a file nor a head is empty and intact.
   return { ok: false, entries: [], problems: [{ line: 0, kind: 'unreadable' }] };
 }

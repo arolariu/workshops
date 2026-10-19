@@ -96,7 +96,9 @@ export default (t) => [
     const c = evaluate({ ...policy, default: 'deny' }, normalize('view', { path: 'README.md' }));
     if (c?.decision !== 'deny' || c.rule !== null) return `With "default": "deny", a call that no rule matches is denied (rule: null). Got ${JSON.stringify(c)?.slice(0, 140)}`;
     const d = evaluate(policy, normalize('view', { path: 'README.md' }));
-    return (d?.decision === 'allow' && d.rule === null) || `With "default": "allow", a call that no rule matches is allowed (rule: null). Got ${JSON.stringify(d)?.slice(0, 140)}`;
+    if (d?.decision !== 'allow' || d.rule !== null) return `With "default": "allow", a call that no rule matches is allowed (rule: null). Got ${JSON.stringify(d)?.slice(0, 140)}`;
+    const e = evaluate({ ...policy, default: 'deny' }, normalize('bash', { command: 'npm test && curl https://example.com' }));
+    return e?.decision === 'deny' || `An allow rule speaks for the whole call: with "default": "deny", allow-npm (^npm) must not let "npm test && curl …" through on the strength of its first command. Got ${JSON.stringify(e)?.slice(0, 140)}`;
   }, { milestone: 'M2' }),
   t.check('The old rules still hold: dependencies, .env, the hooks, secrets', () => expectDecisions(t, OLD_DENY, OLD_ALLOW), { milestone: 'M2' }),
   t.check('The rules live in policies/repo.json, and the log names the rule that decided', () => {
@@ -135,7 +137,7 @@ export default (t) => [
   }, { timeout: 120000, milestone: 'M3' }),
 
   // M4 · Fail closed, fast
-  t.check('A missing or broken policy blocks every call, and says why', () => {
+  t.check('A missing or broken policy, or a call it cannot read, blocks the call and says why', () => {
     const cases = [
       ['broken JSON', (f) => fs.writeFileSync(f, '{ "version": 1, "rules": [')],
       ['an invalid policy', (f) => fs.writeFileSync(f, JSON.stringify({ version: 1, default: 'allow', rules: [{ id: 'x', decision: 'deny', match: {} }] }))],
@@ -146,7 +148,8 @@ export default (t) => [
       if (r.decision !== 'deny') return `With ${what}, the guard allowed "ls". Fail closed: no usable policy, no calls.`;
       if (!/polic/i.test(r.reason)) return `With ${what}, say that the policy is the problem (got "${r.reason}").`;
     }
-    return true;
+    const garbage = t.hook(GUARD, { raw: '{ this is not a tool call' });
+    return garbage.decision === 'deny' || 'Given input it cannot parse, the guard allowed the call. A guard that cannot read the call cannot vouch for it: deny.';
   }, { timeout: 60000, milestone: 'M4' }),
   t.check('A policy that hangs is cut off: denied within 5 seconds', () => {
     const r = guardWithPolicy(t, addRule({ id: 'slow-on-purpose', decision: 'deny', severity: 'low', reason: 'Slow on purpose.', match: { text: '(a+)+$' } }), shell(`echo ${'a'.repeat(34)}!`), { timeout: 20000 });
@@ -166,6 +169,7 @@ export default (t) => [
     const policy = t.json(POLICY);
     const rows = [fixture(t, 'spellings.json'), fixture(t, 'injection.json')].flatMap((f) => [...f.deny, ...f.allow]);
     const calls = rows.map(([toolName, command]) => normalize(toolName, { command }));
+    if (evaluate(policy, normalize('bash', { command: 'rm -rf build' }))?.decision !== 'deny') return 'evaluate() does not deny "rm -rf build" with your policy yet: M2 and M3 first, then time it.';
     for (const c of calls) evaluate(policy, c);
     const times = [];
     for (let round = 0; round < 10; round++) for (const c of calls) { const s = performance.now(); evaluate(policy, c); times.push(performance.now() - s); }

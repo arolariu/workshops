@@ -44,10 +44,10 @@ function writesPackageJson(segment) {
   return WRITES_FILE.test(cmd ?? '') || />>?\s*\S*package\.json/i.test(segment);
 }
 
-// ".env" or ".env.local" as a file name, but not ".env.example", and not "process.env".
+// ".env", ".env.local" or ".env.production.local" as a file name, but not ".env.example", and not "process.env".
 function mentionsEnvFile(text) {
-  for (const m of String(text).matchAll(/(^|[\s"'`/\\=:])\.env(\.[\w-]+)?(?=$|[\s"'`/\\,;)}])/g)) {
-    if (!/^\.(example|sample|template)$/i.test(m[2] ?? '')) return true;
+  for (const m of String(text).matchAll(/(^|[\s"'`/\\=:])\.env((?:\.[\w-]+)*)(?=$|[\s"'`/\\,;)}])/g)) {
+    if (!/^\.(example|sample|template)(\.|$)/i.test(m[2] ?? '')) return true;
   }
   return false;
 }

@@ -33,8 +33,9 @@ nobody tests is a guard that quietly stopped working three commits ago.
   them allowed, and at least two denied rows for each rule: rm -rf, dependencies, `.env`, `.github/hooks`, secrets
   (write a secret as `{{secret:ghp}}`, `{{secret:aws}}`, … and the runner fills it in)
 - `node --test .github/hooks/scripts/guard.test.mjs` runs one test per row and passes on your guard
-- It also passes on the reference guard, and **fails** on each of the six mutants in `labs/lab-05/hard/tests/mutants/`
-  (one rule removed each, and one rule that blocks too much)
+- It also passes on the reference guard (the table describes this lab's rules, not stricter ones of your own), and
+  **fails** on each of six mutants: the reference guard with one rule removed, and one with a rule that blocks too
+  much (`tests/mutants.mjs` builds them when the check runs)
 
 ### M4 · A leash
 - `leashArgs(prompt)` in `scripts/leash.mjs`: prompt mode, a credit cap (30–60), may write files and run `npm`/`node`,
@@ -94,8 +95,8 @@ Import `decide` from `./guard.mjs` (not a copy of it): the check swaps that file
 
 <details><summary>Trying the mutants yourself</summary>
 
-Copy a mutant over your guard in a scratch copy of `src/`, run the suite, and read which rows fail. If none do, the
-table has no row about that rule, or none that a broken guard gets wrong.
+In a scratch copy of `src/`, comment out one rule in `guard.mjs`, run the suite, and read which rows fail. If none
+do, the table has no row about that rule, or none that a broken guard gets wrong.
 
 </details>
 

@@ -7,6 +7,8 @@
 //   commandLine  tested against the whole shell command (whitespace collapsed)
 //   path         tested against each path the call touches (a file tool's path; a shell command's arguments)
 //   text         tested against JSON.stringify(args)
+// A deny rule fires when one command of the call matches. An allow rule speaks for the whole call: its `command`
+// pattern must match every command, or `npm test && rm -rf src` would ride along on an allow rule for `npm test`.
 
 export const SEVERITY = ['low', 'medium', 'high', 'critical'];
 export const MATCH_KEYS = ['tool', 'command', 'commandLine', 'path', 'text'];

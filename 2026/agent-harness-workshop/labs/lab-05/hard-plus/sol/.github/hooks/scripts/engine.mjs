@@ -7,6 +7,8 @@
 //   commandLine  tested against the whole shell command (whitespace collapsed)
 //   path         tested against each path the call touches (a file tool's path; a shell command's arguments)
 //   text         tested against JSON.stringify(args)
+// A deny rule fires when one command of the call matches. An allow rule speaks for the whole call: its `command`
+// pattern must match every command, or `npm test && rm -rf src` would ride along on an allow rule for `npm test`.
 
 export const SEVERITY = ['low', 'medium', 'high', 'critical'];
 export const MATCH_KEYS = ['tool', 'command', 'commandLine', 'path', 'text'];
@@ -82,7 +84,7 @@ export function validatePolicy(policy) {
 // ---------- M3 · one command, many spellings ----------
 const DELETE = new Set(['rm', 'remove-item', 'ri', 'del', 'erase', 'rd', 'rmdir']);
 const CMD_DELETE = new Set(['del', 'erase', 'rd', 'rmdir']);
-const PREFIXES = new Set(['sudo', 'doas', 'env', 'command', 'exec', 'nohup', 'time', 'xargs']);
+const PREFIXES = new Set(['sudo', 'doas', 'env', 'command', 'exec', 'nohup', 'time', 'xargs', 'nice', 'ionice', 'timeout', 'stdbuf']);
 const SHELLS = { bash: 'bash', sh: 'bash', zsh: 'bash', dash: 'bash', cmd: 'cmd', powershell: 'powershell', pwsh: 'powershell' };
 
 /**
@@ -98,15 +100,17 @@ export function canonical(words, dialect = 'bash') {
   const args = [];
   const ps = dialect === 'powershell' || name === 'remove-item' || name === 'ri';
   for (const w of rest) {
-    if (/^\/[a-z]$/i.test(w) && (dialect === 'cmd' || CMD_DELETE.has(name))) {          // cmd: rd /s /q
-      if (/s/i.test(w[1])) flags.add('recursive');
-      if (/q/i.test(w[1])) flags.add('force');
+    if (/^(\/[a-z])+$/i.test(w) && (dialect === 'cmd' || CMD_DELETE.has(name))) {        // cmd: rd /s /q, rd /s/q
+      if (/\/s/i.test(w)) flags.add('recursive');
+      if (/\/q/i.test(w)) flags.add('force');
       continue;
     }
-    if (ps && /^-[a-z]+(:\$?\w+)?$/i.test(w)) {                                           // PowerShell: -Recurse, -rec, -Force, -fo
+    if (ps && /^-[a-z]+(:\S*)?$/i.test(w)) {                                              // PowerShell parameters
       const p = w.slice(1).split(':')[0].toLowerCase();
       if ('recurse'.startsWith(p)) { flags.add('recursive'); flags.add('force'); continue; } // PowerShell never asks
       if (p.length >= 2 && 'force'.startsWith(p)) { flags.add('force'); continue; }
+      if (!/^[rf]+$/.test(p)) continue;  // -LiteralPath, -ErrorAction, -WhatIf …: not about recursion or force
+      // -rf typed into PowerShell: read it the way bash would
     }
     if (w === '--recursive') { flags.add('recursive'); continue; }
     if (w === '--force') { flags.add('force'); continue; }
@@ -122,29 +126,79 @@ export function canonical(words, dialect = 'bash') {
   return { name: 'delete', flags: sorted, args, line: ['delete', ...sorted.map((f) => `--${f}`), ...args].join(' ') };
 }
 
+// Flags of a prefix command that take a value (sudo -u root, xargs -I {}, nice -n 10, timeout -s KILL).
+const VALUE_FLAGS = { sudo: /^-[ugCphrtD]$/, doas: /^-[uC]$/, env: /^-[uSC]$/, xargs: /^-[IinLPdsEa]$/, nice: /^-n$/, ionice: /^-[cnp]$/, timeout: /^-[sk]$/ };
+const KEYWORDS = new Set(['then', 'do', 'else', 'elif', 'if', 'while', 'until', '!', '&']);
+// PowerShell parameters that take a value, and those after which there is nothing to unwrap (a script file, an encoded command).
+const PS_VALUE = /^-(executionpolicy|ep|windowstyle|w|outputformat|of|inputformat|if|configurationname|workingdirectory|wd)$/i;
+const PS_OPAQUE = /^-(file|f|e|ec|en|enc\w*|encodedcommand)$/i;
+
 /**
- * The command a wrapper runs, or null. Prefixes are dropped (`sudo -E rm …`, `env A=1 rm …`, `xargs rm …`), and shells
- * inside shells are opened up: `bash -c "…"`, `cmd /c "…"`, `powershell -NoProfile -Command "…"`, `Invoke-Expression "…"`.
+ * The command a wrapper runs, or null. Grouping and keywords are peeled off (`(rm -rf x)`, `$(…)`, `{ …; }`, `then …`,
+ * `& { … }`), prefixes are dropped (`sudo -u root …`, `env A=1 …`, `xargs -I {} …`, `timeout 5 …`), `find … -exec …`
+ * gives up its command, and shells inside shells are opened up: `bash -lc "…"`, `cmd /c "…"`,
+ * `powershell -NoProfile -Command "…"` (or just `powershell "…"`), `Invoke-Expression "…"`.
  */
 export function unwrap(words, dialect = 'bash') {
-  const first = base(words[0]);
-  if (/^\w+=/.test(words[0] ?? '') || PREFIXES.has(first)) {
-    let i = 1;
-    while (i < words.length && (/^-/.test(words[i]) || /^\w+=/.test(words[i]) || (/^\d+$/.test(words[i]) && /^-/.test(words[i - 1] ?? '')))) i++;
-    return i < words.length ? { command: requote(words.slice(i)), dialect } : null;
+  const w = [...words];
+  let peeled = false;
+  let open = 0;  // openers removed at the front, so the same number of closers comes off the end (and `{}` stays)
+  while (w.length && (KEYWORDS.has(w[0]) || /^(\$\(|\(|\{|&\{?)$/.test(w[0]))) { open += (w[0].match(/[({]/g) ?? []).length; w.shift(); peeled = true; }
+  const lead = (w[0] ?? '').match(/^(\$\(|\(|\{)+/);
+  if (lead && w[0].length > lead[0].length) { open += lead[0].match(/[({]/g).length; w[0] = w[0].slice(lead[0].length); peeled = true; }
+  while (open > 0 && w.length) {
+    const closers = w.at(-1).match(/[)}]+$/)?.[0].length ?? 0;
+    if (!closers) break;
+    const n = Math.min(open, closers);
+    w[w.length - 1] = w.at(-1).slice(0, -n);
+    open -= n;
+    if (!w.at(-1)) w.pop();
   }
-  if (first === 'iex' || first === 'invoke-expression') return words.length > 1 ? { command: words.slice(1).join(' '), dialect: 'powershell' } : null;
+  if (peeled) return w.length ? { command: requote(w), dialect } : null;
+
+  const first = base(w[0]);
+  if (/^\w+=/.test(w[0] ?? '') || PREFIXES.has(first)) {
+    let i = 1;
+    while (i < w.length && (/^-/.test(w[i]) || /^\w+=/.test(w[i]))) i += VALUE_FLAGS[first]?.test(w[i]) ? 2 : 1;
+    if (first === 'timeout' && i < w.length) i++;  // the duration
+    return i < w.length ? { command: requote(w.slice(i)), dialect } : null;
+  }
+  if (first === 'find') {
+    const at = w.findIndex((x) => /^-(exec|execdir|ok|okdir)$/.test(x));
+    if (at < 0) return null;
+    const end = w.findIndex((x, j) => j > at && /^(\\?;|\+)$/.test(x));
+    return { command: requote(w.slice(at + 1, end > 0 ? end : undefined)), dialect };
+  }
+  if (first === 'iex' || first === 'invoke-expression') return w.length > 1 ? { command: w.slice(1).join(' '), dialect: 'powershell' } : null;
   const shell = SHELLS[first];
-  if (!shell) return null;
-  const at = words.findIndex((w, j) => j > 0 && (shell === 'cmd' ? /^\/[ck]$/i.test(w) : shell === 'bash' ? w === '-c' : /^-c[a-z]*$/i.test(w) && 'command'.startsWith(w.slice(1).toLowerCase())));
-  return at > 0 && at + 1 < words.length ? { command: words.slice(at + 1).join(' '), dialect: shell } : null;
+  if (shell === 'bash') {
+    const at = w.findIndex((x, j) => j > 0 && /^-[a-z]*c[a-z]*$/i.test(x));        // -c, -lc, -ec
+    return at > 0 && at + 1 < w.length ? { command: w.slice(at + 1).join(' '), dialect: 'bash' } : null;
+  }
+  if (shell === 'cmd') {
+    const at = w.findIndex((x, j) => j > 0 && /^\/[ck]$/i.test(x));
+    return at > 0 && at + 1 < w.length ? { command: w.slice(at + 1).join(' '), dialect: 'cmd' } : null;
+  }
+  if (shell === 'powershell') {
+    const at = w.findIndex((x, j) => j > 0 && /^-c[a-z]*$/i.test(x) && 'command'.startsWith(x.slice(1).toLowerCase()));
+    if (at > 0) return at + 1 < w.length ? { command: w.slice(at + 1).join(' '), dialect: 'powershell' } : null;
+    let i = 1;
+    while (i < w.length && /^-/.test(w[i])) {
+      if (PS_OPAQUE.test(w[i])) return null;
+      i += PS_VALUE.test(w[i]) ? 2 : 1;
+    }
+    return i < w.length ? { command: w.slice(i).join(' '), dialect: 'powershell' } : null;
+  }
+  return null;
 }
 
 function commandsOf(command, dialect, depth) {
   return segments(command).flatMap((segment) => {
     const words = tokens(segment);
     const inner = depth < 3 ? unwrap(words, dialect) : null;
-    return inner ? commandsOf(inner.command, inner.dialect, depth + 1) : [canonical(words, dialect)];
+    // A command substitution runs too: `echo $(rm -rf x)` and `echo \`rm -rf x\`` hide a second command.
+    const hidden = depth < 3 && !inner ? [...segment.matchAll(/\$\(([^()]+)\)|`([^`]+)`/g)].flatMap((m) => commandsOf(m[1] ?? m[2], dialect, depth + 1)) : [];
+    return [...(inner ? commandsOf(inner.command, inner.dialect, depth + 1) : [canonical(words, dialect)]), ...hidden];
   });
 }
 
@@ -160,21 +214,27 @@ export function normalize(toolName, args = {}) {
 }
 
 // ---------- M2 · the engine ----------
-function matches(m, call) {
+function matchesWith(m, call, every) {
   if (m.tool !== undefined && ![].concat(m.tool).some((w) => w === call.kind || w === call.tool)) return false;
-  if (m.command !== undefined && !call.commands.some((c) => compile(m.command).test(c.line))) return false;
+  if (m.command !== undefined) {
+    const fits = (c) => compile(m.command).test(c.line);
+    if (!(every ? call.commands.length > 0 && call.commands.every(fits) : call.commands.some(fits))) return false;
+  }
   if (m.commandLine !== undefined && !compile(m.commandLine).test(call.commandLine)) return false;
   if (m.path !== undefined && !call.paths.some((p) => compile(m.path).test(p))) return false;
   if (m.text !== undefined && !compile(m.text).test(call.text)) return false;
   return true;
 }
+// A deny rule needs one bad command to fire. An allow rule speaks for the whole call, so with a `command` pattern every
+// command in it must match: otherwise `npm test && rm -rf src` would ride along on an allow rule for `npm test`.
+const fires = (rule, call) => matchesWith(rule.match, call, rule.decision === 'allow');
 
 /**
  * The decision for one call. Deny wins: the matching deny rule with the highest severity (the first one on a tie);
  * otherwise the first matching allow rule; otherwise the policy's default.
  */
 export function evaluate(policy, call) {
-  const hits = policy.rules.filter((r) => matches(r.match, call));
+  const hits = policy.rules.filter((r) => fires(r, call));
   const matched = hits.map((r) => r.id);
   const denies = hits.filter((r) => r.decision === 'deny');
   if (denies.length) {

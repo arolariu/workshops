@@ -293,3 +293,16 @@ test('checks that never start are stopped after the start timeout, with a reason
   assert.equal(result.complete, false);
   assert.match(result.fatal, /did not start within 2 s/);
 });
+test('temp folders a check makes with t.tmp() and t.copy() are removed when the check ends', async () => {
+  const record = path.join(tmpdir(), 'made.txt');
+  const { exDir, target } = fixture(`import fs from 'node:fs';
+export default (t) => [
+  t.check('makes temp folders', () => { const a = t.tmp(); const b = t.copy(t.tmp()); fs.appendFileSync(${JSON.stringify(record)}, a + '\\n' + b + '\\n'); return true; }),
+  t.check('fails after making one', () => { fs.appendFileSync(${JSON.stringify(record)}, t.tmp() + '\\n'); return 'no'; }),
+];`);
+  const result = await runChecks({ exDir, target });
+  assert.equal(result.passed, 1);
+  const made = fs.readFileSync(record, 'utf8').trim().split('\n');
+  assert.equal(made.length, 3);
+  for (const dir of made) assert.equal(fs.existsSync(dir), false, `${dir} is left behind`);
+});

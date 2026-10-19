@@ -306,6 +306,7 @@ export function makeKit({ dir, exDir }) {
   const solDir = path.join(exDir, 'sol');
   const P = (rel) => path.join(dir, rel);
   const norm = (s) => (s == null ? s : s.replace(/\r\n/g, '\n'));
+  const temps = [];
   const t = {
     dir,
     exDir,
@@ -424,7 +425,15 @@ export function makeKit({ dir, exDir }) {
       };
     },
     tmp() {
-      return fs.mkdtempSync(path.join(os.tmpdir(), 'harness-'));
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-'));
+      temps.push(dir);
+      return dir;
+    },
+    /** Remove the temp folders made so far (run-checks calls this after every check). */
+    cleanup() {
+      for (const dir of temps.splice(0)) {
+        try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 }); } catch { /* a locked file on Windows: the OS cleans temp */ }
+      }
     },
     copy(dest) {
       fs.cpSync(dir, dest, { recursive: true, filter: (src) => !/[\\/](node_modules|\.git|\.agent-logs)([\\/]|$)/.test(path.relative(dir, src) ? `/${path.relative(dir, src)}` : '') });
