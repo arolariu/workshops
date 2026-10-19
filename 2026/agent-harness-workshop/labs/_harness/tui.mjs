@@ -773,6 +773,8 @@ export async function startTui({
     }
     const focus = resultLines(R, L);
     if (!R.running && R.summary) verdictLines(R, lab, ex, L);
+    if (!R.running && R.inherited === 'loading') L.push('', ...para(`🧱 ${dim(`${spin()} checking your harness so far…`)}`));
+    else if (!R.running && R.inherited) L.push('', ...inheritedLines(R.inherited, { W: W(), fmt }));
     L.push('');
     const answering = R.firstPass && exObj().quiz ? [[`1-${exObj().quiz.options.length}`, 'answer']] : [];
     const keys = R.running
@@ -1307,6 +1309,14 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
     store.recordChecks(ex.key, summary, evidence);
     view.tracker.invalidate(ex.key);
     tickClock({ flush: true });
+    // Advisory, and outside the run: inherited checks never change its counts, its state or the recorded progress.
+    if (summary.complete) {
+      const run = S.run;
+      run.inherited = 'loading';
+      inheritedChecks({ ex, dir: ex.src })
+        .then((g) => { run.inherited = g; if (S.run === run) render(); })
+        .catch(() => { run.inherited = null; if (S.run === run) render(); });
+    }
     const fixName = nextFixName(summary.results);
     const firstFail = fixName ? summary.results.findIndex((r) => r.name === fixName) : summary.results.findIndex((r) => r.status !== 'pass');
     S.detail.idx = Math.max(0, firstFail);

@@ -173,6 +173,17 @@ function cancellable() {
 }
 
 const CHECK_ICON = { pass: '✅', fail: '❌', blocked: '🚧', skip: '⏩' };
+/** The advisory "🧱 Your harness so far" group. Printed after the checks; never part of their result or exit code. */
+async function printInherited(ex, target) {
+  const { inheritedChecks } = await import('./_harness/xray.mjs');
+  const { inheritedLines } = await import('./_harness/screens/xray.mjs');
+  let group = null;
+  try { group = await inheritedChecks({ ex, dir: target }); } catch { return; }
+  if (!group) return;
+  say();
+  for (const l of inheritedLines(group, { W: Math.min(96, (process.stdout.columns || 100) - 4), fmt: { green, bright, dim, white, yellow, bold, cyan } })) say(l);
+}
+
 async function printChecks(lab, ex, target, label, signal) {
   const { runChecks } = await import('./_harness/checks.mjs');
   const { groupChecks, milestoneBar } = await import('./_harness/milestones.mjs');
@@ -379,6 +390,7 @@ if (cmd === '' || cmd === 'open') {
   const evidence = captureEvidence(ex);
   const res = await printChecks(lab, ex, target, label, c.signal);
   if (!useSol) progress.recordChecks(ex.key, res, evidence);
+  if (res.complete) await printInherited(ex, target);
   if (opt.watch) {
     const waiting = () => say(`  👀 ${dim('Watching')} ${cyan(rel(target))} ${dim('— save a file to run the checks again. Ctrl+C to stop.')}`);
     c.done();
@@ -395,6 +407,7 @@ if (cmd === '' || cmd === 'open') {
       const ev = captureEvidence(ex);
       const r = await printChecks(lab, ex, target, label);
       if (!useSol) progress.recordChecks(ex.key, r, ev);
+      if (r.complete) await printInherited(ex, target);
       say();
       waiting();
       running = false;

@@ -597,3 +597,18 @@ test('u X-rays the level: your harness, the context budget and the maturity; s s
   assert.equal(t.state.screen, 'exercise');
   t.quit();
 });
+test('inherited checks show under the results, advisory: the level still passes and the counts do not change', async () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.mkdirSync(path.join(labsDir, 'lab-05/easy/src/.github/skills/x'), { recursive: true });
+  fs.writeFileSync(path.join(labsDir, 'lab-05/easy/src/.github/skills/x/SKILL.md'), '---\nname: wrong\ndescription: Helps.\n---\n1.\n');
+  const t = await app({ labsDir, open: 'lab-05/easy', size: { columns: 100, rows: 90 }, deps: { runChecks: passAll } });
+  press(t.input, 't');
+  await waitFor(() => t.state.run && !t.state.run.running && t.state.run.inherited && t.state.run.inherited !== 'loading');
+  const s = text(t.output);
+  assert.match(s, /A L L {3}C H E C K S {3}P A S S E D/);
+  assert.match(s, /YOUR HARNESS SO FAR · advisory[\s\S]*⚠️ +🧩 Skills/);
+  assert.equal(t.state.run.summary.passed, 1);
+  assert.equal(t.state.run.summary.total, 1);
+  assert.equal(progressStore(labsDir).get('lab-05/easy').checks, 'pass', 'an advisory warning never turns a pass into a fail');
+  t.quit();
+});

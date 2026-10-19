@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { tokens, measureMcp, contextBudget, artifactMarks, xrayReport } from '../xray.mjs';
-import { xrayLines } from '../screens/xray.mjs';
+import { tokens, measureMcp, contextBudget, artifactMarks, xrayReport, inheritedChecks } from '../xray.mjs';
+import { xrayLines, inheritedLines } from '../screens/xray.mjs';
 import { scanHarness } from '../scorecard.mjs';
 import { blobId } from '../chain.mjs';
 import { stripAnsi, width } from '../ui.mjs';
@@ -92,4 +92,22 @@ test('a server that never answers leaves no process behind', async () => {
   await waitFor(() => fs.existsSync(pidFile));
   const pid = Number(fs.readFileSync(pidFile, 'utf8'));
   await waitFor(() => !alive(pid), { timeout: 5000 });
+});
+
+test('inherited checks: the layers earlier labs taught, advisory, with missing layers named but not failed', async () => {
+  const dir = writeTree(tmpdir(), {
+    'AGENTS.md': '# Rules\n## Commands\n- npm test\n## Boundaries\n- Never push.\n## Definition of done\n- green\n',
+    '.github/skills/new-module/SKILL.md': '---\nname: modules\ndescription: Create a module the team way. Use when asked for a module.\n---\n1.\n',
+    '.github/hooks/guard.json': JSON.stringify({ version: 1, hooks: { preToolUse: [{ bash: 'x', timeoutSec: 5 }] } }),
+  });
+  assert.equal(await inheritedChecks({ ex: { labId: 'lab-01' }, dir }), null, 'Lab 01 inherits nothing');
+  const g = await inheritedChecks({ ex: { labId: 'lab-05' }, dir });
+  assert.deepEqual(g.layers.map((l) => l.id), ['instructions', 'skills', 'agents', 'mcp'], 'Lab 05\'s own layer (hooks) is not inherited');
+  assert.equal(g.failed, 1);
+  assert.equal(g.layers.find((l) => l.id === 'agents').present, false);
+  const s = inheritedLines(g, { W: 76, fmt }).map(stripAnsi).join('\n');
+  assert.match(s, /YOUR HARNESS SO FAR · advisory/);
+  assert.match(s, /✅ 📜 Instructions/);
+  assert.match(s, /⚠️ +🧩 Skills name "modules" should match its folder "new-module"/);
+  assert.match(s, /◻ 🎭 Custom agents: not in this folder \(Lab 03 teaches it\)/);
 });

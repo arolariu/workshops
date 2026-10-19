@@ -253,3 +253,18 @@ test('xray prints the harness tree, the context budget and the maturity; --sol l
   assert.match(ref.out, /MATURITY · L1 Instructed/);
   assert.equal(JSON.parse(cli(labsDir, ['xray', 'lab-03', 'easy', '--sol', '--json']).out).maturity.level, 'L1');
 });
+test('test prints the inherited checks after the level passes, without changing the result; verify never runs them', () => {
+  const { labsDir } = fixtureWorkshop();
+  for (const side of ['src', 'sol']) {
+    fs.mkdirSync(path.join(labsDir, `lab-05/easy/${side}/.github/skills/x`), { recursive: true });
+    fs.writeFileSync(path.join(labsDir, `lab-05/easy/${side}/.github/skills/x/SKILL.md`), '---\nname: wrong\ndescription: Helps.\n---\n1.\n');
+  }
+  fs.writeFileSync(path.join(labsDir, 'lab-05/easy/src/done.txt'), 'x\n');
+  const r = cli(labsDir, ['test', 'lab-05', 'easy']);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /All checks passed[\s\S]*YOUR HARNESS SO FAR · advisory[\s\S]*Skills/);
+  fs.rmSync(path.join(labsDir, 'lab-05/easy/src/done.txt'));
+  const v = cli(labsDir, ['verify', 'lab-05']);
+  assert.doesNotMatch(v.out, /YOUR HARNESS SO FAR/);
+  assert.match(v.out, /lab-05 easy\s+src fails 1\/1\s+sol passes 1\/1/);
+});

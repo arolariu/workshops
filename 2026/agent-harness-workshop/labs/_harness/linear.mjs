@@ -221,6 +221,10 @@ export function runLinear({
     else if (res.state === 'fail') say(`${res.passed} of ${res.total} checks passed. Type "details N" for a failing check.`);
     else say(`Result: ${statusWord(res.state)}. ${res.fatal ?? ''}`.trim());
     if (res.state === 'pass' && before !== 'pass' && (ex.takeaway || ex.quiz)) learnText(ex);
+    if (res.complete) {
+      const group = await inheritedChecks({ ex, dir: ex.src }).catch(() => null);
+      if (group) inheritedLines(group, { W: 100, fmt: { ...PLAIN, green: (s) => s, bold: (s) => s, cyan: (s) => s } }).forEach((l) => say(l));
+    }
   }
 
   /** The takeaway and the check-yourself question, as plain lines. */
