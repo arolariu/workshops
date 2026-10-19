@@ -300,7 +300,7 @@ export async function run(ctx) {
         const solOk = o.complete && o.failed === 0 && o.blocked === 0 && o.passed > 0;
         if (!srcOk || !solOk) problems++;
         const skipped = o.results.filter((r) => r.status === 'skip').length;
-        say(`   ${srcOk && solOk ? '✅' : '❌'} ${white(`${lab.id} ${ex.level.padEnd(6)}`)}  ${dim('src')} ${srcOk ? green(`fails ${s.failed}/${s.total}`) : red(!s.complete ? `could not run: ${s.fatal}` : 'passes - nothing to do!')}   ${dim('sol')} ${solOk ? green(`passes ${o.passed}/${o.total}`) : red(!o.complete ? `could not run: ${o.fatal}` : o.blocked ? `blocked ${o.blocked}` : `fails ${o.failed}`)}${skipped ? dim(` (${skipped} skipped)`) : ''}`);
+        say(`   ${srcOk && solOk ? '✅' : '❌'} ${white(`${lab.id} ${ex.level.padEnd(14)}`)}  ${dim('src')} ${srcOk ? green(`fails ${s.failed}/${s.total}`) : red(!s.complete ? `could not run: ${s.fatal}` : 'passes - nothing to do!')}   ${dim('sol')} ${solOk ? green(`passes ${o.passed}/${o.total}`) : red(!o.complete ? `could not run: ${o.fatal}` : o.blocked ? `blocked ${o.blocked}` : `fails ${o.failed}`)}${skipped ? dim(` (${skipped} skipped)`) : ''}`);
         if (!solOk && o.complete) o.results.filter((r) => r.status === 'fail' || r.status === 'blocked').forEach((r) => say(`        ${red(r.status === 'blocked' ? 'sol blocked' : 'sol ✗')} ${r.name}: ${dim(r.message.slice(0, 220))}`));
         if (opt.verbose && s.results) s.results.filter((r) => r.status === 'fail').forEach((r) => say(`        ${dim('src ✗')} ${dim(r.name)}`));
         if (o.complete) {
