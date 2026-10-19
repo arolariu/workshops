@@ -15,7 +15,7 @@ import { runAgentChecks as realRunAgentChecks, loadAgentChecks as realLoadAgentC
 import { copilotBin } from './kit.mjs';
 import { BRAND, creditLine } from './brand.mjs';
 import { runInteractive as realRunInteractive, openFolder as realOpenFolder, copyToClipboard as realCopy } from './system.mjs';
-import { changes as gitChanges, ensureStarter, listRecovery, restoreStarter, restoreSnapshot, createCheckpoint, resetToCommit, compareTrees } from './workspace.mjs';
+import { changes as gitChanges, changesDiff as realChangesDiff, ensureStarter, listRecovery, restoreStarter, restoreSnapshot, createCheckpoint, resetToCommit, compareTrees } from './workspace.mjs';
 import { inspectEnvironment as realInspect } from './doctor.mjs';
 import { PATHS, pathById, progressView, describeSelection, nextExercise, choosePath, learningReport, writeReport, STATUS_FILTERS } from './learning.mjs';
 import { courseOrder, predecessorOf, loadManifest } from './chain.mjs';
@@ -23,6 +23,7 @@ import { loadCourse } from './course.mjs';
 import { bringPlan, applyBring } from './bring.mjs';
 import { revealNextHint, revealedHints, nextFixName, groupChecks } from './milestones.mjs';
 import { bringLines } from './screens/bring.mjs';
+import { changesLines } from './screens/changes.mjs';
 import { KEYMAP, MENU_KEYS, binding } from './keys.mjs';
 import { checkGroupLines, milestoneListLines, hintDots } from './screens/milestones.mjs';
 
@@ -65,6 +66,7 @@ export async function startTui({
   const deps = {
     runChecks: realRunChecks, runAgentChecks: realRunAgentChecks, loadAgentChecks: realLoadAgentChecks, listRuns: realListRuns,
     inspectEnvironment: realInspect, runInteractive: realRunInteractive, openFolder: realOpenFolder, copyToClipboard: realCopy,
+    changesDiff: realChangesDiff,
     ...overrides,
   };
   setAscii(ascii);
@@ -112,6 +114,7 @@ export async function startTui({
     doctor: { running: false },
     exported: null,
     bring: null,
+    diff: null,
     tip: Math.floor(Math.random() * TIPS.length),
   };
 
@@ -254,7 +257,7 @@ export async function startTui({
     return { done, agents, stale, workshop, homework };
   }
   const labDone = (lab) => lab.levels.length > 0 && lab.levels.every((ex) => view.checks(ex) === 'pass');
-  const ON_LEVEL = new Set(['exercise', 'checks', 'checkDetail', 'output', 'agent', 'history', 'solution', 'confirmSolution', 'menu', 'recovery', 'bring']);
+  const ON_LEVEL = new Set(['exercise', 'checks', 'checkDetail', 'output', 'agent', 'history', 'solution', 'confirmSolution', 'menu', 'recovery', 'bring', 'changes']);
   const lastKey = () => { const u = store.get('_ui'); return u.lab && u.level ? `${u.lab}/${u.level}` : null; };
   const nextUp = () => nextExercise(catalog, view, { path: S.path, current: ON_LEVEL.has(S.screen) ? exObj()?.key ?? null : null, last: lastKey() });
   const fmt = { green, bright, dim, white, yellow, bold, cyan };
@@ -544,7 +547,7 @@ export async function startTui({
       if (!S.changes.length) L.push(`  📝 ${dim('No changes since your latest commit.')}`);
       else {
         const names = S.changes.slice(0, 4).map((c) => `${c.file}${c.status === 'new' ? dim(' (new)') : c.status === 'deleted' ? dim(' (deleted)') : ''}`);
-        L.push(...para(`📝 ${white('Your changes:')} ${names.join(dim(', '))}${S.changes.length > 4 ? dim(` +${S.changes.length - 4} more`) : ''}`));
+        L.push(...para(`📝 ${white('Your changes:')} ${names.join(dim(', '))}${S.changes.length > 4 ? dim(` +${S.changes.length - 4} more`) : ''} ${dim('— press v to see them')}`));
       }
     }
     return L;
@@ -600,7 +603,7 @@ export async function startTui({
     L.push('');
     return {
       lines: L,
-      footer: footer([['t', 'checks'], ['c', 'Copilot here'], ['h', 'hint'], ['a', 'agent check'], ['i', 'bring your work'], ['m', 'more'], ['b', 'back'], ['?', 'help'], ['q', 'quit']]),
+      footer: footer([['t', 'checks'], ['c', 'Copilot here'], ['h', 'hint'], ['a', 'agent check'], ['v', 'your changes'], ['i', 'bring your work'], ['m', 'more'], ['b', 'back'], ['?', 'help'], ['q', 'quit']]),
     };
   }
 
@@ -917,10 +920,23 @@ export async function startTui({
     return { lines: L, footer: footer([['←→', 'switch file'], ['↑↓', 'scroll'], ['r', Sol.full ? 'differences' : 'whole reference file'], ['b', 'back'], ['q', 'quit']]) };
   }
 
+  function changesScreen() {
+    const lab = labObj();
+    const ex = exObj();
+    const L = [''];
+    L.push(...header(`📝 ${bold(bright('YOUR CHANGES SINCE YOUR LATEST COMMIT'))}`, dim(`Lab ${lab.num} · ${LABEL(ex)} · ${rel(ex.src)}`)));
+    L.push('');
+    L.push(...changesLines(S.diff.result, { idx: S.diff.idx, W: W(), fmt, panel: (s) => `${style.bg(C.panel)}${s}` }));
+    L.push('');
+    const many = S.diff.result.ok && S.diff.result.files.length > 1;
+    return { lines: L, footer: footer([...(many ? [['←→', 'switch file']] : []), ['↑↓', 'scroll'], ['b', 'back'], ['q', 'quit']]) };
+  }
+
   const MENU = [
     { key: 'w', icon: '👀', label: () => (S.watch ? 'Stop watching src/' : 'Watch src/: run the checks every time you save') },
     { key: 'g', icon: '📖', label: () => 'Read the lab guide' },
     { key: 'i', icon: '🧳', label: () => 'Bring your work forward from earlier levels' },
+    { key: 'v', icon: '📝', label: () => 'Your changes since your latest commit' },
     { key: 's', icon: '🔍', label: () => 'Compare your work with the reference' },
     { key: 'f', icon: '🔖', label: () => (view.bookmarked(exObj()) ? 'Remove the bookmark' : 'Bookmark this exercise') },
     { key: 'x', icon: '♻️', label: () => 'Start over: restore the starter, a checkpoint or a backup' },
@@ -1115,7 +1131,7 @@ ${levelKeyRows()}
     splash: splashScreen, home: homeScreen, lab: labScreen, readme: readmeScreen, browse: browseScreen, exercise: exerciseScreen,
     checks: checksScreen, checkDetail: checkDetailScreen, output: outputScreen, agent: agentScreen, history: historyScreen,
     solution: solutionScreen, confirmSolution: confirmSolutionScreen, menu: menuScreen, recovery: recoveryScreen,
-    doctor: doctorScreen, export: exportScreen, help: helpScreen, bring: bringScreen,
+    doctor: doctorScreen, export: exportScreen, help: helpScreen, bring: bringScreen, changes: changesScreen,
   };
   function render() {
     if (S.suspended || quitting) return;
@@ -1580,6 +1596,7 @@ ${levelKeyRows()}
   const browseFilter = (key, list) => { S.browse[key] = cycle(list, S.browse[key]); S.browse.idx = 0; render(); };
   const moveCheck = (delta) => { const n = Math.max(1, S.run?.results.length ?? 0); S.detail.idx = (S.detail.idx + n + delta) % n; S.scroll = 0; render(); };
   const moveFile = (delta) => { const Sol = S.sol; if (!Sol.files.length) return; Sol.idx = (Sol.idx + Sol.files.length + delta) % Sol.files.length; S.scroll = 0; render(); };
+  const moveDiff = (delta) => { const n = S.diff.result.ok ? S.diff.result.files.length : 0; if (n < 2) return; S.diff.idx = (S.diff.idx + n + delta) % n; S.scroll = 0; render(); };
 
   const HANDLERS = {
     home: {
@@ -1628,6 +1645,7 @@ ${levelKeyRows()}
       hint: () => revealHint(),
       agent: () => openAgent(),
       bring: () => openBring(),
+      changes: () => { S.diff = { result: deps.changesDiff(exObj().src), idx: 0 }; go('changes'); },
       more: () => { S.menu.idx = 0; go('menu'); },
       watch: () => toggleWatch(),
       guide: () => go('readme'),
@@ -1711,6 +1729,12 @@ ${levelKeyRows()}
     // Only an explicit "y" restores; every other key keeps the work as it is.
     recoveryConfirm: { yes: () => doRestore(S.recovery.confirm), keep: () => { S.recovery.confirm = null; toast('👍 Nothing changed.'); } },
     recoveryResult: { back: () => { S.recovery.result = null; go('exercise'); } },
+    changes: {
+      nextFile: () => moveDiff(1),
+      prevFile: () => moveDiff(-1),
+      scroll,
+      back: () => go('exercise'),
+    },
   };
   /** Bindings in keys.mjs without a handler here ([] when complete). */
   const unhandled = () => Object.entries(KEYMAP).flatMap(([state, list]) => list.filter((b) => typeof HANDLERS[state]?.[b.id] !== 'function').map((b) => `${state}.${b.id}`));

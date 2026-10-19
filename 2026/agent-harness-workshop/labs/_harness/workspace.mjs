@@ -57,6 +57,35 @@ export function changes(dir, { gitBin = 'git' } = {}) {
   });
 }
 
+const NO_GIT = {
+  'no-git': 'git is not installed, so there is no last commit to compare with. Install git, or press s to compare your work with the reference solution instead.',
+  'no-repo': 'This folder is not in a git repository, so there is no last commit to compare with. To start tracking your work, run `git init`, then `git add -A` and `git commit -m start` in the workshop folder.',
+  'no-commit': 'This repository has no commit yet. Run `git add -A` and `git commit -m start` in the workshop folder; after that, your changes show up here.',
+};
+/**
+ * Your changes in `dir` since the last commit, file by file, as unified diffs (line endings normalised):
+ * { ok: true, files: [{ path, status, binary, diff, note }] }, or { ok: false, why, message } when git can't tell.
+ */
+export function changesDiff(dir, { gitBin = 'git' } = {}) {
+  const fail = (why) => ({ ok: false, why, message: NO_GIT[why] });
+  const prefix = gitText(gitBin, ['rev-parse', '--show-prefix'], { cwd: dir });
+  if (prefix.missing) return fail('no-git');
+  if (prefix.status !== 0) return fail('no-repo');
+  if (gitText(gitBin, ['rev-parse', '--verify', '-q', 'HEAD'], { cwd: dir }).status !== 0) return fail('no-commit');
+  const pre = prefix.text.trim();
+  const text = (buf) => buf.toString('utf8').replace(/\r\n/g, '\n');
+  const files = (changes(dir, { gitBin }) ?? []).map(({ file, status }) => {
+    const shown = status === 'new' ? null : gitSync(gitBin, ['show', `HEAD:${pre}${file}`], { cwd: dir });
+    const before = shown && shown.status === 0 ? shown.stdout : Buffer.alloc(0);
+    let after = Buffer.alloc(0);
+    if (status !== 'deleted') { try { after = fs.readFileSync(path.join(dir, ...file.split('/'))); } catch { /* removed meanwhile */ } }
+    if (!isText(before) || !isText(after)) return { path: file, status, binary: true, diff: '', note: 'A binary file: no line-by-line view.' };
+    const diff = text(before) === text(after) ? '' : unifiedDiff(text(before), text(after), { from: 'last commit', to: 'yours' });
+    return { path: file, status, binary: false, diff, note: diff ? null : 'Only the line endings changed.' };
+  }).sort((a, b) => a.path.localeCompare(b.path));
+  return { ok: true, files };
+}
+
 // ---------- paths and safety ----------
 /** labs/.recovery/<lab>-<level>, after checking the exercise really is a lab exercise inside labsDir. */
 export function recoveryDir(labsDir, ex) {

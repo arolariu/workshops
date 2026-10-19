@@ -135,3 +135,13 @@ test('bring shows the plan and asks first; nothing changes without yes', async (
   assert.match(accepted.text, /plus your work brought in on/);
   assert.equal(fs.readFileSync(target, 'utf8'), 'mine\n');
 });
+
+test('changes lists your changes since the last commit, or says why it cannot', async () => {
+  const none = await session(['open lab-01 easy', 'changes', 'quit']);
+  assert.match(none.text, /not in a git repository[\s\S]*git init/);
+  const files = [{ path: 'a.js', status: 'changed', binary: false, diff: '@@ -1 +1 @@\n-old\n+new\n', note: null }, { path: 'logo.png', status: 'new', binary: true, diff: '', note: 'A binary file: no line-by-line view.' }];
+  const some = await session(['open lab-01 easy', 'changes', 'quit'], { deps: { changesDiff: () => ({ ok: true, files }) } });
+  assert.match(some.text, /2 file\(s\) changed since your latest commit/);
+  assert.match(some.text, /Changed: a\.js\n[\s\S]*-old\n\+new/);
+  assert.match(some.text, /New: logo\.png\. A binary file/);
+});

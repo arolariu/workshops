@@ -456,3 +456,27 @@ test('the help screen lists every level key from the key table', async () => {
   }
   t.quit();
 });
+test('v shows your changes since the last commit, file by file; without git it explains why', async () => {
+  const t = await app({ open: 'lab-01/easy' });
+  press(t.input, 'v');
+  assert.equal(t.state.screen, 'changes');
+  assert.match(text(t.output), /YOUR CHANGES SINCE YOUR LATEST COMMIT/);
+  assert.match(text(t.output), /git init/);
+  press(t.input, 'b');
+  assert.equal(t.state.screen, 'exercise');
+  t.quit();
+  const files = [
+    { path: 'a.js', status: 'changed', binary: false, diff: '--- last commit\n+++ yours\n@@ -1 +1 @@\n-old line\n+new line\n', note: null },
+    { path: 'notes.md', status: 'new', binary: false, diff: '--- last commit\n+++ yours\n@@ -0,0 +1 @@\n+hello notes\n', note: null },
+  ];
+  const t2 = await app({ open: 'lab-01/easy', deps: { changesDiff: () => ({ ok: true, files }) } });
+  press(t2.input, 'v');
+  assert.match(text(t2.output), /❯ a\.js \(📝 changed\)/);
+  assert.match(text(t2.output), /\+new line/);
+  press(t2.input, '', 'right');
+  assert.match(text(t2.output), /❯ notes\.md \(🆕 new\)/);
+  assert.match(text(t2.output), /\+hello notes/);
+  press(t2.input, '', 'left');
+  assert.match(text(t2.output), /❯ a\.js/);
+  t2.quit();
+});

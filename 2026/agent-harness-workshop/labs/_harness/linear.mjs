@@ -7,7 +7,7 @@ import { progressStore, captureEvidence } from './progress.mjs';
 import { runChecks as realRunChecks } from './checks.mjs';
 import { runAgentChecks as realRunAgentChecks, loadAgentChecks as realLoadAgentChecks, listRuns as realListRuns, budgetPreview, specCommand } from './agent.mjs';
 import { inspectEnvironment as realInspect, reportLines } from './doctor.mjs';
-import { ensureStarter, listRecovery, restoreStarter, restoreSnapshot, createCheckpoint, resetToCommit, compareTrees } from './workspace.mjs';
+import { ensureStarter, listRecovery, restoreStarter, restoreSnapshot, createCheckpoint, resetToCommit, compareTrees, changesDiff as realChangesDiff } from './workspace.mjs';
 import { PATHS, pathById, progressView, describeSelection, nextExercise, choosePath, learningReport, writeReport } from './learning.mjs';
 import { statusWord, stripAnsi, inline, isAscii, asciiFold } from './ui.mjs';
 import { runInteractive as realRunInteractive } from './system.mjs';
@@ -30,6 +30,7 @@ const HELP = `Commands (type one and press Enter):
   bring             bring your own harness forward from the earlier levels you passed (asks first)
   history           agent run history for this exercise
   compare [FILE]    compare your work with the reference solution
+  changes           your changes since your latest commit, file by file (needs git)
   recovery          the starter, your checkpoints and backups
   checkpoint NAME   save your current work as a checkpoint
   restore starter | restore checkpoint:NAME | restore backup:NAME | restore commit
@@ -45,7 +46,7 @@ const HELP = `Commands (type one and press Enter):
 export function runLinear({
   labsDir, input = process.stdin, output = process.stdout, open = null, path: startPath = null, deps: overrides = {},
 }) {
-  const deps = { runChecks: realRunChecks, runAgentChecks: realRunAgentChecks, loadAgentChecks: realLoadAgentChecks, listRuns: realListRuns, inspectEnvironment: realInspect, runInteractive: realRunInteractive, ...overrides };
+  const deps = { runChecks: realRunChecks, runAgentChecks: realRunAgentChecks, loadAgentChecks: realLoadAgentChecks, listRuns: realListRuns, inspectEnvironment: realInspect, runInteractive: realRunInteractive, changesDiff: realChangesDiff, ...overrides };
   const rootDir = path.dirname(labsDir);
   const catalog = loadCatalog(labsDir);
   const store = progressStore(labsDir);
@@ -262,6 +263,19 @@ export function runLinear({
     for (const f of chosen) { say(`File ${f.path}: ${f.status}.${f.note ? ` ${f.note}` : ''}`); if (f.diff) say(f.diff.trimEnd()); }
   }
 
+  function changes() {
+    if (!need()) return;
+    const r = deps.changesDiff(current.ex.src);
+    if (!r.ok) { say(r.message); return; }
+    if (!r.files.length) { say('No changes since your latest commit.'); return; }
+    say(`${r.files.length} file(s) changed since your latest commit (- last commit, + yours):`);
+    const word = { new: 'New', changed: 'Changed', deleted: 'Deleted' };
+    for (const f of r.files) {
+      say(`${word[f.status]}: ${f.path}${f.note ? `. ${f.note}` : ''}`);
+      if (f.diff) say(f.diff.trimEnd());
+    }
+  }
+
   async function handle(line) {
     const [cmd = '', ...args] = line.trim().split(/\s+/);
     switch (cmd.toLowerCase()) {
@@ -294,6 +308,7 @@ export function runLinear({
         return;
       }
       case 'compare': case 'diff': compare(args[0]); return;
+      case 'changes': changes(); return;
       case 'recovery': recovery(); return;
       case 'checkpoint': {
         if (!need()) return;

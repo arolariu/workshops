@@ -53,3 +53,9 @@ test('every binding has words for the help screen', () => {
   assert.deepEqual(keysOf('exercise', 'guide'), ['g', 'r']);
   assert.deepEqual(keysOf('exercise', 'nope'), []);
 });
+
+test('v views your changes on the mission screen, and the more menu offers it too', () => {
+  assert.equal(binding('exercise', 'v', 'v').id, 'changes');
+  assert.equal(binding('changes', 'right', '').id, 'nextFile');
+  assert.equal(binding('changes', 'b', 'b').id, 'back');
+});

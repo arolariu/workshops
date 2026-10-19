@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { loadCatalog } from '../catalog.mjs';
 import {
   ensureStarter, restoreStarter, createCheckpoint, restoreSnapshot, listRecovery, resetToCommit,
-  buildStarterManifest, compareTrees, unifiedDiff, recoveryDir,
+  buildStarterManifest, compareTrees, unifiedDiff, recoveryDir, changesDiff,
 } from '../workspace.mjs';
 import { tmpdir, writeTree } from './helpers.mjs';
 
@@ -208,4 +208,36 @@ test('unifiedDiff keeps hunks small with context', () => {
   const d = unifiedDiff(a, b, { from: 'a', to: 'b' });
   assert.equal((d.match(/^@@/gm) ?? []).length, 2);
   assert.match(d, /@@ -2,7 \+2,7 @@/);
+});
+
+test('changesDiff: changed, new and deleted files since the last commit, as diffs', { skip: !hasGit && 'git is not installed' }, () => {
+  const root = tmpdir();
+  git(root, 'init', '-q');
+  writeTree(root, { 'src/a.js': 'one\ntwo\n', 'src/gone.txt': 'x\n', 'src/crlf.txt': 'same\r\n', 'src/img.bin': Buffer.from([0, 1, 2]), 'other.txt': 'outside\n' });
+  git(root, 'add', '-A');
+  git(root, 'commit', '-qm', 'start');
+  writeTree(root, { 'src/a.js': 'one\nTWO\n', 'src/new dir/new.md': 'hello\n', 'src/crlf.txt': 'same\n', 'src/img.bin': Buffer.from([0, 9, 2]), 'other.txt': 'changed outside\n' });
+  fs.rmSync(path.join(root, 'src', 'gone.txt'));
+  const r = changesDiff(path.join(root, 'src'));
+  assert.equal(r.ok, true, r.message);
+  assert.deepEqual(r.files.map((f) => [f.path, f.status]), [['a.js', 'changed'], ['crlf.txt', 'changed'], ['gone.txt', 'deleted'], ['img.bin', 'changed'], ['new dir/new.md', 'new']]);
+  assert.match(r.files[0].diff, /-two\n\+TWO/);
+  assert.equal(r.files[1].diff, '');
+  assert.match(r.files[1].note, /line endings/);
+  assert.match(r.files[2].diff, /-x/);
+  assert.equal(r.files[3].binary, true);
+  assert.match(r.files[4].diff, /\+hello/);
+});
+
+test('changesDiff explains why it cannot work: no git, no repository, no commit', () => {
+  const plain = tmpdir();
+  const noGit = changesDiff(plain, { gitBin: 'definitely-missing-git' });
+  assert.deepEqual([noGit.ok, noGit.why], [false, 'no-git']);
+  assert.match(noGit.message, /git is not installed/);
+  if (!hasGit) return;
+  const noRepo = changesDiff(plain);
+  assert.deepEqual([noRepo.ok, noRepo.why], [false, 'no-repo']);
+  assert.match(noRepo.message, /git init/);
+  git(plain, 'init', '-q');
+  assert.equal(changesDiff(plain).why, 'no-commit');
 });

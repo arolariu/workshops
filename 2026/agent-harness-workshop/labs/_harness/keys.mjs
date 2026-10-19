@@ -26,7 +26,7 @@ export const RESERVED = {
 };
 
 /** The "more" menu's items, in order (tui.mjs MENU must list exactly these keys). */
-export const MENU_KEYS = ['w', 'g', 'i', 's', 'f', 'x', 'H', 'o', 'y', 'd', 'e'];
+export const MENU_KEYS = ['w', 'g', 'i', 'v', 's', 'f', 'x', 'H', 'o', 'y', 'd', 'e'];
 
 export const KEYMAP = {
   home: [
@@ -75,7 +75,8 @@ export const KEYMAP = {
     b('h', 'hint', 'reveal the next hint (for the milestone you are on)'),
     b('a', 'agent', '🤖 agent check: the real Copilot on a copy of your folder (uses AI credits; c cancels)'),
     b('i', 'bring', '🧳 bring your own harness forward from the earlier levels you passed (your files are backed up first)'),
-    b('m', 'more', 'more: watch, guide, compare, bring, bookmark, start over, history, doctor, export'),
+    b('v', 'changes', '📝 view your changes since your latest commit, file by file'),
+    b('m', 'more', 'more: watch, guide, compare, bring, your changes, bookmark, start over, history, doctor, export'),
     b('w', 'watch', 'watch: run the checks again every time you save a file'),
     b(['g', 'r'], 'guide', 'read the lab guide: concepts, under the hood, examples, links'),
     b('s', 'solution', 'compare your work with the reference solution'),
@@ -136,6 +137,12 @@ export const KEYMAP = {
     b('r', 'toggle', 'the whole reference file, or the differences'),
     b(SCROLL, 'scroll', 'scroll'),
     b(['b', 'escape', 'backspace'], 'back', 'back'),
+  ],
+  changes: [
+    b(['right', 'tab'], 'nextFile', 'the next file'),
+    b('left', 'prevFile', 'the previous file'),
+    b(SCROLL, 'scroll', 'scroll'),
+    b(['b', 'escape', 'backspace', 'v'], 'back', 'back'),
   ],
   recovery: [
     b(PREV, 'prev', 'choose'),
