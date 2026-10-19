@@ -242,3 +242,14 @@ test('a path saved by an older version (no longer a path) falls back to all, it 
   assert.equal(JSON.parse(next.out).key, 'lab-00/easy');
   assert.match(cli(labsDir, ['path']).out, /❯ All exercises/);
 });
+test('xray prints the harness tree, the context budget and the maturity; --sol looks at the reference', () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.writeFileSync(path.join(labsDir, 'lab-03/easy/sol/AGENTS.md'), '# Rules\n## Commands\n- npm test\n## Boundaries\n- Never push.\n## Definition of done\n- green\n');
+  const mine = cli(labsDir, ['xray', 'lab-03', 'easy']);
+  assert.equal(mine.code, 0, mine.out);
+  assert.match(mine.out, /CONTEXT BUDGET/);
+  assert.match(mine.out, /MATURITY · L0 Bare/);
+  const ref = cli(labsDir, ['xray', 'lab-03', 'easy', '--sol']);
+  assert.match(ref.out, /MATURITY · L1 Instructed/);
+  assert.equal(JSON.parse(cli(labsDir, ['xray', 'lab-03', 'easy', '--sol', '--json']).out).maturity.level, 'L1');
+});

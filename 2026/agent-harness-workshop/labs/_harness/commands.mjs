@@ -8,6 +8,29 @@ export async function run(ctx) {
   const { cmd, pos, opt, say, fail, labsDir, rootDir, catalog, progress, rel, pickExercise, signature } = ctx;
   const ws = await import('./workspace.mjs');
 
+  if (cmd === 'xray') {
+    const { lab, ex } = pickExercise();
+    const { xrayReport } = await import('./xray.mjs');
+    const { xrayLines } = await import('./screens/xray.mjs');
+    const { loadManifest } = await import('./chain.mjs');
+    let manifest = null;
+    try { manifest = loadManifest(labsDir); } catch { /* no marks without a manifest */ }
+    const dir = opt.sol ? ex.sol : ex.src;
+    const report = await xrayReport({ key: ex.key, dir, manifest, brought: opt.sol ? null : progress.get(ex.key).brought });
+    if (opt.json) {
+      const { scan, ...rest } = report;
+      const slim = { ...rest, scan: { files: scan.files, artifacts: scan.artifacts, problems: scan.problems } };
+      process.stdout.write(`${JSON.stringify(slim, null, 2)}\n`);
+      return;
+    }
+    say();
+    say(`  🔬 ${bold(bright(`X-RAY · Lab ${lab.num} · ${ex.label}`))} ${dim(`· ${opt.sol ? 'the reference' : 'your work'}: ${rel(dir)}`)}`);
+    say();
+    for (const l of xrayLines(report, { W: Math.min(96, (process.stdout.columns || 100) - 4), fmt: { green, bright, dim, white, yellow, bold, cyan } })) say(l);
+    say();
+    return;
+  }
+
   if (cmd === 'reset') {
     const { lab, ex } = pickExercise();
     const list = ws.changes(ex.src);

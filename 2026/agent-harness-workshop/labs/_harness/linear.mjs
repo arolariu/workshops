@@ -21,6 +21,8 @@ import { answerQuiz, quizUnlocked } from './screens/learn.mjs';
 import { levelClock, suggestedMinutes, timerText, shouldNudge } from './timer.mjs';
 import { creditSummary, meterLine } from './credits.mjs';
 import { loadGlossary, glossaryLines } from './glossary.mjs';
+import { xrayReport, inheritedChecks } from './xray.mjs';
+import { xrayLines, inheritedLines } from './screens/xray.mjs';
 
 const HELP = `Commands (type one and press Enter):
   list [path=ID] [level=L] [status=S] [minutes=N] [bookmarked] [words…]   numbered exercises, filtered
@@ -37,6 +39,7 @@ const HELP = `Commands (type one and press Enter):
   history           agent run history for this exercise
   compare [FILE]    compare your work with the reference solution
   changes           your changes since your latest commit, file by file (needs git)
+  xray [sol]        X-ray your harness (or the reference): what it adds to every turn, and its maturity level
   glossary [WORD]   the words this workshop uses, in one line each
   recovery          the starter, your checkpoints and backups
   checkpoint NAME   save your current work as a checkpoint
@@ -374,6 +377,17 @@ export function runLinear({
       }
       case 'compare': case 'diff': compare(args[0]); return;
       case 'changes': changes(); return;
+      case 'xray': {
+        if (!need()) return;
+        const { ex } = current;
+        const sol = /^(sol|reference)$/i.test(args[0] ?? '');
+        let manifest = null;
+        try { manifest = loadManifest(labsDir); } catch { /* no marks */ }
+        say(`X-ray of ${sol ? 'the reference solution' : 'your work'} (${rel(sol ? ex.sol : ex.src)}). MCP servers get 5 seconds to list their tools.`);
+        const report = await xrayReport({ key: ex.key, dir: sol ? ex.sol : ex.src, manifest, brought: sol ? null : store.get(ex.key).brought });
+        xrayLines(report, { W: 100, fmt: { ...PLAIN, green: (s) => s, bold: (s) => s, cyan: (s) => s } }).forEach((l) => say(l));
+        return;
+      }
       case 'glossary': {
         const lines = glossaryLines(loadGlossary(labsDir), { query: args.join(' ') });
         if (!lines.length) say(args.length ? `No term matches "${args.join(' ')}".` : 'There is no glossary (labs/glossary.md).');

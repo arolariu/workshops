@@ -21,7 +21,6 @@ export const GLOBAL = [
 
 /** Keys kept free for features that are coming, so nothing else takes them. */
 export const RESERVED = {
-  exercise: [{ key: 'u', for: 'the harness X-ray: what your harness adds to every turn (Phase 3)' }],
   home: [{ key: 'u', for: 'the agent-loop replay (Phase 3)' }],
 };
 
@@ -77,6 +76,7 @@ export const KEYMAP = {
     b('i', 'bring', '🧳 bring your own harness forward from the earlier levels you passed (your files are backed up first)'),
     b('v', 'changes', '📝 view your changes since your latest commit, file by file'),
     b('l', 'learn', '🧠 the takeaway and a check-yourself question (after your checks pass)'),
+    b('u', 'xray', '🔬 under the hood: X-ray your harness (what it adds to every turn, and its maturity level)'),
     b('m', 'more', 'more: watch, guide, compare, bring, your changes, bookmark, start over, history, doctor, export'),
     b('w', 'watch', 'watch: run the checks again every time you save a file'),
     b(['g', 'r'], 'guide', 'read the lab guide: concepts, under the hood, examples, links'),
@@ -147,6 +147,7 @@ export const KEYMAP = {
     b(['b', 'escape', 'backspace', 'v'], 'back', 'back'),
   ],
   learn: [b(digits(1, 4), 'answer', 'answer the question'), b(SCROLL, 'scroll', 'scroll'), b([...BACK, 'return', 'l'], 'back', 'back')],
+  xray: [b(SCROLL, 'scroll', 'scroll'), b('s', 'side', 'your src/ or the reference sol/'), b('r', 'again', 'look again (and measure the MCP servers again)'), b([...BACK, 'return', 'u'], 'back', 'back')],
   recovery: [
     b(PREV, 'prev', 'choose'),
     b(NEXT, 'nextItem', 'choose'),

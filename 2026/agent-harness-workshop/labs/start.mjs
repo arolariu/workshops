@@ -45,6 +45,7 @@ const COMMANDS = {
   bring: { args: [2, 2], opts: { 'dry-run': 'flag', ascii: 'flag' } },
   path: { args: [0, 1], opts: { ascii: 'flag' } },
   glossary: { args: [0, 1], opts: { ascii: 'flag' } },
+  xray: { args: [2, 2], opts: { sol: 'flag', json: 'flag', ascii: 'flag' } },
   export: { args: [0, 0], opts: { format: 'value', name: 'value', dir: 'value', path: 'value', ascii: 'flag' } },
   doctor: { args: [0, 0], opts: { full: 'flag', lab: 'value', json: 'flag', ascii: 'flag' } },
   verify: { args: [0, 1], opts: { chain: 'flag', bring: 'flag', verbose: 'flag', ascii: 'flag' } },
@@ -120,6 +121,7 @@ function usage() {
   row('node labs/start.mjs bookmark lab-01 easy', 'bookmark an exercise (--remove to undo)');
   row('node labs/start.mjs history lab-01 easy', 'agent check runs kept for this exercise');
   row('node labs/start.mjs glossary [word]', 'the words this workshop uses, in one line each');
+  row('node labs/start.mjs xray lab-04 easy [--sol]', 'X-ray a harness: what it adds to every turn, its maturity');
   say();
   say(`  ${white('Start over (your current files are always backed up first)')}`);
   row('node labs/start.mjs recovery lab-01 easy', 'the starter, your checkpoints and backups');

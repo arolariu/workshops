@@ -15,12 +15,12 @@ test('a collision is found when there is one', () => {
   }
 });
 
-test('PR #1 keeps d and m; u is reserved for Phase 3 on the mission and home screens', () => {
+test('PR #1 keeps d and m; u is the X-ray on a level and stays reserved on home for the replay', () => {
   assert.equal(binding('exercise', 'd', 'd').id, 'doctor');
   assert.equal(binding('exercise', 'm', 'm').id, 'more');
-  assert.deepEqual(RESERVED.exercise.map((r) => r.key), ['u']);
+  assert.equal(binding('exercise', 'u', 'u').id, 'xray');
+  assert.equal(binding('xray', 's', 's').id, 'side');
   assert.deepEqual(RESERVED.home.map((r) => r.key), ['u']);
-  assert.equal(binding('exercise', 'u', 'u'), null, 'reserved means unbound for now');
   assert.equal(binding('home', 'u', 'u'), null);
 });
 

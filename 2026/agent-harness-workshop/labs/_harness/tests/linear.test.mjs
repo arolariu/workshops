@@ -195,3 +195,9 @@ test('glossary works in linear mode too', async () => {
   assert.match(text, /Hook: your code that runs before a tool call\. \(Lab 05\)/);
   assert.match(text, /No term matches "zebra"/);
 });
+test('xray works line by line too', async () => {
+  const { text } = await session(['open lab-03 easy', 'xray', 'xray sol', 'quit']);
+  assert.match(text, /X-ray of your work[\s\S]*CONTEXT BUDGET[\s\S]*MATURITY · L0 Bare/);
+  assert.match(text, /X-ray of the reference solution/);
+  assert.doesNotMatch(text, /\x1b/);
+});

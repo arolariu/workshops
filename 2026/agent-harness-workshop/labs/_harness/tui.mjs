@@ -29,6 +29,8 @@ import { layerMapLines } from './screens/layers.mjs';
 import { levelClock, suggestedMinutes, timerText, shouldNudge } from './timer.mjs';
 import { creditSummary, meterLine } from './credits.mjs';
 import { loadGlossary } from './glossary.mjs';
+import { xrayReport, inheritedChecks } from './xray.mjs';
+import { xrayLines, inheritedLines } from './screens/xray.mjs';
 import { KEYMAP, MENU_KEYS, binding } from './keys.mjs';
 import { checkGroupLines, milestoneListLines, hintDots } from './screens/milestones.mjs';
 
@@ -124,6 +126,7 @@ export async function startTui({
     bring: null,
     diff: null,
     quizChoice: null,
+    xray: null,
     tip: Math.floor(Math.random() * TIPS.length),
   };
 
@@ -267,7 +270,7 @@ export async function startTui({
     return { done, agents, stale, workshop, homework };
   }
   const labDone = (lab) => lab.levels.length > 0 && lab.levels.every((ex) => view.checks(ex) === 'pass');
-  const ON_LEVEL = new Set(['exercise', 'checks', 'checkDetail', 'output', 'agent', 'history', 'solution', 'confirmSolution', 'menu', 'recovery', 'bring', 'changes', 'learn']);
+  const ON_LEVEL = new Set(['exercise', 'checks', 'checkDetail', 'output', 'agent', 'history', 'solution', 'confirmSolution', 'menu', 'recovery', 'bring', 'changes', 'learn', 'xray']);
   const lastKey = () => { const u = store.get('_ui'); return u.lab && u.level ? `${u.lab}/${u.level}` : null; };
   const nextUp = () => nextExercise(catalog, view, { path: S.path, current: ON_LEVEL.has(S.screen) ? exObj()?.key ?? null : null, last: lastKey() });
   const fmt = { green, bright, dim, white, yellow, bold, cyan };
@@ -313,6 +316,21 @@ export async function startTui({
     S.quizChoice = { key: ex.key, choice: n };
     render();
   };
+
+  // ---------- the X-ray (xray.mjs): async, because it lists the MCP servers' tools ----------
+  let xrayToken = 0;
+  function openXray(side) {
+    const ex = exObj();
+    const token = ++xrayToken;
+    S.xray = { side, report: null, error: null };
+    S.scroll = 0;
+    if (S.screen !== 'xray') go('xray'); else render();
+    let manifest = null;
+    try { manifest = loadManifest(labsDir); } catch { /* no manifest: no marks */ }
+    xrayReport({ key: ex.key, dir: side === 'sol' ? ex.sol : ex.src, manifest, brought: side === 'sol' ? null : view.entry(ex).brought })
+      .then((report) => { if (token === xrayToken && S.xray) { S.xray.report = report; render(); } })
+      .catch((e) => { if (token === xrayToken && S.xray) { S.xray.error = `The X-ray could not look at this folder: ${e.message}`; render(); } });
+  }
 
   // ---------- the credit meter (credits.mjs): read from the run history on the home screen, never per frame ----------
   function loadCredits() {
@@ -659,7 +677,7 @@ export async function startTui({
     L.push('');
     return {
       lines: L,
-      footer: footer([['t', 'checks'], ['c', 'Copilot here'], ['h', 'hint'], ['a', 'agent check'], ['v', 'your changes'], ...(quizUnlocked(view, ex) ? [['l', 'learn']] : []), ['i', 'bring your work'], ['m', 'more'], ['b', 'back'], ['?', 'help'], ['q', 'quit']]),
+      footer: footer([['t', 'checks'], ['c', 'Copilot here'], ['h', 'hint'], ['a', 'agent check'], ['v', 'your changes'], ['u', 'X-ray'], ...(quizUnlocked(view, ex) ? [['l', 'learn']] : []), ['i', 'bring your work'], ['m', 'more'], ['b', 'back'], ['?', 'help'], ['q', 'quit']]),
     };
   }
 
@@ -989,6 +1007,20 @@ export async function startTui({
     return { lines: L, footer: footer([...(many ? [['←→', 'switch file']] : []), ['↑↓', 'scroll'], ['b', 'back'], ['q', 'quit']]) };
   }
 
+  function xrayScreen() {
+    const lab = labObj();
+    const ex = exObj();
+    const X = S.xray;
+    const L = [''];
+    L.push(...header(`🔬 ${bold(bright(`X-RAY · Lab ${lab.num} · ${LABEL(ex)} · ${X.side === 'sol' ? 'the reference sol/' : 'your src/'}`))}`, dim('What your harness adds to every turn of the model\'s context, and how far it has come.')));
+    L.push('');
+    if (X.error) L.push(...para(`⚠️  ${yellow(X.error)}`));
+    else if (!X.report) L.push(...para(`${bright(spin())} ${dim('Looking at your harness… (MCP servers get 5 seconds to list their tools)')}`));
+    else L.push(...xrayLines(X.report, { W: W(), fmt }));
+    L.push('');
+    return { lines: L, footer: footer([['s', X.side === 'sol' ? 'your src/' : 'the reference'], ['r', 'look again'], ['↑↓', 'scroll'], ['b', 'back'], ['q', 'quit']]) };
+  }
+
   function learnScreen() {
     const lab = labObj();
     const ex = exObj();
@@ -1204,7 +1236,7 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
     splash: splashScreen, home: homeScreen, lab: labScreen, readme: readmeScreen, browse: browseScreen, exercise: exerciseScreen,
     checks: checksScreen, checkDetail: checkDetailScreen, output: outputScreen, agent: agentScreen, history: historyScreen,
     solution: solutionScreen, confirmSolution: confirmSolutionScreen, menu: menuScreen, recovery: recoveryScreen,
-    doctor: doctorScreen, export: exportScreen, help: helpScreen, bring: bringScreen, changes: changesScreen, learn: learnScreen,
+    doctor: doctorScreen, export: exportScreen, help: helpScreen, bring: bringScreen, changes: changesScreen, learn: learnScreen, xray: xrayScreen,
   };
   function render() {
     if (S.suspended || quitting) return;
@@ -1730,6 +1762,7 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
       learn: () => {
         if (quizUnlocked(view, exObj())) { S.quizChoice = null; go('learn'); } else toast('🧠 The takeaway and a check-yourself question unlock when your checks pass (press t).');
       },
+      xray: () => openXray('src'),
       more: () => { S.menu.idx = 0; go('menu'); },
       watch: () => toggleWatch(),
       guide: () => go('readme'),
@@ -1821,6 +1854,12 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
       back: () => go('exercise'),
     },
     learn: { answer: ({ str }) => answer(str), scroll, back: () => go('exercise') },
+    xray: {
+      scroll,
+      side: () => openXray(S.xray?.side === 'sol' ? 'src' : 'sol'),
+      again: () => openXray(S.xray?.side ?? 'src'),
+      back: () => { S.xray = null; go('exercise'); },
+    },
   };
   /** Bindings in keys.mjs without a handler here ([] when complete). */
   const unhandled = () => Object.entries(KEYMAP).flatMap(([state, list]) => list.filter((b) => typeof HANDLERS[state]?.[b.id] !== 'function').map((b) => `${state}.${b.id}`));

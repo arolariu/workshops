@@ -216,7 +216,7 @@ export function isTrusted(dir) {
 }
 
 // ---------- MCP client (JSON-RPC over stdio) ----------
-export async function mcpClient({ command, args = [], env = {}, cwd }) {
+export async function mcpClient({ command, args = [], env = {}, cwd, timeout = 8000 }) {
   const bin = command === 'node' ? process.execPath : command;
   const child = spawn(bin, args, { cwd, env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
   let buf = '';
@@ -252,7 +252,9 @@ export async function mcpClient({ command, args = [], env = {}, cwd }) {
       try { child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`); } catch { /* reported by exit */ }
     });
   }
-  const init = await request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'harness-check', version: '1.0.0' } });
+  // A server that never initializes must not outlive the check (or the X-ray) that started it.
+  const init = await request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'harness-check', version: '1.0.0' } }, timeout)
+    .catch((e) => { try { child.kill(); } catch { /* already gone */ } throw e; });
   child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
   return {
     init: init.result,

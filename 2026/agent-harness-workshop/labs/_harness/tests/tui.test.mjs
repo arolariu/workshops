@@ -576,3 +576,24 @@ test('the help screen labels tier times as targets, like the readme', async () =
   assert.match(s, /a level's own 🕐 says how long it takes\s+today/);
   t.quit();
 });
+test('u X-rays the level: your harness, the context budget and the maturity; s switches to the reference', async () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.writeFileSync(path.join(labsDir, 'lab-03/easy/src/AGENTS.md'), '# Rules\n## Commands\n- npm test\n## Boundaries\n- Never push.\n## Definition of done\n- green\n');
+  const t = await app({ labsDir, open: 'lab-03/easy', size: { columns: 100, rows: 60 } });
+  press(t.input, 'u');
+  assert.equal(t.state.screen, 'xray');
+  await waitFor(() => t.state.xray?.report);
+  let s = text(t.output);
+  assert.match(s, /X-RAY · Lab 03 · EASY · your src\//);
+  assert.match(s, /YOUR HARNESS[\s\S]*AGENTS\.md 🆕/);
+  assert.match(s, /CONTEXT BUDGET[\s\S]*≈\d+/);
+  assert.match(s, /MATURITY · L1 Instructed/);
+  press(t.input, 's');
+  await waitFor(() => t.state.xray?.report && t.state.xray.side === 'sol');
+  s = text(t.output);
+  assert.match(s, /the reference sol\//);
+  assert.match(s, /MATURITY · L0 Bare/);
+  press(t.input, 'b');
+  assert.equal(t.state.screen, 'exercise');
+  t.quit();
+});
