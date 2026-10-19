@@ -1,0 +1,40 @@
+#!/usr/bin/env node
+// 🎬 sessionStart: runs once when a session begins. Its additionalContext goes into the model's context, so the model
+// knows the rules before its first tool call; and the chain records which policies governed this session.
+// Input: { sessionId, timestamp, cwd, source: "new" | "startup" | "resume", initialPrompt }.
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { append } from './audit-chain.mjs';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+export const ORG_POLICY = process.env.HARNESS_ORG_POLICY ? path.resolve(process.env.HARNESS_ORG_POLICY) : path.join(HERE, '..', 'org-policy.json');
+export const REPO_POLICY = path.join(HERE, '..', 'policy.json');
+const sha = (file) => { try { return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'); } catch { return null; } };
+
+/** What the model should know before it starts: who governs it, and what can never be allowed. */
+export function sessionContext(org) {
+  if (!org) return '⚠️ The organisation policy could not be read, so every tool call will be denied until a human fixes it. Tell the human.';
+  const denies = (org.rules ?? []).filter((r) => r.decision === 'deny').map((r) => r.id);
+  return [
+    '🔒 This session is governed by the organisation policy and this repository\'s policy.',
+    `The organisation forbids, and nothing in this repository can allow: ${denies.join(', ')}.`,
+    'A denied tool call comes back with a reason: follow it, and don\'t look for a way around it.',
+  ].join(' ');
+}
+
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) {
+  try {
+    const input = JSON.parse(fs.readFileSync(0, 'utf8') || 'null') ?? {};
+    let org = null;
+    try { org = JSON.parse(fs.readFileSync(ORG_POLICY, 'utf8')); } catch { /* reported in the context */ }
+    try {
+      append(path.join('.agent-logs', 'audit-chain.jsonl'), { type: 'session-start', at: new Date().toISOString(), session: String(input.sessionId ?? 'unknown'), source: input.source ?? null, policies: { org: sha(ORG_POLICY), repo: sha(REPO_POLICY) } });
+    } catch { /* the context still matters */ }
+    process.stdout.write(JSON.stringify({ additionalContext: sessionContext(org) }));
+  } catch {
+    // A session hook must never break the session.
+  }
+}

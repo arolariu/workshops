@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "default": "allow",
+  "rules": [
+    {
+      "id": "no-recursive-force-delete",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "Recursive force-deletes (rm -rf, Remove-Item -Recurse, rd /s /q) are blocked in this project. Delete specific files instead, or ask the human.",
+      "match": {
+        "tool": "shell",
+        "command": "^delete --force --recursive\\b"
+      }
+    },
+    {
+      "id": "no-new-dependencies",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "No new dependencies: StudyBuddy is dependency-free on purpose (see AGENTS.md). Write a small helper instead, or ask the human.",
+      "match": {
+        "tool": "shell",
+        "command": "^(npm|pnpm|yarn) (install|i|add)( -\\S+)* [^-\\s]|^npm pkg set\\b"
+      }
+    },
+    {
+      "id": "no-package-json-from-shell",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "package.json is locked: no new dependencies or scripts without a human. Write a small helper instead, or ask the human.",
+      "match": {
+        "tool": "shell",
+        "command": "^(tee|sed|truncate|mv|cp|set-content|add-content|out-file|clear-content|new-item|move-item|copy-item)\\b.*package\\.json|>>?\\s*\\S*package\\.json"
+      }
+    },
+    {
+      "id": "no-package-json-edits",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "package.json is locked: no new dependencies or scripts without a human. Write a small helper instead, or ask the human.",
+      "match": {
+        "tool": "write",
+        "path": "(^|[\\\\/])package\\.json$"
+      }
+    },
+    {
+      "id": "no-env-files",
+      "decision": "deny",
+      "severity": "high",
+      "reason": ".env files hold secrets and are off-limits for the agent. Use .env.example for the variable names instead, and ask the human for values.",
+      "match": {
+        "text": "(^|[\\s\"'`/\\\\=:])\\.env(?!\\.(example|sample|template)\\b)(\\.[\\w-]+)?(?=$|[\\s\"'`/\\\\,;)}])"
+      }
+    },
+    {
+      "id": "no-hook-changes",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "The guardrails in .github/hooks are protected. Read them if you need to, and ask the human to change them.",
+      "match": {
+        "tool": "write",
+        "text": "(^|[\\s\"'`/\\\\])\\.github[\\\\/]+hooks([\\\\/]|\\b)"
+      }
+    },
+    {
+      "id": "no-hook-changes-from-shell",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "The guardrails in .github/hooks are protected. Read them if you need to, and ask the human to change them.",
+      "match": {
+        "tool": "shell",
+        "command": "^(delete|tee|sed|truncate|mv|cp|set-content|add-content|out-file|clear-content|new-item|move-item|copy-item|chmod|chown|ln|rename-item)\\b.*\\.github[\\\\/]+hooks|>>?\\s*\\S*\\.github[\\\\/]+hooks"
+      }
+    },
+    {
+      "id": "no-github-token",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a GitHub token. Secrets never go into files or commands: read it from an environment variable instead.",
+      "match": {
+        "tool": [
+          "write",
+          "shell"
+        ],
+        "text": "\\bghp_[A-Za-z0-9]{36}\\b"
+      }
+    },
+    {
+      "id": "no-github-fine-grained-token",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a GitHub fine-grained token. Secrets never go into files or commands: read it from an environment variable instead.",
+      "match": {
+        "tool": [
+          "write",
+          "shell"
+        ],
+        "text": "\\bgithub_pat_[A-Za-z0-9_]{22,}"
+      }
+    },
+    {
+      "id": "no-aws-key",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like an AWS access key. Secrets never go into files or commands: read it from an environment variable instead.",
+      "match": {
+        "tool": [
+          "write",
+          "shell"
+        ],
+        "text": "\\bAKIA[0-9A-Z]{16}\\b"
+      }
+    },
+    {
+      "id": "no-private-key",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a private key. Secrets never go into files or commands: read it from an environment variable instead.",
+      "match": {
+        "tool": [
+          "write",
+          "shell"
+        ],
+        "text": "-----BEGIN [A-Z ]*PRIVATE KEY-----"
+      }
+    },
+    {
+      "id": "no-api-key",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like an API key. Secrets never go into files or commands: read it from an environment variable instead.",
+      "match": {
+        "tool": [
+          "write",
+          "shell"
+        ],
+        "text": "\\bsk-[A-Za-z0-9]{32,}\\b"
+      }
+    },
+    {
+      "id": "no-pipe-to-shell",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a call a prompt injection would make: it pipes a download straight into a shell. Download, read and review the file first, or ask the human.",
+      "match": {
+        "tool": "shell",
+        "commandLine": "\\b(curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\\b[^|]*\\|\\s*(sudo\\s+)?(sh|bash|zsh|iex|invoke-expression|python3?|node)\\b"
+      }
+    },
+    {
+      "id": "no-run-downloaded-code",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a call a prompt injection would make: it runs code it has just downloaded. Download, read and review the file first, or ask the human.",
+      "match": {
+        "tool": "shell",
+        "commandLine": "\\b(iex|invoke-expression)\\b.*\\b(iwr|irm|invoke-webrequest|invoke-restmethod|curl|wget|downloadstring)\\b|\\$\\(\\s*(curl|wget)\\b|`\\s*(curl|wget)\\b"
+      }
+    },
+    {
+      "id": "no-encoded-powershell",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a call a prompt injection would make: an encoded PowerShell command hides what it does. Write the command out in plain text, or ask the human.",
+      "match": {
+        "tool": "shell",
+        "commandLine": "\\b(powershell|pwsh)(\\.exe)?\\b.*\\s-(e|ec|en|enc|enco|encod|encode|encoded|encodedc\\w*)\\b"
+      }
+    },
+    {
+      "id": "no-upload-local-files",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a call a prompt injection would make: it sends a local file to the network. Nothing leaves this machine without the human.",
+      "match": {
+        "tool": "shell",
+        "commandLine": "\\bcurl\\b.*\\s(-d|--data(-binary|-raw|-urlencode)?|-F|--form)\\s+\\S*@|\\bcurl\\b.*\\s(-T|--upload-file)\\s|\\bwget\\b.*--post-file|\\b(iwr|irm|invoke-webrequest|invoke-restmethod)\\b.*\\s-infile\\b|\\s-body\\s*\\(?\\s*(get-content|gc|cat|type)\\b"
+      }
+    }
+  ]
+}

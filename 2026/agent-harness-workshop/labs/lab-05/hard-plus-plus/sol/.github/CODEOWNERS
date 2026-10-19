@@ -1,0 +1,4 @@
+# The guardrails and the organisation policy need the security team's review.
+/.github/hooks/            @studybuddy/security
+/.github/hooks/org-policy.json  @studybuddy/security @studybuddy/platform
+/.github/CODEOWNERS        @studybuddy/security

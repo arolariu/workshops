@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "node .github/hooks/scripts/session-start.mjs",
+        "powershell": "node .github/hooks/scripts/session-start.mjs",
+        "cwd": ".",
+        "timeoutSec": 10
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "node .github/hooks/scripts/prompt-scan.mjs",
+        "powershell": "node .github/hooks/scripts/prompt-scan.mjs",
+        "cwd": ".",
+        "timeoutSec": 10
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "node .github/hooks/scripts/guard.mjs",
+        "powershell": "node .github/hooks/scripts/guard.mjs",
+        "cwd": ".",
+        "timeoutSec": 10
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "node .github/hooks/scripts/audit.mjs",
+        "powershell": "node .github/hooks/scripts/audit.mjs",
+        "cwd": ".",
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": "node .github/hooks/scripts/run-tests-after-edit.mjs",
+        "powershell": "node .github/hooks/scripts/run-tests-after-edit.mjs",
+        "cwd": ".",
+        "timeoutSec": 120
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "type": "command",
+        "bash": "node .github/hooks/scripts/audit.mjs",
+        "powershell": "node .github/hooks/scripts/audit.mjs",
+        "cwd": ".",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}

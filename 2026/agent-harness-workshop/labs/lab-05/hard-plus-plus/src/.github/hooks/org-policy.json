@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "default": "allow",
+  "rules": [
+    {
+      "id": "org-no-secrets",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "The organisation never allows secrets (tokens, keys) in files or commands. Read them from an environment variable instead.",
+      "match": {
+        "tool": [
+          "write",
+          "shell"
+        ],
+        "text": "\\bghp_[A-Za-z0-9]{36}\\b|\\bgithub_pat_[A-Za-z0-9_]{22,}|\\bAKIA[0-9A-Z]{16}\\b|-----BEGIN [A-Z ]*PRIVATE KEY-----|\\bsk-[A-Za-z0-9]{32,}\\b"
+      }
+    },
+    {
+      "id": "org-no-pipe-to-shell",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a call a prompt injection would make: it pipes a download straight into a shell. Download, read and review the file first, or ask the human.",
+      "match": {
+        "tool": "shell",
+        "commandLine": "\\b(curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\\b[^|]*\\|\\s*(sudo\\s+)?(sh|bash|zsh|iex|invoke-expression|python3?|node)\\b"
+      }
+    },
+    {
+      "id": "org-no-run-downloaded-code",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a call a prompt injection would make: it runs code it has just downloaded. Download, read and review the file first, or ask the human.",
+      "match": {
+        "tool": "shell",
+        "commandLine": "\\b(iex|invoke-expression)\\b.*\\b(iwr|irm|invoke-webrequest|invoke-restmethod|curl|wget|downloadstring)\\b|\\$\\(\\s*(curl|wget)\\b|`\\s*(curl|wget)\\b"
+      }
+    },
+    {
+      "id": "org-no-encoded-powershell",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a call a prompt injection would make: an encoded PowerShell command hides what it does. Write the command out in plain text, or ask the human.",
+      "match": {
+        "tool": "shell",
+        "commandLine": "\\b(powershell|pwsh)(\\.exe)?\\b.*\\s-(e|ec|en|enc|enco|encod|encode|encoded|encodedc\\w*)\\b"
+      }
+    },
+    {
+      "id": "org-no-upload-local-files",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a call a prompt injection would make: it sends a local file to the network. Nothing leaves this machine without the human.",
+      "match": {
+        "tool": "shell",
+        "commandLine": "\\bcurl\\b.*\\s(-d|--data(-binary|-raw|-urlencode)?|-F|--form)\\s+\\S*@|\\bcurl\\b.*\\s(-T|--upload-file)\\s|\\bwget\\b.*--post-file|\\b(iwr|irm|invoke-webrequest|invoke-restmethod)\\b.*\\s-infile\\b|\\s-body\\s*\\(?\\s*(get-content|gc|cat|type)\\b"
+      }
+    },
+    {
+      "id": "org-no-force-push",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "Force-pushing rewrites history other people rely on, so the organisation forbids it. Push a new commit instead, or ask the human.",
+      "match": {
+        "tool": "shell",
+        "commandLine": "\\bgit\\s+push\\b.*\\s(--force(-with-lease)?|-f)\\b"
+      }
+    }
+  ]
+}
