@@ -59,7 +59,17 @@ A green-on-dark terminal app that guides you through every level. On a level you
 | **?** | every key, and the glossary |
 
 Everywhere: **/** searches every exercise (and filters by level, status, time and bookmarks), **p** picks a learning
-path, **d** opens the setup doctor, **e** exports a learning summary and **?** shows every key and the glossary.
+path, **d** opens the setup doctor, **e** exports a learning summary and **?** shows every key and the glossary. On the
+home screen, **u** replays an agent run turn by turn (**←**/**→** step, **tab** switches between the run without and
+with a harness).
+
+**Under the hood.** The 🔬 X-ray (**u** on a level, or `node labs/start.mjs xray lab-04 easy`) shows your harness as
+a tree, marks what you added (🆕), changed (✏️) or brought in (🧳), estimates what it adds to every turn of the
+model's context (≈ characters ÷ 4; MCP servers get 5 seconds to list their tools, or show "not measured"), and scores
+it against the rules the labs teach, with a maturity level from L0 (bare) to L5 (governed). After a level's checks
+pass, 🧱 *Your harness so far* re-runs the earlier labs' rules on your folder: it's advisory, so it never changes
+whether the level passes. And every 🤖 agent check keeps a 🧭 timeline of the run: each tool call, whether a hook or
+the permission system denied it, and the tokens Copilot reported.
 
 On a level, ⏱ shows how long you have been on it against the suggested time (time away from the keyboard counts at
 most 45 minutes at a stretch); past one and a half times the suggestion, the app offers a hint once. After your checks
@@ -143,6 +153,8 @@ node labs/start.mjs restore lab-01 easy --starter --yes        # back to the ori
 node labs/start.mjs reset lab-01 easy --yes       # discard changes since your latest commit (git)
 node labs/start.mjs history lab-01 easy           # agent check runs kept for this level, and this month's 💳 line
 node labs/start.mjs glossary hook                 # the words the workshop uses (all of them without a word)
+node labs/start.mjs xray lab-04 easy [--sol]      # 🔬 X-ray a harness: what it adds to every turn, its maturity level
+node labs/start.mjs replay [harnessed]            # 🎬 an agent run turn by turn, without (or with) a harness; no credits
 node labs/start.mjs bookmark lab-01 easy          # bookmark a level
 node labs/start.mjs export --format=json          # a learning summary in labs/.reports/ (stays local)
 node labs/start.mjs doctor                        # what is installed, what is missing (read-only)
@@ -171,7 +183,7 @@ Only the 🟢 easy levels are done live, together. Everything above easy is opti
 | Time | What |
 |---|---|
 | 0–10 | Welcome and why a harness matters, then clone the repo, trust the folder and start the app |
-| 10–98 | Labs 00–07, 11 minutes each: the idea (2), under the hood (2), the easy level together (6), and the takeaway with its check-yourself question (1) |
+| 10–98 | Labs 00–07, 11 minutes each: the idea (2), under the hood (2; for Lab 00, the 🎬 replay of an agent run without and with a harness), the easy level together (6), and the takeaway with its check-yourself question (1) |
 | 98–110 | Lab 08 kickoff (when it ships): bring a finished harness together and look at its maturity. Then walk through the homework map: tiers, times and paths |
 
 Anyone who falls behind presses **n**: on an easy level it moves to the next lab's easy level, which starts from the
@@ -217,6 +229,8 @@ node labs/start.mjs verify --chain --bring   # …and the seeded chain is in syn
 node labs/start.mjs sync-seeds --dry-run     # after changing a level: what the chain would update in every later level
 node labs/start.mjs test lab-03 easy --sol --agent   # try a reference solution with the real agent
 node labs/start.mjs open lab-03 easy --no-intro      # jump straight to a level during the live demo
+node labs/start.mjs replay                           # Lab 00's under-the-hood demo: ←/→ step, tab compares with a harness
+node labs/start.mjs xray lab-05 easy --sol           # show a finished harness: its tree, context budget and maturity
 node labs/start.mjs --path=deeper --no-intro         # start everyone on a learning path
 node labs/start.mjs starters        # is labs/_harness/starters.json (the published starters) up to date?
 start.cmd --full --setup-only       # prepare a classroom machine (see SETUP.md for shared offline caches)

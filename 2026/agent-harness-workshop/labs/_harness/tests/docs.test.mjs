@@ -34,3 +34,16 @@ test('the readme has the 110-minute agenda, the five tiers and every homework pa
   assert.match(readme, /glossary/i);
   assert.doesNotMatch(readme, /--path=(builder|foundations|automation)/, 'old path ids are gone');
 });
+
+test('the readme and the Lab 00 guide point to the replay and the X-ray, on the keys the app uses', () => {
+  assert.ok(KEYMAP.home.some((b) => b.id === 'replay' && b.keys.includes('u')));
+  assert.match(section('⌨️ The lab companion'), /home screen, \*\*u\*\* replays an agent run/);
+  assert.match(readme, /node labs\/start\.mjs replay/);
+  assert.match(readme, /node labs\/start\.mjs xray lab-/);
+  assert.match(section('🕐 The workshop'), /\| 10–98 \|[^\n]*replay/);
+  assert.match(section('🧑‍🏫 For facilitators'), /node labs\/start\.mjs replay /);
+  const lab00 = fs.readFileSync(path.join(import.meta.dirname, '..', '..', 'lab-00', 'readme.md'), 'utf8').replace(/\r/g, '');
+  const hood = lab00.split(/^## /m).find((s) => s.startsWith('🔬 Under the hood')) ?? '';
+  assert.match(hood, /press \*\*u\*\* on the home screen \(or run `node labs\/start\.mjs replay`\)/);
+  assert.match(hood, /\*\*tab\*\*/);
+});

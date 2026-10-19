@@ -42,6 +42,10 @@ Two consequences you'll meet in every lab:
 - **Output varies.** The model samples each answer, so one prompt can take different paths. Trust checks and
   repeated runs, not one lucky answer.
 
+**Watch it:** press **u** on the home screen (or run `node labs/start.mjs replay`) and step through a run with
+**←**/**→**: each turn shows the context window, the tool call the model wrote, what the harness decided and what went
+back into the history. Then press **tab** to see the same task with a harness, on the same turn.
+
 ## Cheat sheet
 | You want to… | Do this |
 |---|---|
