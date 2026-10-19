@@ -11,7 +11,9 @@ async function run(ext, name, args) {
 const isError = (r) => r.levels.includes('error');
 const show = (s) => JSON.stringify(s.slice(0, 220));
 
-export default (t) => [
+import { guard } from './no-copilot.mjs';
+
+export default (t) => guard(t, [
   // M1 · /grades does the maths
   t.check('/grades is registered with a description', async () => {
     const cmd = (await load(t)).command('grades');
@@ -27,9 +29,9 @@ export default (t) => [
   t.check('/grades AI210 and DB220: rounding is right', async () => {
     const ext = await load(t);
     const ai = (await run(ext, 'grades', 'AI210')).out;
-    if (!/\b6\.8\b/.test(ai) || /6\.81/.test(ai)) return `AI210: an 8 needs exactly 6.8 (watch out for floating-point noise). Got: ${show(ai)}`;
+    if (!/\b6\.80?\b/.test(ai) || /6\.81/.test(ai)) return `AI210: an 8 needs exactly 6.8 (watch out for floating-point noise). Got: ${show(ai)}`;
     const db = (await run(ext, 'grades', 'DB220')).out;
-    return /\b8\.4\b/.test(db) || `DB220: an 8 needs 8.4. Got: ${show(db)}`;
+    return /\b8\.40?\b/.test(db) || `DB220: an 8 needs 8.4. Got: ${show(db)}`;
   }, { milestone: 'M1' }),
   t.check('/grades ma110: passing needs 5.67, an 8 is not reachable', async () => {
     const { out } = await run(await load(t), 'grades', 'ma110');
@@ -56,6 +58,7 @@ export default (t) => [
     if (!/XYZ999/i.test(r.out)) return `Say which course you didn't find ("XYZ999"). Got: ${show(r.out)}`;
     if (!/SE201/.test(r.out) || !/WEB230/.test(r.out)) return 'For an unknown course, list the course codes the student has.';
     if (BAD.test(r.out)) return `No internals in the message, please. Got: ${show(r.out)}`;
+    if (!/Usage: \/grades <course>/.test(r.out)) return `Every mistake ends with the usage line: "Usage: /grades <course>". Got: ${show(r.out)}`;
     return isError(r) || 'An unknown course is a problem: log it with level "error".';
   }, { milestone: 'M2' }),
   t.check('/grades SE21, se2011 and SE301: "Did you mean SE201?"', async () => {
@@ -107,4 +110,4 @@ export default (t) => [
     const unknown = (await run(ext, 'due', '--course XYZ999')).out;
     return /SE201/.test(unknown) || 'For an unknown course, list the course codes.';
   }, { milestone: 'M3' }),
-];
+]);

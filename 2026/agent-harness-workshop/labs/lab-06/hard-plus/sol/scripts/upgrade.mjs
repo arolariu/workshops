@@ -40,6 +40,13 @@ export function upgrade(root, dep, version, { vendor = VENDOR } = {}) {
   let release;
   try { release = JSON.parse(fs.readFileSync(path.join(dir, 'release.json'), 'utf8')); } catch { return refuse(`There is no release ${tag} of ${key} in ${vendor}.`); }
   if (depKey(release.repo) !== key || !/^[0-9a-f]{40}$/.test(release.commit ?? '')) return refuse(`${dir}/release.json is not a pinned release of ${key}.`);
+  // A package only ever touches paths inside the project (and reads only inside its own release folder): "../x" or
+  // "/etc/x" in a lock or a release is an attack or a bug, never something to follow.
+  const leaves = (p) => typeof p !== 'string' || !p || path.isAbsolute(p) || /^[a-zA-Z]:/.test(p) || p.split(/[\\/]/).includes('..');
+  const badLocked = (entry.deployed_files ?? []).filter(leaves);
+  if (badLocked.length) return refuse(`apm.lock.yaml lists files outside the project for ${key}: ${badLocked.join(', ')}. Refusing to touch them.`);
+  const badDeploy = Object.entries(release.deploy ?? {}).filter(([to, from]) => leaves(to) || leaves(from)).map(([to, from]) => `${to} ← ${from}`);
+  if (badDeploy.length) return refuse(`${tag} wants to write or read outside the project or its release: ${badDeploy.join(', ')}. Refusing it.`);
   const next = new Map(Object.entries(release.deploy ?? {}).map(([to, from]) => [to, fs.readFileSync(path.join(dir, ...from.split('/')), 'utf8')]));
 
   // 3. Ownership: write only where this package wrote before, or where nothing exists yet.
@@ -96,7 +103,7 @@ export function upgrade(root, dep, version, { vendor = VENDOR } = {}) {
   const shadows = findShadows(root, plugins);
   const problems = [
     ...after.problems.map((p) => `after the upgrade: ${p.message}`),
-    ...shadows.map((s) => `after the upgrade: ${s.project} hides ${s.plugin}`),
+    ...shadows.map((s) => `after the upgrade: ${s.project} ${s.effect === 'look-alike' ? `looks like ${s.id}` : `hides ${s.plugin}`}`),
   ];
   return { ok: !problems.length, changed: [...changed].sort(), problems };
 }
@@ -119,7 +126,14 @@ function prune(root, dir) {
 }
 
 // ---------- CLI (given) ----------
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Run as a script (not imported)? Compare real paths: a symlink, a junction or an 8.3 short name must not switch it off.
+const isMain = (() => {
+  try {
+    const real = (p) => fs.realpathSync.native(p);
+    const [a, b] = [real(process.argv[1]), real(fileURLToPath(import.meta.url))];
+    return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+  } catch { return false; }
+})();
 if (isMain) {
   const args = process.argv.slice(2);
   const at = args.indexOf('--root');

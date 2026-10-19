@@ -29,7 +29,7 @@ what went wrong and what to type instead.
 ### M2 · Errors that help
 - `/grades` alone: `Usage: /grades <course>` and every course code, logged as an error; also when the CLI sends no
   `args` field at all
-- `/grades XYZ999` names the code and lists the courses; `SE21`, `se2011` and `SE301` get "Did you mean SE201?"
+- `/grades XYZ999` names the code, lists the courses and ends with the usage line; `SE21`, `se2011` and `SE301` get "Did you mean SE201?"
 - `/grades SE201 AI210` asks for one course at a time (with the usage line, as an error)
 - `/grades WEB230` says there are no grades yet: that's an answer, not an error
 

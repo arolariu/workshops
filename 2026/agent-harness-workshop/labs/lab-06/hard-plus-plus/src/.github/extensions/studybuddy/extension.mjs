@@ -113,7 +113,7 @@ const session = await joinSession({
         if (!list.length) return fail(`Which course? ${GRADES_USAGE}. Your courses: ${codes}`);
         if (list.length > 1) return fail(`One course at a time, please. ${GRADES_USAGE}. Your courses: ${codes}`);
         const found = findCourse(data, list[0]);
-        if (found.error) return fail(found.error);
+        if (found.error) return fail(`${found.error}\n${GRADES_USAGE}`);
         const { course } = found;
         const lines = [`📊 ${course.code} · ${course.name}`];
         if (!course.grades.length) {

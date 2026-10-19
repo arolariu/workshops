@@ -1,5 +1,6 @@
 // Free checks for Lab 06 · hard: ship the harness as one plugin. The CLI checks run Copilot with a scratch
 // COPILOT_HOME, so your own plugins and settings neither help nor get touched; they never send a prompt.
+import { guard } from './no-copilot.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -12,12 +13,13 @@ const WRITE_TOOLS = /^(?:\*|all|edit|write|create|execute|shell|bash|powershell)
 const WHEN = /\buse (it |this )?when\b|\bwhen (the user|you|asked|someone)\b/i;
 const PATH_FIELDS = ['agents', 'skills', 'commands', 'hooks', 'mcpServers', 'lspServers', 'extensions'];
 
-/** Every name the plugin gives Copilot: agents, skills (frontmatter names) and MCP servers. */
+/** Every name the plugin gives Copilot: agents and skills (by the name: in their frontmatter) and MCP servers. */
 function itemNames(t, dir) {
   const skills = skillFolders(t, dir).map((s) => String(t.frontmatter(`${dir}/skills/${s}/SKILL.md`).data.name ?? s));
+  const agents = agentNames(t, dir).map((a) => String(t.frontmatter(`${dir}/agents/${a}.agent.md`).data.name ?? a));
   let servers = [];
   try { servers = Object.keys(mcpConfig(t, dir).servers); } catch { /* M4 reports it */ }
-  return { agents: agentNames(t, dir), skills, servers };
+  return { agents, skills, servers };
 }
 /** Run the plugin's guard from a copy of the plugin, with a session folder elsewhere (like Copilot does). */
 function runGuard(t, toolName, command) {
@@ -33,7 +35,7 @@ function runGuard(t, toolName, command) {
   return { ...r, copy, project };
 }
 
-export default (t) => [
+export default (t) => guard(t, [
   // M1 · The manifest
   t.check('plugin.json: name, description, version, author', () => {
     const p = manifest(t);
@@ -105,8 +107,12 @@ export default (t) => [
     const off = all.filter((n) => !prefix || !n.startsWith(prefix));
     if (prefix.length < 3 || off.length) return `Give every agent, skill and MCP server the same short prefix (like sb-), so they never collide with a project's own. Not prefixed: ${(off.length ? off : all).join(', ')}.`;
     const project = projectNames(t);
-    const clash = [...mine.agents.filter((n) => project.agents.includes(n)), ...mine.skills.filter((n) => project.skills.includes(n)), ...mine.servers.filter((n) => project.servers.includes(n))];
-    return !clash.length || `These names exist in the project too; the project's agent or skill would hide the plugin's: ${clash.join(', ')}.`;
+    const hidden = mine.skills.filter((n) => project.skills.includes(n));
+    if (hidden.length) return `The project has skills with these names too, so Copilot would use the project's and drop the plugin's: ${hidden.join(', ')}.`;
+    const twins = mine.agents.filter((n) => project.agents.includes(n));
+    if (twins.length) return `The project has agents with these names too. The plugin's stay available as <plugin>:<name>, but "/agent ${twins[0]}" would pick the project's look-alike: ${twins.join(', ')}.`;
+    const servers = mine.servers.filter((n) => project.servers.includes(n));
+    return !servers.length || `The project's .mcp.json has servers with these names too, so one would replace the other: ${servers.join(', ')}.`;
   }, { milestone: 'M2' }),
   t.check('Copilot lists the plugin\'s skills', () => {
     const dir = pluginDir(t);
@@ -129,8 +135,9 @@ export default (t) => [
       const missing = SHELLS.filter((s) => !e[s]);
       if (missing.length) return `The preToolUse hook needs a "${missing.join('" and a "')}" command (macOS/Linux and Windows).`;
       if (!(Number(e.timeoutSec) > 0)) return 'Give the preToolUse hook a "timeoutSec".';
-      if (e.cwd !== undefined) return `Leave "cwd" out: a plugin's hook runs from the plugin's own folder, so "${e.cwd}" can only point somewhere the script isn't.`;
+      if (e.cwd !== undefined) return `Leave "cwd" out. A hook's "cwd" is relative to the repository root (hooks reference), so even "." sends the plugin's hook into the project, where hooks/scripts/… doesn't exist; without it, the command runs from the plugin's own folder, like GitHub's own plugins do.`;
       for (const s of SHELLS) {
+        if (/PLUGIN_ROOT|\$env:|%\w+%/.test(String(e[s]))) return `The ${s} command uses a variable (${e[s]}). Copilot documents \${PLUGIN_ROOT} for MCP server arguments, not for hook commands, and a plugin's hook already runs from the plugin's folder: use \`node hooks/scripts/sb-guard.mjs\`.`;
         const script = hookScript(dir, e[s]);
         if (!script) return `The ${s} command should be \`node <a script inside the plugin>\` (got "${e[s]}").`;
         if (!t.exists(script)) return `The ${s} command runs ${script}, which doesn't exist.`;
@@ -165,7 +172,7 @@ export default (t) => [
       const s = servers[n];
       if (s.url || (s.type && !['stdio', 'local'].includes(s.type))) return `"${n}" should be a local stdio server (the portal runs as a process).`;
       if (!/^node(\.exe)?$/i.test(String(s.command ?? ''))) return `"${n}" should run with "command": "node".`;
-      const script = s.args?.[0] ? inside(dir, s.args[0]) : null;
+      const script = s.args?.[0] ? inside(dir, s.args[0], { pluginRoot: true }) : null;
       if (!script) return `"${n}": the first argument should be the server script inside the plugin (like "mcp/sb-portal.mjs").`;
       if (!t.exists(script)) return `"${n}" runs ${script}, which doesn't exist.`;
     }
@@ -213,4 +220,4 @@ export default (t) => [
     if (!/--plugin-dir/.test(s)) return 'Show how to try it without installing (copilot --plugin-dir …).';
     return s.includes(version) || `Say which version this is (plugin.json says ${version}).`;
   }, { milestone: 'M5' }),
-];
+]);

@@ -1,6 +1,9 @@
 {
   "name": "studybuddy-internal",
-  "owner": { "name": "StudyBuddy platform team", "email": "platform@example.com" },
+  "owner": {
+    "name": "StudyBuddy platform team",
+    "email": "platform@example.com"
+  },
   "metadata": {
     "description": "The StudyBuddy platform team's approved Copilot CLI plugins",
     "version": "1.0.0"
@@ -11,14 +14,20 @@
       "description": "Guardrails for every repository: blocks recursive force-deletes",
       "version": "1.0.0",
       "source": "./plugins/studybuddy-guard",
-      "keywords": ["guardrails", "hooks"]
+      "keywords": [
+        "guardrails",
+        "hooks"
+      ]
     },
     {
       "name": "studybuddy-grades",
       "description": "studybuddy_exam_needed: exam maths the model calls instead of guessing",
       "version": "1.0.0",
       "source": "./plugins/studybuddy-grades",
-      "keywords": ["education", "extension"]
+      "keywords": [
+        "education",
+        "extension"
+      ]
     }
   ]
 }

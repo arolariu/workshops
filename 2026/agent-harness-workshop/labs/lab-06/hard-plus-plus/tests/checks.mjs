@@ -1,5 +1,6 @@
 // Free checks for Lab 06 · hard++: an internal marketplace. The Copilot check uses a scratch COPILOT_HOME (your own
 // marketplaces and plugins stay out of it and untouched); the release checks run in scratch Git repositories.
+import { guard } from './no-copilot.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -40,7 +41,7 @@ const SE201 = { grades: [{ grade: 8, weight: 30 }, { grade: 9, weight: 30 }], ex
 const releaseIn = (t, dir, ...args) => t.node([RELEASE, ...args], { cwd: dir, env: GIT_ENV });
 const tags = (dir) => gitRun(dir, ['tag', '-l']).out.split('\n').filter(Boolean);
 
-export default (t) => [
+export default (t) => guard(t, [
   // M1 · The marketplace
   t.check('marketplace.json: a kebab-case name, an owner, a description and two plugins', () => {
     const m = t.json(MJSON, `Create ${MJSON}.`);
@@ -60,6 +61,7 @@ export default (t) => [
   }, { milestone: 'M1' }),
   t.check('Every entry points at a plugin with the same name and version', () => {
     const m = t.json(MJSON);
+    if (!localEntries(m).length) return 'marketplace.json has no plugin entries with a local "source" yet (like "./plugins/studybuddy-guard").';
     for (const p of localEntries(m)) {
       const dir = path.posix.normalize(`${MARKET}/${p.source.replace(/\\/g, '/')}`);
       if (!dir.startsWith(`${MARKET}/`)) return `"${p.name}": the source ${p.source} is outside the marketplace.`;
@@ -79,6 +81,9 @@ export default (t) => [
   }, { milestone: 'M1' }),
   t.check('Copilot adds it, lists both plugins, and installs them at their versions', () => {
     const m = t.json(MJSON);
+    // Names from your JSON become command-line arguments: only kebab-case ones (never something like "-p") reach Copilot.
+    const unsafe = [m.name, ...(m.plugins ?? []).map((p) => p.name)].filter((n) => !KEBAB.test(String(n ?? '')));
+    if (unsafe.length) return `Fix these names in marketplace.json first (kebab-case): ${unsafe.map(show).join(', ')}.`;
     const copy = copyMarket(t);
     const env = { COPILOT_HOME: t.tmp(), COPILOT_AUTO_UPDATE: 'false' };
     const cli = (args) => t.copilot(args, { env, cwd: copy });
@@ -151,9 +156,9 @@ export default (t) => [
     const tl = await tool(t);
     const cases = [
       [SE201, (s) => /\b7\.25\b/.test(s), 'SE201 (Project 8 at 30%, Labs 9 at 30%, exam 40%) needs 7.25 for an 8'],
-      [{ ...SE201, target: undefined }, (s) => /\b5\b/.test(s) && !/-0\.25|\b0\b/.test(s), 'without a target it aims for 5, and passing always needs at least 5 on the exam (the exam rule), not -0.25'],
-      [{ grades: [{ grade: 9.2, weight: 50 }], examWeight: 50, target: 8 }, (s) => /\b6\.8\b/.test(s) && !/6\.81/.test(s), 'AI210 needs exactly 6.8 for an 8 (no floating-point noise)'],
-      [{ grades: [{ grade: 7.6, weight: 50 }], examWeight: 50, target: 8 }, (s) => /\b8\.4\b/.test(s), 'DB220 needs 8.4 for an 8'],
+      [{ ...SE201, target: undefined }, (s) => /\b5\b/.test(s) && !/-0\.25|(?<![\d.])0(?![\d.])/.test(s), 'without a target it aims for 5, and passing always needs at least 5 on the exam (the exam rule), not -0.25'],
+      [{ grades: [{ grade: 9.2, weight: 50 }], examWeight: 50, target: 8 }, (s) => /\b6\.80?\b/.test(s) && !/6\.81/.test(s), 'AI210 needs exactly 6.8 for an 8 (no floating-point noise)'],
+      [{ grades: [{ grade: 7.6, weight: 50 }], examWeight: 50, target: 8 }, (s) => /\b8\.40?\b/.test(s), 'DB220 needs 8.4 for an 8'],
       [{ grades: [{ grade: 4, weight: 40 }], examWeight: 60, target: 8 }, (s) => /not reachable|unreachable|out of reach|impossible/i.test(s) && /10\.67/.test(s), 'MA110 would need 10.67 for an 8: say it is not reachable, with the number'],
     ];
     for (const [args, ok, what] of cases) {
@@ -285,6 +290,20 @@ export default (t) => [
     if (readJson(plain, 'plugins/studybuddy-guard/plugin.json').version !== '1.0.1') return 'Outside its own repository, plugin.json should still be bumped.';
     return (/skip/i.test(r.all) && !fs.existsSync(path.join(plain, '.git'))) || 'Say that it skipped the commit and the tag (the folder is not its own repository), and never create one.';
   }, { milestone: 'M4', needs: ['git'], timeout: 90000 }),
+  t.check('Inside a bigger repository (like this workshop), it never commits or tags that repository', () => {
+    const outer = t.tmp();
+    const dir = copyMarket(t, path.join(outer, 'marketplace'));
+    fs.writeFileSync(path.join(outer, 'README.md'), '# The workshop: marketplace/ is only a folder in here\n');
+    gitInit(outer);
+    const head = gitRun(outer, ['rev-parse', 'HEAD']).out;
+    const r = releaseIn(t, dir, 'studybuddy-guard', 'patch', '--date', DATE);
+    if (r.code !== 0) return `Inside a bigger repository the release should still update the files (exit ${r.code}): ${r.all.trim().slice(0, 200)}`;
+    if (readJson(dir, 'plugins/studybuddy-guard/plugin.json').version !== '1.0.1') return 'Inside a bigger repository, plugin.json should still be bumped.';
+    if (gitRun(outer, ['rev-parse', 'HEAD']).out !== head) return 'It committed to the repository around the marketplace (in real life: the workshop you cloned). Being inside a repository isn\'t enough: the marketplace folder must be its top (git rev-parse --show-cdup prints nothing there).';
+    if (tags(outer).length) return `It tagged the repository around the marketplace (${tags(outer).join(', ')}).`;
+    if (fs.existsSync(path.join(dir, '.git'))) return 'It created a repository inside the marketplace folder: never do that on your own.';
+    return /skip/i.test(r.all) || 'Say that it skipped the commit and the tag (the marketplace is not a repository of its own).';
+  }, { milestone: 'M4', needs: ['git'], timeout: 90000 }),
   t.check('You shipped studybuddy-grades 1.0.0 (or later) with the script', async () => {
     const { changeKind } = await t.import(SCRIPT);
     const pj = t.json(`${GRADES}/plugin.json`);
@@ -295,4 +314,4 @@ export default (t) => [
     if (!new RegExp(`^## ${pj.version.replace(/\./g, '\\.')}\\b`, 'm').test(log)) return `CHANGELOG.md has no "## ${pj.version}" section.`;
     return changeKind(log) === null || 'Its Unreleased section still has entries: they were released, so they belong under the version.';
   }, { milestone: 'M4' }),
-];
+]);

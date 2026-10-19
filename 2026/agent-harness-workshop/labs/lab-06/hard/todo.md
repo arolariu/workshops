@@ -85,8 +85,8 @@ Agents in `agents/` and skills in `skills/` are found without path fields. Hooks
 ### M2
 <details><summary>Renaming, everywhere</summary>
 
-An agent's ID is its **file name** (`sb-reviewer.agent.md`), and a skill's name is the `name:` in its frontmatter,
-which must match its folder. Rename the file or folder **and** the frontmatter. Copilot names a plugin's agents
+An agent and a skill are both known by the `name:` in their frontmatter (an agent falls back to its file name), and a
+skill's name must match its folder. Rename the file or folder **and** the frontmatter. Copilot names a plugin's agents
 after the plugin (`studybuddy-harness:sb-reviewer`), but a plugin's skills keep their own names next to the
 project's (`copilot --plugin-dir ./studybuddy-plugin skill list` shows both): that's why plugins prefix.
 
@@ -151,19 +151,21 @@ Push the repository to GitHub and anyone can install the folder:
 A plugin is your harness as one versioned dependency: prefix every name, keep every path inside it, and never assume where it will run.
 
 ## ❓ Check yourself
-A team installs your plugin, and their repository already has `.github/agents/sb-reviewer.agent.md`, an older copy
-someone pasted in last year. Which reviewer do they get when they run `/agent sb-reviewer`?
+A team installs your plugin, and their repository already has `.github/skills/explain/SKILL.md` with
+`name: sb-explain-error`, an older copy someone pasted in last year. They paste a stack trace. Which instructions
+can Copilot use?
 1. Yours: an installed plugin overrides the project, so updates reach everyone.
 2. Copilot refuses to start until the clash is fixed.
-3. The project's old copy: agents are first-found-wins, project before plugins, and the plugin's is silently
-   ignored.
-4. Both: Copilot merges the two instructions into one agent.
+3. Only the project's old copy: skills are first-found-wins by their `name:`, project before plugins, and the
+   plugin's is silently dropped.
+4. Both: Copilot merges the two skills into one.
 
 <details><summary>Answer</summary>
 
-**3.** Project agents and skills load before plugin ones, and the first name wins without a warning. A prefix only
-helps if nobody copies the plugin's files into a project, which is why Lab 06 hard+ builds a detector for exactly
-this shadowing.
+**3.** Skills go by the `name:` in `SKILL.md`, whatever the folder is called, and project skills load first:
+`copilot --plugin-dir ./studybuddy-plugin skill list` shows only the project's `sb-explain-error`. Agents are
+different: a plugin's agents are named `studybuddy-harness:sb-reviewer`, so a project agent can't hide one, but
+`/agent sb-reviewer` would still pick a project look-alike. Lab 06 hard+ builds a detector for both.
 
 </details>
 

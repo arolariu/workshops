@@ -44,15 +44,17 @@ export function release(t, version) {
 
 /**
  * A consumer project in a temp folder: fixtures/consumer.json, plus campus-standards v1.4.0 deployed from vendor/,
- * plus a lock that matches. `extra` adds or replaces project files; `prefix` writes hashes as "sha256:<hex>".
+ * plus a lock that matches. `extra` adds or replaces project files; `prefix` writes hashes as "sha256:<hex>";
+ * `nested` puts the project one folder down (so "../x" stays inside the check's own temp folder); `campusExtra` adds
+ * files to campus-standards' lock entry (and writes them).
  */
-export function buildConsumer(t, { extra = {}, prefix = '' } = {}) {
-  const root = t.tmp();
+export function buildConsumer(t, { extra = {}, prefix = '', nested = false, campusExtra = {} } = {}) {
+  const root = nested ? path.join(t.tmp(), 'project') : t.tmp();
   const c = fixture(t, 'consumer.json');
   const campus = release(t, 'v1.4.0');
   const entries = [
     ...c.packages.map((p) => ({ ...p, prefix })),
-    { repo: campus.repo, ref: campus.ref, commit: campus.commit, version: campus.version, files: campus.files, prefix },
+    { repo: campus.repo, ref: campus.ref, commit: campus.commit, version: campus.version, files: { ...campus.files, ...campusExtra }, prefix },
   ];
   for (const e of entries) for (const [f, text] of Object.entries(e.files)) write(root, f, text);
   for (const [f, text] of Object.entries({ ...c.files, ...extra })) write(root, f, text);

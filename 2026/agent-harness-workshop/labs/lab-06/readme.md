@@ -51,8 +51,10 @@ studybuddy-plugin/
 | See what's installed | `copilot plugin list` or `/plugin` |
 | Add your own marketplace | `copilot plugin marketplace add owner/repo` or an **absolute** local path |
 
-If a project and a plugin both define an agent or skill with the same name, the **project's wins**, so
-give plugin items their own names.
+If a project and a plugin both have a **skill** with the same `name:`, the **project's wins** and the plugin's is
+silently dropped. A plugin's **agents** are listed as `<plugin>:<name>` (`studybuddy-harness:sb-reviewer`), so they
+can't be hidden, but a project agent with the same name is what `/agent sb-reviewer` picks. Give plugin items their own
+names.
 
 Good to know (Copilot CLI 1.0.101):
 - A plugin's hook command and its stdio MCP servers run **from the plugin's folder**: point them at files inside the
@@ -117,7 +119,7 @@ tools for the model and listen to session events.
 
 ## Common pitfalls
 - **Unpinned dependencies** (`owner/repo` without `#tag`): your harness changes under your feet.
-- **Name clashes**: a project agent shadows a plugin agent with the same name.
+- **Name clashes**: a project skill hides a plugin skill with the same name, and a project agent passes for a plugin's.
 - **Doing deterministic work with AI**: if the answer is a formula, write a command, not a prompt.
 
 ## Learn more

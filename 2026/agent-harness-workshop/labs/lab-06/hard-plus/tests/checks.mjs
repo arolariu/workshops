@@ -1,4 +1,5 @@
 // Free checks for Lab 06 · hard+: the supply chain. Everything runs offline, on projects built in temp folders.
+import { guard } from './no-copilot.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,7 +27,7 @@ const DRIFT = [
   ['no-lock', 'deleted apm.lock.yaml', (r) => fs.rmSync(path.join(r, 'apm.lock.yaml'))],
 ];
 
-export default (t) => [
+export default (t) => guard(t, [
   // M1 · Pin everything
   t.check('pinProblems() flags 9 loose dependencies and lets 7 pinned ones through', async () => {
     const { pinProblems } = await t.import(PINS);
@@ -98,19 +99,24 @@ export default (t) => [
   }, { milestone: 'M2' }),
 
   // M3 · Shadows
-  t.check('findShadows() finds the 5 shadows in the fixture, and nothing else', async () => {
+  t.check('findShadows() finds the 3 skill shadows and the 3 agent look-alikes in the fixture, and nothing else', async () => {
     const { findShadows } = await t.import(SHADOWS);
     const { root, plugin, expected } = buildShadows(t);
-    const got = (findShadows(root, [plugin]) ?? []).map(({ kind, name, project, plugin: p }) => ({ kind, name, project, plugin: p }));
+    const got = findShadows(root, [plugin]) ?? [];
     const key = (s) => `${s.kind} ${s.name} ${s.project}`;
     const missing = expected.filter((e) => !got.some((g) => key(g) === key(e)));
     const extra = got.filter((g) => !expected.some((e) => key(g) === key(e)));
     if (missing.length || extra.length) {
       return t.fail(`findShadows() ${missing.length ? `missed ${missing.map(key).join('; ')}` : ''}${missing.length && extra.length ? ', and ' : ''}${extra.length ? `wrongly reported ${extra.map(key).join('; ')}` : ''}.`, { expected: expected.map(key), actual: got.map(key) });
     }
-    const wrongPlugin = got.find((g) => g.plugin !== expected.find((e) => key(e) === key(g)).plugin);
-    if (wrongPlugin) return `Say which plugin file is hidden: for ${key(wrongPlugin)} that's ${expected.find((e) => key(e) === key(wrongPlugin)).plugin} (got ${wrongPlugin.plugin}).`;
-    return JSON.stringify(got.map(key)) === JSON.stringify(expected.map(key)) || 'Sort the result by kind, then name.';
+    const want = (g) => expected.find((e) => key(e) === key(g));
+    const wrongEffect = got.find((g) => g.effect !== want(g).effect);
+    if (wrongEffect) return `${key(wrongEffect)} is a ${want(wrongEffect).effect}: ${want(wrongEffect).effect === 'shadow' ? 'a project skill with the plugin skill\'s name hides it' : `the plugin's agent stays available as ${want(wrongEffect).id}, so the project's is a look-alike`} (got effect "${wrongEffect.effect}").`;
+    const wrongPlugin = got.find((g) => g.plugin !== want(g).plugin);
+    if (wrongPlugin) return `Say which plugin file it is about: for ${key(wrongPlugin)} that's ${want(wrongPlugin).plugin} (got ${wrongPlugin.plugin}).`;
+    const wrongId = got.find((g) => g.kind === 'agent' && g.id !== want(g).id);
+    if (wrongId) return `For ${key(wrongId)}, give the plugin agent's own name: "${want(wrongId).id}" (<plugin name>:<agent name>, got "${wrongId.id}").`;
+    return JSON.stringify(got.map(key)) === JSON.stringify(expected.map(key)) || 'Sort the result by kind, then name, then project path.';
   }, { milestone: 'M3' }),
   t.check('node scripts/find-shadows.mjs: exit 1 on the fixture, 0 on your project', () => {
     const { root, plugin } = buildShadows(t);
@@ -181,4 +187,33 @@ export default (t) => [
     if (diff.length) return `It refused, but changed files anyway: ${diff.join(', ')}.`;
     return r.all.includes(mine) || `Name the file you won't overwrite (${mine}).`;
   }, { milestone: 'M4' }),
-];
+  t.check('It never follows a path out of the project, from the lock or from a release', () => {
+    // 1. A lock entry that claims ../keep.txt (with the right hash, so it isn't drift): v2 doesn't deploy it, so a
+    //    naive upgrade deletes a file outside the project.
+    const root = buildConsumer(t, { nested: true, campusExtra: { '../keep.txt': 'Not the package\'s to delete.\n' } });
+    const keep = path.join(root, '..', 'keep.txt');
+    const before = snapshot(root);
+    const r = upgradeCli(t, root);
+    if (!fs.existsSync(keep)) return 'The lock said campus-standards deployed ../keep.txt, and the upgrade deleted it: a file OUTSIDE the project. Refuse lock paths with ".." or an absolute path.';
+    if (r.code !== 1 || snapshotDiff(before, snapshot(root)).length) return `A lock entry with a path outside the project ("../keep.txt") must make the upgrade refuse (exit 1) and change nothing (exit ${r.code}).`;
+    if (!r.all.includes('../keep.txt')) return 'Say which path you refused to touch (../keep.txt).';
+    // 2. A release that deploys to ../escaped.txt: a copy of your scripts and vendor/ with one hostile release added.
+    const tool = t.tmp();
+    for (const d of ['scripts', 'vendor']) fs.cpSync(t.path(d), path.join(tool, d), { recursive: true });
+    const hostile = path.join(tool, 'vendor/campus-standards/v2.0.1');
+    fs.mkdirSync(path.join(hostile, 'files'), { recursive: true });
+    fs.writeFileSync(path.join(hostile, 'files/x.md'), 'Written where it should never be.\n');
+    const good = JSON.parse(fs.readFileSync(path.join(tool, 'vendor/campus-standards/v2.0.0/release.json'), 'utf8'));
+    fs.writeFileSync(path.join(hostile, 'release.json'), JSON.stringify({ ...good, version: '2.0.1', ref: 'v2.0.1', deploy: { ...good.deploy, '../escaped.txt': 'files/x.md' } }, null, 2));
+    for (const from of Object.values(good.deploy)) {
+      fs.mkdirSync(path.dirname(path.join(hostile, from)), { recursive: true });
+      fs.copyFileSync(path.join(tool, 'vendor/campus-standards/v2.0.0', from), path.join(hostile, from));
+    }
+    const project = buildConsumer(t, { nested: true });
+    const snap = snapshot(project);
+    const h = t.node([path.join(tool, UPGRADE), CAMPUS, 'v2.0.1', '--root', project]);
+    if (fs.existsSync(path.join(project, '..', 'escaped.txt'))) return 'A release that deploys to "../escaped.txt" wrote a file OUTSIDE the project. Refuse release paths with ".." or an absolute path.';
+    if (h.code !== 1 || snapshotDiff(snap, snapshot(project)).length) return `A release that wants to write outside the project must be refused (exit 1) with nothing changed (exit ${h.code}).`;
+    return h.all.includes('../escaped.txt') || 'Say which path of the release you refused (../escaped.txt).';
+  }, { milestone: 'M4' }),
+]);

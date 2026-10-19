@@ -5,8 +5,8 @@
 ## 🎯 Mission
 Your plugin is now a dependency of other teams, and it has dependencies of its own. That makes it part of a supply
 chain made of prompts and code, with the usual ways to break: a dependency that follows `#main` changes under
-everyone overnight, someone "fixes" a deployed skill by hand and the lock no longer tells the truth, a project file
-with the plugin's name silently hides the approved item, and the next major release renames the skill your agents
+everyone overnight, someone "fixes" a deployed skill by hand and the lock no longer tells the truth, a project skill
+with the plugin skill's name silently hides the approved one, and the next major release renames the skill your agents
 rely on. Pin everything, build the tools that catch drift and shadowing, then use them to take a project through a
 breaking upgrade and prove that nothing broke.
 
@@ -17,7 +17,7 @@ breaking upgrade and prove that nothing broke.
    major-only tag.
 3. `scripts/verify-lock.mjs` finds every kind of drift between `apm.yml`, `apm.lock.yaml` and the deployed files, and
    doesn't call a CRLF checkout drift.
-4. `scripts/find-shadows.mjs` lists the project agents and skills that hide a plugin's, by the names Copilot uses.
+4. `scripts/find-shadows.mjs` lists the project skills that hide a plugin's (shadows) and the project agents that pass for a plugin's (look-alikes), by the names Copilot uses.
 5. `scripts/upgrade.mjs` moves a project to a new release of a package: it refuses over drift and over files it
    doesn't own, applies the release's migrations, rewrites the pin and the lock, and proves the result.
 
@@ -56,9 +56,11 @@ dependencies:
   (`unpinned-commit`), and no lock at all (`no-lock`)
 - `node scripts/verify-lock.mjs <folder>` exits 0 when clean, and 1 with the file's name when something drifted
 
-### M3 · Shadows
-- `findShadows(root, pluginDirs)` returns exactly the 5 shadows in `tests/fixtures/shadows.json`, sorted by kind,
-  then name, with both paths: and none of its look-alikes
+### M3 · Shadows and look-alikes
+- `findShadows(root, pluginDirs)` returns exactly what `tests/fixtures/shadows.json` expects, sorted by kind, name
+  and project path, with both paths: 3 skill **shadows** (`effect: "shadow"`) and 3 agent **look-alikes**
+  (`effect: "look-alike"`, with the plugin agent's own name in `id`, like `sb-harness:sb-reviewer`), and none of the
+  fixture's traps (`docs/`, `sb-study-plan-v2`, an agent called `reviewer`)
 - `node scripts/find-shadows.mjs --root <folder> <plugin>` exits 1 and names them; on your project with
   `studybuddy-plugin` it exits 0
 
@@ -118,10 +120,12 @@ gets the same hash everywhere: `createHash('sha256').update(text.replace(/\r\n/g
 ### M3
 <details><summary>Which names Copilot compares</summary>
 
-Agents are first-found-wins **by file name**: `.github/agents/sb-reviewer.agent.md` and `.claude/agents/sb-tutor.md`
-hide the plugin's `sb-reviewer` and `sb-tutor`, but `tutor.agent.md` with `name: sb-tutor` hides nothing. Skills are
-first-found-wins **by the `name:` in SKILL.md**, in `.github/skills/`, `.agents/skills/` and `.claude/skills/`, whatever
-the folder is called. `docs/` isn't loaded at all. `frontmatter(file)` is given.
+Both go by the `name:` in their frontmatter (the file or folder name only when there is none), and `docs/` isn't loaded
+at all. **Skills** are first-found-wins: a project skill in `.github/skills/`, `.agents/skills/` or `.claude/skills/`
+with a plugin skill's name hides it, whatever its folder is called (`skill list` shows only the project's).
+**Agents** can't be hidden: Copilot lists a plugin's agents as `<plugin>:<name>`. But a project agent in
+`.github/agents/*.agent.md` or `.claude/agents/*.md` with the same `name:` (even `tutor.agent.md` with
+`name: sb-tutor`) is what `/agent sb-tutor` picks: a look-alike. `frontmatter(file)` is given.
 
 </details>
 

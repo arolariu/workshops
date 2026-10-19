@@ -76,8 +76,9 @@ A plugin from another repository: `"source": { "source": "github", "repo": "owne
   `plugin.json` and the entry to 1.0.1, cuts the changelog, commits everything and tags that commit
   `studybuddy-guard-v1.0.1`
 - It refuses (exit 1, nothing written, no tag): a `minor` release over a Breaking entry, a dirty tree, a tag that
-  exists, an invalid marketplace. `--dry-run` writes nothing; outside its own repository it updates the files and
-  says it skipped the commit and the tag
+  exists, an invalid marketplace. `--dry-run` writes nothing; outside its own repository (a plain folder, or a folder
+  inside a bigger repository like this workshop) it updates the files, says it skipped the commit and the tag, and
+  leaves the bigger repository's commits and tags alone
 - `studybuddy-grades` is at 1.0.0 (or later): `plugin.json`, the entry and a changelog section agree, and Unreleased
   is empty
 
@@ -86,7 +87,6 @@ A plugin from another repository: `"source": { "source": "github", "repo": "owne
 cd labs/lab-06/hard-plus-plus/src/marketplace
 code .github/plugin/marketplace.json README.md scripts/release.mjs
 code plugins/studybuddy-grades/extensions/studybuddy-grades/extension.mjs
-copilot plugin marketplace add "$PWD"       # an ABSOLUTE path
 node scripts/release.mjs --validate
 node labs/start.mjs test lab-06 hard++     # from the workshop folder
 ```
@@ -94,9 +94,20 @@ node labs/start.mjs test lab-06 hard++     # from the workshop folder
 fix waiting in Unreleased); `studybuddy-grades` is a 0.1.0 skeleton. `release.mjs` gives you the plumbing
 (`manifestPath`, `readJson`, `writeJson`, `git`, `ownRepo`, `unreleased`) and the CLI; you write the parts marked
 `TODO(Mn)`. Inside this workshop, `marketplace/` is not its own Git repository, so your release script must skip the
-commit and the tag here; the checks run it in scratch repositories. Try it in a session:
-`copilot plugin install studybuddy-grades@studybuddy-internal`, then `copilot --experimental` and ask "What do I need
-on the SE201 exam for an 8?"
+commit and the tag here; the checks run it in scratch repositories.
+
+Try the marketplace in a throwaway Copilot setup first (PowerShell: `$env:COPILOT_HOME = "<a new folder>"`):
+```bash
+export COPILOT_HOME="$(mktemp -d)"   # your own setup stays untouched
+copilot plugin marketplace add "$PWD"         # an ABSOLUTE path
+copilot plugin marketplace browse studybuddy-internal
+copilot plugin install studybuddy-grades@studybuddy-internal
+copilot plugin list
+unset COPILOT_HOME                   # back to your own setup
+```
+To ask "What do I need on the SE201 exam for an 8?" in a session (`copilot --experimental`), add and install the same
+way in your own setup, and undo it afterwards with `copilot plugin uninstall studybuddy-grades` and
+`copilot plugin marketplace remove studybuddy-internal`.
 
 ## 💡 Hints
 ### M1
@@ -110,9 +121,10 @@ live from their folder ("nothing was copied"), so edits show up in the next sess
 
 <details><summary>Try it without touching your own setup</summary>
 
-`COPILOT_HOME` moves Copilot's configuration: `COPILOT_HOME=$(mktemp -d) copilot plugin marketplace add "$PWD"` (on
-Windows, set `$env:COPILOT_HOME` to a new folder first) registers the marketplace in a throwaway home. That's what the
-check does.
+`COPILOT_HOME` moves Copilot's whole configuration (settings, marketplaces, installed plugins) to another folder:
+point it at a new folder, add, browse, install and list, and your own setup never changes. That's exactly what the
+check does. When you did try something in your own setup, undo it: `copilot plugin uninstall <plugin>`, then
+`copilot plugin marketplace remove studybuddy-internal` (`--force` also uninstalls the plugins still installed from it).
 
 </details>
 
@@ -155,8 +167,9 @@ them, `git commit`, and `git tag` (the tag goes on the release commit).
 
 <details><summary>Never tag the wrong repository</summary>
 
-`git rev-parse --show-toplevel` prints the top of the repository a folder is in. If that isn't the marketplace folder
-itself (`ownRepo(root)` does this), you're inside something bigger, like the workshop: skip the commit and the tag,
+`git rev-parse --is-inside-work-tree` says "true" anywhere inside the workshop clone, so it can't tell you whether to
+tag. `git rev-parse --show-cdup` prints the way up to the top of the repository (`../../`), and nothing at the top
+itself: `ownRepo(root)` uses it. Anything else means you're inside something bigger: skip the commit and the tag,
 and say so.
 
 </details>
@@ -184,7 +197,7 @@ the release script changes both in one commit.
 ## 🚀 Going further
 - Run the release in CI: on a merge to `main`, `node scripts/release.mjs --validate`, and on a tag, publish.
 - List `studybuddy-harness` (Lab 06 hard) from its own repository with a `github` source pinned to a 40-character
-  `sha`, and extend the gatekeeper to refuse a `sha` that isn't 40 characters.
+  `sha`, and install it from your marketplace next to the two local plugins.
 - Teach the gatekeeper about org policy: only plugins whose `author.name` is on an allow-list, and no hooks from
   outside the platform team.
 - Give `studybuddy-grades` a second tool, `studybuddy_days_left`, and a `/grades` command that uses the same code.

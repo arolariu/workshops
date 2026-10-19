@@ -11,7 +11,7 @@ import { joinSession } from '@github/copilot-sdk/extension';
 export function examNeeded(args) {
   // TODO(M3): validate the input (say what's wrong in an "Error: …" string, never throw), then compute the exam
   // grade needed for `target` (default 5), rounded UP to 2 decimals, with the exam rule (at least 5 on the exam).
-  return 'Error: studybuddy_exam_needed is not written yet.';
+  return 'studybuddy_exam_needed is not written yet.';
 }
 
 await joinSession({

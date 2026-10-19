@@ -56,7 +56,14 @@ function log(cwd, entry) {
     fs.appendFileSync(path.join(dir, 'sb-guard.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`);
   } catch { /* logging must never break the agent */ }
 }
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Run as a script (not imported)? Compare real paths: a symlink, a junction or an 8.3 short name must not switch it off.
+const isMain = (() => {
+  try {
+    const real = (p) => fs.realpathSync.native(p);
+    const [a, b] = [real(process.argv[1]), real(fileURLToPath(import.meta.url))];
+    return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+  } catch { return false; }
+})();
 const input = isMain ? readInput() : null;
 if (input && typeof input === 'object') {
   let args = input.toolArgs ?? {};

@@ -15,9 +15,14 @@ export function pluginDir(t) {
 }
 export const manifest = (t, dir = pluginDir(t)) => t.json(`${dir}/plugin.json`);
 
-/** A path the manifest gives, relative to the plugin. null when it leaves the plugin. */
-export function inside(dir, rel) {
-  const clean = String(rel).replace(/^\$\{(?:PLUGIN_ROOT|COPILOT_PLUGIN_ROOT|CLAUDE_PLUGIN_ROOT)\}[\\/]/, '').replace(/^\.\//, '');
+/**
+ * A path the plugin gives, relative to the plugin; null when it leaves the plugin. `pluginRoot`: accept a leading
+ * ${PLUGIN_ROOT}/ (documented for MCP server args only, not for hook commands or manifest paths).
+ */
+export function inside(dir, rel, { pluginRoot = false } = {}) {
+  const raw = String(rel);
+  const clean = (pluginRoot ? raw.replace(/^\$\{(?:PLUGIN_ROOT|COPILOT_PLUGIN_ROOT|CLAUDE_PLUGIN_ROOT)\}[\\/]/, '') : raw).replace(/^\.\//, '');
+  if (/\$|%/.test(clean)) return null;
   const joined = path.posix.normalize(`${dir}/${clean.replace(/\\/g, '/')}`);
   return joined === dir || joined.startsWith(`${dir}/`) ? joined : null;
 }
@@ -44,8 +49,10 @@ export function mcpConfig(t, dir = pluginDir(t)) {
 export const agentNames = (t, dir) => t.files(`${dir}/agents`).filter((f) => f.endsWith('.agent.md')).map((f) => path.basename(f, '.agent.md'));
 export const skillFolders = (t, dir) => t.files(`${dir}/skills`).filter((f) => /\/skills\/[^/]+\/SKILL\.md$/.test(f)).map((f) => path.basename(path.dirname(f)));
 export function projectNames(t) {
-  const agents = t.files('.github/agents').filter((f) => f.endsWith('.agent.md')).map((f) => path.basename(f, '.agent.md'));
-  const skills = t.files('.github/skills').filter((f) => /^\.github\/skills\/[^/]+\/SKILL\.md$/.test(f)).map((f) => String(t.frontmatter(f).data.name ?? path.basename(path.dirname(f))));
+  // Agents and skills are both known by the name: in their frontmatter (the file or folder name only as a fallback).
+  const nameOf = (f, fallback) => { try { return String(t.frontmatter(f).data.name ?? fallback); } catch { return fallback; } };
+  const agents = t.files('.github/agents').filter((f) => f.endsWith('.agent.md')).map((f) => nameOf(f, path.basename(f, '.agent.md')));
+  const skills = t.files('.github/skills').filter((f) => /^\.github\/skills\/[^/]+\/SKILL\.md$/.test(f)).map((f) => nameOf(f, path.basename(path.dirname(f))));
   let servers = [];
   try { servers = Object.keys(JSON.parse(t.read('.mcp.json') ?? '{}').mcpServers ?? {}); } catch { /* not this level's business */ }
   return { agents, skills, servers };

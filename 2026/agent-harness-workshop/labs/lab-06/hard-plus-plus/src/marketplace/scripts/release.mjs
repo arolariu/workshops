@@ -20,15 +20,18 @@ export function manifestPath(root) {
 }
 export const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 export const writeJson = (file, value) => fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
-/** Run git in `cwd`: { code, out }. */
+/** Run git in `cwd`: { code, out (stdout and stderr), stdout }. */
 export function git(cwd, args) {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true });
-  return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() };
+  return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim(), stdout: (r.stdout ?? '').trim() };
 }
-/** Is `root` the top of its own Git repository (not a folder inside a bigger one)? */
+/**
+ * Is `root` the top of its own Git repository (not a folder inside a bigger one)? `--show-cdup` prints the way up
+ * to the top ("../../" inside a bigger repository) and nothing at the top itself, so no path strings are compared.
+ */
 export function ownRepo(root) {
-  const r = git(root, ['rev-parse', '--show-toplevel']);
-  return r.code === 0 && path.resolve(r.out) === path.resolve(root);
+  const r = git(root, ['rev-parse', '--show-cdup']);
+  return r.code === 0 && r.stdout === '';
 }
 /** The "## Unreleased" section of a changelog: { start, end, body } (line indexes), or null. */
 export function unreleased(changelog) {
@@ -81,7 +84,14 @@ export function release({ plugin, part, date, dryRun = false, root = ROOT }) {
 }
 
 // ---------- CLI (given) ----------
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Run as a script (not imported)? Compare real paths: a symlink, a junction or an 8.3 short name must not switch it off.
+const isMain = (() => {
+  try {
+    const real = (p) => fs.realpathSync.native(p);
+    const [a, b] = [real(process.argv[1]), real(fileURLToPath(import.meta.url))];
+    return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+  } catch { return false; }
+})();
 if (isMain) {
   const args = process.argv.slice(2);
   if (args.includes('--validate')) {

@@ -26,7 +26,7 @@ export function hashText(text) {
 export function verifyLock(root) {
   // TODO(M2): readLock(root) and readManifest(root) give you both files; depKey()/depRef() match apm.yml's
   // dependencies to the lock's entries (repo_url). Then check every deployed file against its hash.
-  return { ok: true, problems: [] };
+  return { ok: false, problems: [{ kind: 'todo', message: 'verifyLock() is not written yet.' }] };
 }
 
 // ---------- plumbing (given): read and write apm.yml and apm.lock.yaml, no dependencies ----------
@@ -175,7 +175,14 @@ export function depRef(dep) {
 }
 
 // ---------- CLI (given) ----------
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Run as a script (not imported)? Compare real paths: a symlink, a junction or an 8.3 short name must not switch it off.
+const isMain = (() => {
+  try {
+    const real = (p) => fs.realpathSync.native(p);
+    const [a, b] = [real(process.argv[1]), real(fileURLToPath(import.meta.url))];
+    return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+  } catch { return false; }
+})();
 if (isMain) {
   const root = path.resolve(process.argv[2] ?? '.');
   const { ok, problems } = verifyLock(root);

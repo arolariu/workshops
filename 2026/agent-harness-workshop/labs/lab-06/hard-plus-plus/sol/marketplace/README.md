@@ -21,6 +21,14 @@ copilot plugin install studybuddy-guard@studybuddy-internal
 copilot plugin install studybuddy-grades@studybuddy-internal
 copilot --experimental        # extensions (studybuddy-grades) need it
 ```
+Try it in a throwaway setup first: point `COPILOT_HOME` at a new folder for those commands, and your own setup stays as
+it is.
+
+## Remove
+```bash
+copilot plugin uninstall studybuddy-grades
+copilot plugin marketplace remove studybuddy-internal   # --force: uninstall its plugins too
+```
 
 ## Release
 ```bash

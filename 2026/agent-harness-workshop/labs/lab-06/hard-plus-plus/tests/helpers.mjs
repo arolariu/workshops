@@ -20,10 +20,9 @@ const write = (root, rel, text) => {
 export const readJson = (root, rel) => JSON.parse(fs.readFileSync(path.join(root, ...rel.split('/')), 'utf8'));
 export const writeJson = (root, rel, v) => write(root, rel, `${JSON.stringify(v, null, 2)}\n`);
 
-/** A copy of your marketplace folder in a temp folder. */
-export function copyMarket(t) {
-  const dest = path.join(t.tmp(), 'marketplace');
-  fs.cpSync(t.path(MARKET), dest, { recursive: true });
+/** A copy of your marketplace folder in a temp folder (or at `dest`), without .git or node_modules. */
+export function copyMarket(t, dest = path.join(t.tmp(), 'marketplace')) {
+  fs.cpSync(t.path(MARKET), dest, { recursive: true, filter: (src) => !['.git', 'node_modules'].includes(path.basename(src)) });
   return dest;
 }
 
