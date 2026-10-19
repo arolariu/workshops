@@ -18,6 +18,12 @@ import { runInteractive as realRunInteractive, openFolder as realOpenFolder, cop
 import { changes as gitChanges, ensureStarter, listRecovery, restoreStarter, restoreSnapshot, createCheckpoint, resetToCommit, compareTrees } from './workspace.mjs';
 import { inspectEnvironment as realInspect } from './doctor.mjs';
 import { PATHS, pathById, progressView, describeSelection, nextExercise, choosePath, learningReport, writeReport, STATUS_FILTERS } from './learning.mjs';
+import { courseOrder, predecessorOf, loadManifest } from './chain.mjs';
+import { loadCourse } from './course.mjs';
+import { bringPlan, applyBring } from './bring.mjs';
+import { revealNextHint, revealedHints, nextFixName, groupChecks } from './milestones.mjs';
+import { bringLines } from './screens/bring.mjs';
+import { checkGroupLines, milestoneListLines, hintDots } from './screens/milestones.mjs';
 
 const CONFETTI = ['🎉', '✨', '🎊', '⭐', '🥳', '💚', '🚀'];
 const TIPS = [
@@ -29,6 +35,8 @@ const TIPS = [
   '`/env` in Copilot shows everything it loaded: instructions, skills, agents, MCP servers, hooks.',
   'Agent checks run on a copy in `labs/.runs/`, so your `src/` stays exactly as you left it.',
   'Press `/` to search every exercise, and `p` to follow a learning path.',
+  'Every level starts from the reference result of the level before it. Press `i` to bring your own harness forward instead.',
+  'Only the 🟢 easy levels are done together. Every other level is optional homework: pick what interests you.',
   '`/usage` shows what a session cost. Cap scripted runs with `--max-ai-credits`.',
   'Messed up a level? Press `x`: restore the starter, a checkpoint or a backup. Your files are backed up first.',
 ];
@@ -65,6 +73,7 @@ export async function startTui({
   const catalog = loadCatalog(labsDir);
   const store = progressStore(labsDir);
   const view = progressView(store, catalog);
+  const order = courseOrder(catalog);
   const total = catalog.reduce((n, l) => n + l.levels.length, 0);
   const tiers = DIFFICULTIES.filter((d) => catalog.some((l) => l.levels.some((e) => e.level === d.id)));
   const rel = (p) => path.relative(rootDir, p).split(path.sep).join('/');
@@ -101,6 +110,7 @@ export async function startTui({
     recovery: { list: null, idx: 0, confirm: null, result: null, naming: null },
     doctor: { running: false },
     exported: null,
+    bring: null,
     tip: Math.floor(Math.random() * TIPS.length),
   };
 
@@ -230,16 +240,31 @@ export async function startTui({
     let done = 0;
     let agents = 0;
     let stale = 0;
+    const workshop = { done: 0, total: 0 };
+    const homework = { done: 0, total: 0 };
     for (const lab of catalog) for (const ex of lab.levels) {
       const s = view.checks(ex);
-      if (s === 'pass') done++;
+      const bucket = ex.mode === 'together' ? workshop : homework;
+      bucket.total++;
+      if (s === 'pass') { done++; bucket.done++; }
       if (s === 'stale') stale++;
       if (view.agent(ex) === 'pass') agents++;
     }
-    return { done, agents, stale };
+    return { done, agents, stale, workshop, homework };
   }
   const labDone = (lab) => lab.levels.length > 0 && lab.levels.every((ex) => view.checks(ex) === 'pass');
-  const nextUp = () => nextExercise(catalog, view, { path: S.path });
+  const ON_LEVEL = new Set(['exercise', 'checks', 'checkDetail', 'output', 'agent', 'history', 'solution', 'confirmSolution', 'menu', 'recovery', 'bring']);
+  const lastKey = () => { const u = store.get('_ui'); return u.lab && u.level ? `${u.lab}/${u.level}` : null; };
+  const nextUp = () => nextExercise(catalog, view, { path: S.path, current: ON_LEVEL.has(S.screen) ? exObj()?.key ?? null : null, last: lastKey() });
+  const fmt = { green, bright, dim, white, yellow, bold, cyan };
+  const shortDate = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
+  /** Where this level starts: the reference result of the level before it, plus your brought-in work. */
+  const startsFrom = (ex) => {
+    const pred = predecessorOf(order, ex.key);
+    if (!pred) return `🧱 ${dim('Starts from: the plain app, the start of the chain.')}`;
+    const brought = view.entry(ex).brought;
+    return `🧱 ${dim('Starts from:')} ${white(`Lab ${pred.lab.num} · ${pred.ex.badge} ${pred.ex.label}`)} ${dim(brought ? `(the reference, plus your work brought in on ${shortDate(brought.at)})` : '(reference)')}`;
+  };
   const header = (title, sub, right) => {
     const inner = W() - 4;
     const top = right && width(title) + width(right) + 1 <= inner ? `${title}${' '.repeat(Math.max(1, inner - width(title) - width(right)))}${right}` : title;
@@ -344,7 +369,7 @@ export async function startTui({
     const t = ANIM ? now() - S.t.home : 1e9;
     const L = [''];
     L.push(...header(`🧠  ${bold(bright('BUILD YOUR AGENT HARNESS'))}`, dim(`${BRAND.tagline} · hands-on labs`), dim(`✨ by ${BRAND.author}`)));
-    const { done, agents, stale } = counts();
+    const { done, agents, stale, workshop, homework } = counts();
     const shown = Math.round(done * ease(t / 800));
     const hour = new Date().getHours();
     const hello = hour >= 5 && hour < 12 ? 'Good morning' : hour >= 12 && hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -357,13 +382,19 @@ export async function startTui({
         ? `🏆 ${bold(white(`${hello}, harness engineer!`))} ${dim('Every exercise passes. Try the "Going further" ideas, or harness your own project.')}`
         : `👋 ${bold(white(`${hello}! Welcome back.`))} ${dim(`${done} exercise${done === 1 ? '' : 's'} passing, ${total - done} to go.`)}`));
     L.push('');
-    const barW = Math.max(8, Math.min(30, W() - 30));
-    L.push(`  ${white('Progress')}  ${bar(shown, total, barW)}  ${bold(bright(`${shown}/${total}`))}${agents ? `  🤖 ${bright(String(agents))}` : ''}${stale ? `  🕓 ${yellow(String(stale))} ${dim('stale')}` : ''}`);
+    const barW = Math.max(8, Math.min(30, W() - 66));
+    const split = `👥 ${white('Workshop')} ${bold(bright(`${workshop.done}/${workshop.total}`))} ${dim('·')} 🏠 ${white('Homework')} ${bold(bright(`${homework.done}/${homework.total}`))}`;
+    const extra = `${agents ? `  🤖 ${bright(String(agents))}` : ''}${stale ? `  🕓 ${yellow(String(stale))} ${dim('stale')}` : ''}`;
+    const progressLine = `  ${white('Progress')}  ${bar(shown, total, barW)}  ${bold(bright(`${shown}/${total}`))}  ${split}`;
+    if (width(progressLine + extra) <= W() + 2) L.push(progressLine + extra);
+    else { L.push(progressLine); if (extra) L.push(`            ${extra.trim()}`); }
     L.push(...para(`🧭 ${white('Path:')} ${bright(pathLabel())} ${dim('— press p to change, / to search')}`));
     L.push('');
-    const wide = W() >= 72;
+    const wide = W() >= 36 + tiers.length * 11;
     const cellW = wide ? 11 : 5;
     const nameW = Math.max(8, Math.min(36, W() - 6 - tiers.length * cellW));
+    const homeworkW = Math.max(0, tiers.length - 1) * cellW;
+    L.push(`       ${pad('', nameW)}${pad(wide ? `👥 ${dim('together')}` : ' 👥', cellW)}${homeworkW ? clip(` 🏠 ${dim(wide ? 'homework, optional' : 'homework')}`, homeworkW) : ''}`);
     L.push(`       ${dim(pad('LAB', nameW))}${tiers.map((d) => pad(wide ? `${d.badge} ${dim(d.label.toUpperCase())}` : ` ${d.badge}`, cellW)).join('')}`);
     const pulse = ANIM && Math.floor(now() / 600) % 2 === 0;
     let focus = null;
@@ -393,7 +424,7 @@ export async function startTui({
     wrap(`💡 ${inline(tip)}`, W() - 2).forEach((l) => L.push(`  ${dim(l)}`));
     L.push(...para(dim(`✨ ${creditLine()}`), '  ', '     '));
     L.push(...para(dim(`📧 Questions, ideas or feedback? ${BRAND.email}`), '  ', '     '));
-    return { lines: L, focus, footer: footer([['↑↓', 'choose'], ['⏎', 'open'], ['0-7', 'jump'], ['n', 'next up'], ['/', 'search'], ['p', 'path'], ['d', 'doctor'], ['e', 'export'], ['?', 'help'], ['q', 'quit']]) };
+    return { lines: L, focus, footer: footer([['↑↓', 'choose'], ['⏎', 'open'], [`0-${Number(catalog.at(-1)?.num ?? 7)}`, 'jump'], ['n', 'next up'], ['/', 'search'], ['p', 'path'], ['d', 'doctor'], ['e', 'export'], ['?', 'help'], ['q', 'quit']]) };
   }
 
   function labScreen() {
@@ -411,19 +442,20 @@ export async function startTui({
     const narrow = W() < 60;
     const nameW = Math.max(10, Math.min(58, W() - 20));
     lab.levels.forEach((ex, i) => {
-      if (t < 80 + i * 90) { L.push('', '', ''); return; }
+      if (t < 80 + i * 90) { L.push('', '', '', ''); return; }
       const sel = i === S.level;
-      const mins = ex.minutes ? `🕐 ${ex.minutes} min` : '🕐 ?';
+      const mins = `🕐 ${ex.time ?? (ex.minutes ? `${ex.minutes} min` : '?')}`;
       const bg = now() - S.t.flash < 180 && sel ? 238 : C.panel;
       const mark = `  ${sel ? (pulse ? bright('❯') : green('❯')) : ' '}  `;
       const start = L.length;
       if (narrow) {
-        L.push(`${mark}${ex.badge} ${sel ? bold(white(LABEL(ex))) : LABEL(ex)}  ${cell(lab, ex)}  ${dim(mins)}${view.bookmarked(ex) ? ' 🔖' : ''}`);
+        L.push(`${mark}${ex.badge} ${sel ? bold(white(LABEL(ex))) : LABEL(ex)}  ${cell(lab, ex)}${view.bookmarked(ex) ? ' 🔖' : ''}`);
         wrap(ex.title, Math.max(8, W() - 6)).forEach((l) => L.push(`      ${sel ? bold(white(l)) : l}`));
       } else {
         const name = clip(`${ex.badge} ${pad(LABEL(ex), 7)} ${ex.title}`, nameW);
-        L.push(`${mark}${sel ? bold(white(pad(name, nameW))) : pad(name, nameW)}  ${cell(lab, ex)}  ${dim(mins)}${view.bookmarked(ex) ? ' 🔖' : ''}`);
+        L.push(`${mark}${sel ? bold(white(pad(name, nameW))) : pad(name, nameW)}  ${cell(lab, ex)}${view.bookmarked(ex) ? ' 🔖' : ''}`);
       }
+      L.push(...para(dim(`${ex.theme ?? ''} · ${mins} · ${ex.mode === 'together' ? '👥 together, live' : '🏠 homework'}`), '      ', '      '));
       const sentence = firstSentence(ex.mission);
       const room = Math.max(8, W() - 10);
       L.push(`      ${dim(width(sentence) > room ? `${clip(sentence, room - 1)}…` : sentence)}`);
@@ -434,7 +466,7 @@ export async function startTui({
       L.push('');
     });
     L.push(...para(`📖 ${dim('Full lab guide:')} ${cyan(rel(lab.readmePath))} ${dim('— press g to read it here')}`));
-    return { lines: L, focus, footer: footer([['↑↓', 'choose'], ['⏎', 'open'], [`1-${lab.levels.length}`, 'level'], ['g', 'lab guide'], ['b', 'back'], ['?', 'help'], ['q', 'quit']]) };
+    return { lines: L, focus, footer: footer([['↑↓', 'choose'], ['⏎', 'open'], ['1-5', 'tier'], ['g', 'lab guide'], ['b', 'back'], ['?', 'help'], ['q', 'quit']]) };
   }
 
   function readmeScreen() {
@@ -520,10 +552,14 @@ export async function startTui({
   function exerciseScreen() {
     const lab = labObj();
     const ex = exObj();
-    const shown = Math.min(view.hints(ex), ex.hints.length);
+    const entry = view.entry(ex);
+    const shownSet = revealedHints(ex, entry);
+    const shown = shownSet.size;
     const L = [''];
-    L.push(...header(`${ex.badge} ${bold(bright(`${LABEL(ex)} · ${ex.title}`))}`, dim(`Lab ${lab.num} · ${lab.emoji} ${lab.title}`), lab.levels.map((e, i) => `${e.badge} ${i === S.level ? bold(bright(String(i + 1))) : dim(String(i + 1))}`).join('  ')));
+    const switcher = lab.levels.map((e, i) => `${e.badge}${i === S.level ? bold(bright(DIFFICULTIES.find((d) => d.id === e.level)?.key ?? '')) : dim(DIFFICULTIES.find((d) => d.id === e.level)?.key ?? '')}`).join(' ');
+    L.push(...header(`${ex.badge} ${bold(bright(`${LABEL(ex)} · ${ex.title}`))}`, dim(`Lab ${lab.num} · ${lab.emoji} ${lab.title} · ${ex.theme} · ${ex.mode === 'together' ? '👥 together' : '🏠 homework'}`), switcher));
     if (ex.meta) L.push(...para(dim(ex.meta.replace(/\*\*/g, ''))));
+    L.push(...para(startsFrom(ex)));
     L.push(...para(`📖 ${dim('Press')} ${keycap('g')} ${dim(`for the lab guide: ${lab.title} explained, with examples and links.`)}`));
     const section = (icon, title, md) => {
       if (!md) return;
@@ -532,18 +568,27 @@ export async function startTui({
       L.push(...renderMarkdown(md, W()));
     };
     section('🎯', 'MISSION', ex.mission);
+    section('📋', 'REQUIREMENTS', ex.requirements);
+    if (ex.milestones?.length) {
+      const fresh = ['pass', 'fail'].includes(view.checks(ex));
+      L.push('');
+      L.push(`  🧭 ${bold(white('MILESTONES'))} ${dim(fresh ? '— from your last check run' : '— press t to see where you are')}`);
+      L.push(...milestoneListLines(ex, entry, { W: W(), fmt, renderMarkdown, fresh }));
+    }
     section('📂', 'WORK HERE', ex.where);
-    L.push(...para(`💻 ${keycap('c')} ${dim('start Copilot here')}   📂 ${keycap('o')} ${dim('open the folder')}   📋 ${keycap('y')} ${dim('copy the cd command')}`));
+    L.push(...para(`💻 ${keycap('c')} ${dim('start Copilot here')}   📂 ${keycap('o')} ${dim('open the folder')}   📋 ${keycap('y')} ${dim('copy the cd command')}   🧳 ${keycap('i')} ${dim('bring your work')}`));
     section('✅', 'DONE WHEN', ex.done);
     L.push('');
-    const dots = ex.hints.map((_, i) => (i < shown ? yellow('●') : dim('○'))).join('');
-    L.push(...para(`💡 ${bold(white('HINTS'))}  ${dots}  ${dim(shown < ex.hints.length ? `${shown} of ${ex.hints.length} revealed — press h for ${shown ? 'the next one' : 'the first one'}` : 'all revealed')}`));
-    for (let i = 0; i < shown; i++) {
-      const h = ex.hints[i];
+    const dots = hintDots(ex, entry, fmt);
+    L.push(...para(`💡 ${bold(white('HINTS'))}  ${dots}  ${dim(shown < ex.hints.length ? `${shown} of ${ex.hints.length} revealed — press h for ${ex.milestones?.length ? 'a hint for the milestone you are on' : shown ? 'the next one' : 'the first one'}` : 'all revealed')}`));
+    let n = 0;
+    ex.hints.forEach((h, i) => {
+      if (!shownSet.has(i)) return;
+      n++;
       L.push('');
-      L.push(`   ${yellow(`${i + 1}.`)} ${yellow(bold(h.title))}`);
+      L.push(`   ${yellow(`${n}.`)} ${yellow(bold(`${h.milestone ? `${h.milestone} · ` : ''}${h.title}`))}`);
       L.push(...renderMarkdown(h.body, W() - 4).map((l) => (l ? `   ${l}` : l)));
-    }
+    });
     L.push('');
     L.push(...statusLines(lab, ex));
     if (ex.further) {
@@ -554,7 +599,7 @@ export async function startTui({
     L.push('');
     return {
       lines: L,
-      footer: footer([['t', 'checks'], ['c', 'Copilot here'], ['h', 'hint'], ['a', 'agent check'], ['m', 'more'], ['b', 'back'], ['?', 'help'], ['q', 'quit']]),
+      footer: footer([['t', 'checks'], ['c', 'Copilot here'], ['h', 'hint'], ['a', 'agent check'], ['i', 'bring your work'], ['m', 'more'], ['b', 'back'], ['?', 'help'], ['q', 'quit']]),
     };
   }
 
@@ -565,21 +610,25 @@ export async function startTui({
   }
 
   function resultLines(R, L) {
-    let focus = null;
-    (R.plan ?? []).forEach((name, i) => {
-      const r = R.results[i];
+    const renderItem = (i, name, r) => {
+      const out = [];
+      let focus = null;
       if (r) {
         const sel = !R.running && i === S.detail.idx;
-        if (sel) focus = [L.length, L.length];
-        L.push(resultRow(r, sel));
-        if (r.status !== 'pass' && r.message) wrap(inline(r.message), Math.max(8, W() - 10)).slice(0, sel ? 6 : 2).forEach((l, j) => L.push(`       ${j === 0 ? dim('↳ ') : '  '}${r.status === 'skip' ? dim(l) : yellow(l)}`));
+        if (sel) focus = [0, 0];
+        out.push(resultRow(r, sel));
+        if (r.status !== 'pass' && r.message) wrap(inline(r.message), Math.max(8, W() - 12)).slice(0, sel ? 6 : 2).forEach((l, j) => out.push(`       ${j === 0 ? dim('↳ ') : '  '}${r.status === 'skip' ? dim(l) : yellow(l)}`));
       } else if (R.running && i === R.results.filter(Boolean).length) {
-        L.push(`     ${bright(spin())} ${white(name)}`);
+        out.push(`     ${bright(spin())} ${white(name)}`);
       } else {
-        L.push(`     ${dim('◻')} ${dim(name)}`);
+        out.push(`     ${dim('◻')} ${dim(name)}`);
       }
-    });
-    return focus;
+      return { lines: out, focus };
+    };
+    const { lines, focus } = checkGroupLines({ R, ex: exObj(), fmt, renderItem, selected: R.running ? -1 : S.detail.idx });
+    const offset = L.length;
+    L.push(...lines);
+    return focus ? [focus[0] + offset, focus[1] + offset] : null;
   }
 
   function celebration(lines, lab, ex) {
@@ -870,6 +919,7 @@ export async function startTui({
   const MENU = [
     { key: 'w', icon: '👀', label: () => (S.watch ? 'Stop watching src/' : 'Watch src/: run the checks every time you save') },
     { key: 'g', icon: '📖', label: () => 'Read the lab guide' },
+    { key: 'i', icon: '🧳', label: () => 'Bring your work forward from earlier levels' },
     { key: 's', icon: '🔍', label: () => 'Compare your work with the reference' },
     { key: 'f', icon: '🔖', label: () => (view.bookmarked(exObj()) ? 'Remove the bookmark' : 'Bookmark this exercise') },
     { key: 'x', icon: '♻️', label: () => 'Start over: restore the starter, a checkpoint or a backup' },
@@ -1011,10 +1061,13 @@ export async function startTui({
   function helpScreen() {
     const L = [''];
     L.push(...header(`❓ ${bold(bright('HOW THE LABS WORK'))}`, dim(`${BRAND.title} · lab companion`)));
-    const levels = tiers.map((d) => `${d.badge} **${d.label}**`).join(', ');
+    const levels = tiers.map((d) => `- ${d.badge} **${d.label}** · ${d.theme} · ${d.time} · ${d.mode === 'together' ? '👥 together, live' : '🏠 homework (optional)'}`).join('\n');
     L.push(...renderMarkdown(`
-Each lab has these levels: ${levels}. Every level is a small standalone project:
-- \`todo.md\` - your mission. It is short on purpose, with hints you reveal one at a time.
+Each lab has up to five tiers. Only 🟢 easy is done together in the workshop; every other tier is optional homework that goes deeper:
+${levels}
+
+Every level starts from the reference result of the level before it (down the easy column, and along each lab's row), so you can start anywhere. Each level has:
+- \`todo.md\` - your mission. Long levels are split into milestones, each with its own checks and hints.
 - \`src/\` - where you work. Press **c** to start Copilot right there.
 - \`tests/\` - the checks. Press **t** to run them - they are free.
 - \`sol/\` - a reference solution, for when you are really stuck (press **s** to compare).
@@ -1024,8 +1077,9 @@ Each lab has these levels: ${levels}. Every level is a small standalone project:
 |---|---|
 | **t** | run the free checks; select one and press ⏎ for the requirement, the files and the full output |
 | **c** | start Copilot in this level's folder; type /exit to come back (your checks run automatically) |
-| **h** | reveal the next hint |
+| **h** | reveal the next hint (for the milestone you are on) |
 | **a** | 🤖 agent check: the real Copilot on a copy of your folder (uses AI credits; c cancels) |
+| **i** | 🧳 bring your own harness forward from the earlier levels you passed (your files are backed up first) |
 | **m** | more: watch, guide, compare, bookmark, start over, history, doctor, export |
 | **w** | watch: run the checks again every time you save a file |
 | **g** | read the lab guide: concepts, examples, links |
@@ -1034,8 +1088,8 @@ Each lab has these levels: ${levels}. Every level is a small standalone project:
 | **f** | bookmark this exercise |
 | **H** | agent run history |
 | **o** / **y** | open the folder / copy its cd command |
-| **${tiers.map((d) => d.key).join(' ')}** | switch level |
-| **n** | next unfinished exercise on your path |
+| **${DIFFICULTIES.map((d) => d.key).join(' ')}** | switch tier: ${DIFFICULTIES.map((d) => `${d.key} ${d.label.toLowerCase()}`).join(', ')} |
+| **n** | next up: on an easy level, the next lab's easy level; elsewhere your next unfinished level |
 
 ## Everywhere
 | Key | What it does |
@@ -1067,7 +1121,7 @@ Each lab has these levels: ${levels}. Every level is a small standalone project:
     splash: splashScreen, home: homeScreen, lab: labScreen, readme: readmeScreen, browse: browseScreen, exercise: exerciseScreen,
     checks: checksScreen, checkDetail: checkDetailScreen, output: outputScreen, agent: agentScreen, history: historyScreen,
     solution: solutionScreen, confirmSolution: confirmSolutionScreen, menu: menuScreen, recovery: recoveryScreen,
-    doctor: doctorScreen, export: exportScreen, help: helpScreen,
+    doctor: doctorScreen, export: exportScreen, help: helpScreen, bring: bringScreen,
   };
   function render() {
     if (S.suspended || quitting) return;
@@ -1105,9 +1159,10 @@ Each lab has these levels: ${levels}. Every level is a small standalone project:
     const ex = exObj();
     keepStarter(ex);
     const before = view.checks(ex);
+    const milestonesBefore = view.entry(ex).milestones ?? {};
     const doneBefore = counts().done;
     const controller = new AbortController();
-    S.run = { running: true, results: [], plan: [], fatal: null, summary: null, firstPass: false, controller };
+    S.run = { running: true, results: [], plan: [], planMilestones: [], fatal: null, summary: null, firstPass: false, controller };
     S.detail.idx = 0;
     if (!silent || S.screen === 'checks') go('checks');
     else render();
@@ -1117,7 +1172,7 @@ Each lab has these levels: ${levels}. Every level is a small standalone project:
       target: ex.src,
       signal: controller.signal,
       onEvent: (e) => {
-        if (e.type === 'plan') S.run.plan = e.names;
+        if (e.type === 'plan') { S.run.plan = e.names; S.run.planMilestones = e.milestones ?? []; }
         if (e.type === 'result') S.run.results[e.idx] = { detail: {}, files: [], output: '', ...e };
         if (e.type === 'fatal') S.run.fatal = e.message;
         if (['plan', 'result', 'fatal'].includes(e.type)) render();
@@ -1129,13 +1184,19 @@ Each lab has these levels: ${levels}. Every level is a small standalone project:
     S.run.results = summary.results;
     S.run.fatal = summary.complete ? null : summary.fatal;
     if (!S.run.plan.length) S.run.plan = summary.results.map((r) => r.name);
+    if (summary.planMilestones?.length) S.run.planMilestones = summary.planMilestones;
     store.recordChecks(ex.key, summary, evidence);
     view.tracker.invalidate(ex.key);
-    const firstFail = summary.results.findIndex((r) => r.status !== 'pass');
+    const fixName = nextFixName(summary.results);
+    const firstFail = fixName ? summary.results.findIndex((r) => r.name === fixName) : summary.results.findIndex((r) => r.status !== 'pass');
     S.detail.idx = Math.max(0, firstFail);
     if (summary.state === 'pass' && before !== 'pass') {
       S.run.firstPass = true;
       S.celebrate = { at: now(), from: doneBefore };
+    } else if (summary.complete) {
+      const finished = groupChecks({ names: S.run.plan, milestones: S.run.planMilestones, results: summary.results, defined: ex.milestones ?? [] })
+        .filter((g) => g.id && g.done && milestonesBefore[g.id] !== 'pass');
+      if (finished.length && !silent) toast(`🎉 ${finished.map((g) => `${g.id}${g.title ? ` · ${g.title}` : ''}`).join(', ')} ${finished.length === 1 ? 'is' : 'are'} done!${fixName ? ` Next: ${fixName}` : ''}`, 6000);
     }
     S.changes = gitChanges(ex.src);
     if (silent && S.screen !== 'checks') {
@@ -1269,9 +1330,12 @@ Each lab has these levels: ${levels}. Every level is a small standalone project:
 
   function revealHint() {
     const ex = exObj();
-    const shown = view.hints(ex);
-    if (shown >= ex.hints.length) { toast('💡 All hints are already revealed. Still stuck? Press s to compare with the reference.'); if (S.screen !== 'checkDetail') go('exercise'); return; }
-    store.set(ex.key, { hints: shown + 1 });
+    const r = ex.hints.length ? revealNextHint(store, ex) : { none: true, milestone: null };
+    if (r.none) {
+      toast(`💡 ${!ex.hints.length ? 'This level has no hints.' : r.milestone ? `All hints for ${r.milestone} are revealed.` : 'All hints are already revealed.'} Still stuck? Press s to compare with the reference.`);
+      if (S.screen !== 'checkDetail') go('exercise');
+      return;
+    }
     if (S.screen === 'checkDetail') { S.scroll = 99999; render(); return; }
     go('exercise');
     S.scroll = 99999;
@@ -1301,6 +1365,55 @@ Each lab has these levels: ${levels}. Every level is a small standalone project:
     stopWatch();
     S.level = i;
     go('exercise');
+  }
+  /** Keys 1-5 pick a tier (1 easy … 5 hard++), whichever levels this lab has. */
+  function pickTier(str) {
+    const d = DIFFICULTIES.find((x) => x.key === str);
+    if (!d) return false;
+    const lab = labObj();
+    const i = lab.levels.findIndex((e) => e.level === d.id);
+    if (i < 0) { toast(`${d.badge} Lab ${lab.num} has no ${d.label} level yet.`); return true; }
+    if (S.screen === 'lab') { S.level = i; go('exercise'); } else switchLevel(i);
+    return true;
+  }
+
+  // ---------- bring your work forward ----------
+  function openBring() {
+    const ex = exObj();
+    refresh();
+    const target = order.find((n) => n.key === ex.key);
+    S.bring = { plan: bringPlan({ catalog, course: loadCourse(labsDir), manifest: loadManifest(labsDir), view, target }), target, result: null };
+    go('bring');
+  }
+  function doBring() {
+    const B = S.bring;
+    if (!B?.plan?.items.length || B.result) return;
+    stopWatch();
+    const r = applyBring({ labsDir, target: B.target, plan: B.plan });
+    B.result = r;
+    if (!r.ok) { render(); return; }
+    store.set(B.target.key, { brought: { at: new Date().toISOString(), files: r.files } });
+    view.tracker.invalidate(B.target.key);
+    toast(`🧳 Brought ${r.files.length} file(s) in. Your previous files are backed up (x restores them). Checking…`, 6000);
+    runFreeChecks();
+  }
+  function bringScreen() {
+    const lab = labObj();
+    const ex = exObj();
+    const B = S.bring;
+    const L = [''];
+    L.push(...header(`🧳 ${bold(bright('BRING YOUR WORK FORWARD'))}`, dim(`Into Lab ${lab.num} · ${ex.badge} ${ex.label} · ${ex.title}`)));
+    L.push('');
+    L.push(...para(dim('Your harness grows with you: the harness files you changed in earlier levels that pass on their current files come into this level. App code never travels.'), '   ', '   '));
+    L.push('');
+    L.push(...bringLines(B.plan, { W: W(), fmt }));
+    L.push('');
+    if (B.result && !B.result.ok) L.push(...para(`⚠️  ${yellow('Not done:')} ${dim(B.result.reason)}`, '   ', '      '));
+    if (B.plan.items.length && !B.result) {
+      L.push(...para(`${keycap('y')} ${dim('bring it in')}   ${keycap('n')} ${dim('cancel')}   ${dim('· your current src/ is backed up first, and x can restore it')}`, '   ', '   '));
+      return { lines: L, footer: footer([['y', 'bring it in'], ['n', 'cancel'], ['↑↓', 'scroll'], ['q', 'quit']]) };
+    }
+    return { lines: L, footer: footer([['b', 'back'], ['↑↓', 'scroll'], ['q', 'quit']]) };
   }
 
   function cyclePath() {
@@ -1459,6 +1572,7 @@ Each lab has these levels: ${levels}. Every level is a small standalone project:
       case 'd': go('doctor'); runDoctor(); return true;
       case 'e': S.exported = null; go('export'); return true;
       case 'n': jumpNext(); return true;
+      case 'i': openBring(); return true;
       default: return false;
     }
   }
@@ -1531,7 +1645,7 @@ Each lab has these levels: ${levels}. Every level is a small standalone project:
         const lab = labObj();
         if (name === 'up' || name === 'k') { S.level = (S.level + lab.levels.length - 1) % lab.levels.length; moveSel(); }
         else if (name === 'down' || name === 'j') { S.level = (S.level + 1) % lab.levels.length; moveSel(); }
-        else if (/^[1-9]$/.test(str ?? '') && Number(str) <= lab.levels.length) { S.level = Number(str) - 1; go('exercise'); return; }
+        else if (/^[1-9]$/.test(str ?? '') && pickTier(str)) return;
         else if (name === 'return' || name === 'right' || name === 'l') { go('exercise'); return; }
         else if (name === 'r' || name === 'g') { go('readme'); return; }
         else if (str === '/') { S.browse.editing = true; go('browse'); return; }
@@ -1580,7 +1694,7 @@ Each lab has these levels: ${levels}. Every level is a small standalone project:
       case 'exercise': {
         if (scrollKeys()) return;
         if (exerciseAction(name, str)) return;
-        if (/^[1-9]$/.test(str ?? '')) switchLevel(Number(str) - 1);
+        if (/^[1-9]$/.test(str ?? '')) pickTier(str);
         else if (str === '/') { S.browse.editing = true; go('browse'); }
         else if (isBack(name)) { stopWatch(); go('lab'); }
         return;
@@ -1650,6 +1764,12 @@ Each lab has these levels: ${levels}. Every level is a small standalone project:
         if (name === 'y') openSolution();
         else if (name === 'h') revealHint();
         else go('exercise');
+        return;
+      }
+      case 'bring': {
+        if (scrollKeys()) return;
+        if (name === 'y' && str === 'y' && S.bring?.plan.items.length && !S.bring.result) doBring();
+        else if (isBack(name) || name === 'n' || name === 'return') go('exercise');
         return;
       }
       case 'solution': {

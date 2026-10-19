@@ -1,13 +1,17 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { test } from 'node:test';
+import { pathToFileURL } from 'node:url';
 import { startTui } from '../tui.mjs';
 import { loadCatalog, exerciseByKey } from '../catalog.mjs';
 import { progressStore, captureEvidence } from '../progress.mjs';
-import { inline, stripAnsi, renderMarkdown, setAscii } from '../ui.mjs';
-import { fixtureWorkshop, waitFor } from './helpers.mjs';
+import { inline, stripAnsi, renderMarkdown, setAscii, width } from '../ui.mjs';
+import { loadCourse } from '../course.mjs';
+import { computeChain, writeChain } from '../chain.mjs';
+import { fixtureWorkshop, waitFor, chainCourse } from './helpers.mjs';
 
 function terminal({ columns = 80, rows = 24 } = {}) {
   const input = new PassThrough();
@@ -179,15 +183,18 @@ test('Next and the home screen use fresh evidence, including updates from the CL
   cli.recordChecks(ex.key, { state: 'pass', allPass: true, passed: 1, total: 1, results: [] }, captureEvidence(ex));
   press(t.input, 'n');
   assert.equal(t.catalog[t.state.lab].levels[t.state.level].key, 'lab-01/easy', 'the CLI pass is seen');
+  const { ex: ex1 } = exerciseByKey(t.catalog, 'lab-01/easy');
+  fs.writeFileSync(path.join(ex1.src, 'done.txt'), 'done\n');
+  cli.recordChecks(ex1.key, { state: 'pass', allPass: true, passed: 1, total: 1, results: [] }, captureEvidence(ex1));
+  press(t.input, 'b');
+  press(t.input, 'b');
+  assert.match(text(t.output), /2\/24/);
+  fs.appendFileSync(path.join(ex.src, 'README.md'), 'edited elsewhere\n');
+  press(t.input, 'n');
+  assert.equal(t.catalog[t.state.lab].levels[t.state.level].key, 'lab-00/easy', 'the edit made it stale: your last level passes, so Next is the first unfinished easy level');
   press(t.input, 'b');
   press(t.input, 'b');
   assert.match(text(t.output), /1\/24/);
-  fs.appendFileSync(path.join(ex.src, 'README.md'), 'edited elsewhere\n');
-  press(t.input, 'n');
-  assert.equal(t.catalog[t.state.lab].levels[t.state.level].key, 'lab-00/easy', 'the edit made it stale');
-  press(t.input, 'b');
-  press(t.input, 'b');
-  assert.match(text(t.output), /0\/24/);
   t.quit();
 });
 
@@ -297,4 +304,137 @@ test('Markdown keeps link destinations and wraps code instead of cutting it', ()
   const stacked = renderMarkdown('| Key | What it does |\n|---|---|\n| **t** | run the free checks |', 14).map(stripAnsi);
   assert.ok(stacked.every((l) => l.length <= 14), stacked.join('\n'));
   assert.match(stacked.join(' '), /Key: t[\s\S]*What it\s+does:\s+run the\s+free\s+checks/);
+});
+
+// ---------- Phase 1: tiers, the chain, bring and milestones ----------
+const widest = (output) => Math.max(...frame(output).map((l) => width(l)));
+
+test('home: two counts, 👥/🏠 over the tiers, readable at 80 and 120 columns', async () => {
+  for (const columns of [80, 120]) {
+    const t = await app({ size: { columns, rows: 40 } });
+    const s = text(t.output);
+    assert.match(s, /Workshop 0\/8/, `${columns} columns`);
+    assert.match(s, /Homework 0\/16/, `${columns} columns`);
+    assert.match(s, /👥/);
+    assert.match(s, /🏠/);
+    assert.match(s, /07 {2}🚀 {2}Agentic workflows/, 'lab names are not cut off');
+    assert.ok(widest(t.output) <= columns, `${columns} columns`);
+    t.quit();
+  }
+});
+
+test('lab and mission screens show the tier theme, time and where the level starts; 1-5 pick a tier', async () => {
+  const t = await app({ open: 'lab-01/medium' });
+  assert.match(text(t.output), /Starts from: Lab 01 · 🟢 Easy \(reference\)/);
+  assert.match(text(t.output), /Shape it · 🏠 homework/);
+  press(t.input, 'b');
+  assert.equal(t.state.screen, 'lab');
+  assert.match(text(t.output), /Use it · 🕐 10 min · 👥 together, live/);
+  press(t.input, '3');
+  assert.equal(t.state.screen, 'exercise');
+  assert.equal(t.catalog[t.state.lab].levels[t.state.level].level, 'hard');
+  press(t.input, '5');
+  assert.match(text(t.output), /no Hard\+\+ level yet/);
+  assert.equal(t.catalog[t.state.lab].levels[t.state.level].level, 'hard', 'a missing tier changes nothing');
+  t.quit();
+});
+
+test('the first level says it is the start of the chain; n on an easy level moves down the live track', async () => {
+  const t = await app({ open: 'lab-00/easy' });
+  assert.match(text(t.output), /start of the chain/);
+  press(t.input, 'n');
+  assert.equal(t.catalog[t.state.lab].levels[t.state.level].key, 'lab-01/easy', 'even though lab-00/easy is not finished');
+  t.quit();
+});
+
+const M_TODO = '# 🔴 Hard · M\n\n> 🕐 30 min\n\n## 🎯 Mission\nGo.\n\n## 🧭 Milestones\n### M1 · First\n- one\n### M2 · Second\n- two\n\n## 💡 Hints\n### M1\n<details><summary>Hint for one</summary>\n\nx\n\n</details>\n### M2\n<details><summary>Hint for two</summary>\n\ny\n\n</details>\n';
+const res = (idx, name, status, milestone) => ({ idx, name, status, milestone, message: status === 'pass' ? '' : 'not yet', optional: false, detail: {}, files: [], output: '' });
+
+test('checks are grouped by milestone, finished ones fold, and h follows the current milestone', async () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.writeFileSync(path.join(labsDir, 'lab-05/hard/todo.md'), M_TODO);
+  const results = [res(0, 'alpha', 'pass', 'M1'), res(1, 'beta', 'pass', 'M1'), res(2, 'gamma', 'fail', 'M2')];
+  const runChecks = async ({ onEvent }) => {
+    onEvent({ type: 'plan', total: 3, names: ['alpha', 'beta', 'gamma'], milestones: ['M1', 'M1', 'M2'] });
+    return { state: 'fail', allPass: false, complete: true, results, passed: 2, failed: 1, skipped: 0, blocked: 0, total: 3, fatal: null, stdout: '', stderr: '', planMilestones: ['M1', 'M1', 'M2'], milestones: { M1: 'pass', M2: 'fail' } };
+  };
+  const t = await app({ labsDir, open: 'lab-05/hard', deps: { runChecks } });
+  assert.match(text(t.output), /MILESTONES/);
+  press(t.input, 't');
+  await waitFor(() => t.state.run && !t.state.run.running);
+  const s = text(t.output);
+  assert.match(s, /✅ M1 · First\s+▰▰ 2\/2/);
+  assert.doesNotMatch(s, /alpha/, 'a finished milestone folds into one line');
+  assert.match(s, /🧭 M2 · Second\s+▱ 0\/1/);
+  assert.match(s, /gamma/);
+  assert.match(s, /M1 · First is done!/, 'finishing a milestone is celebrated');
+  press(t.input, 'b');
+  press(t.input, 'h');
+  assert.match(text(t.output), /M2 · Hint for two/);
+  assert.doesNotMatch(text(t.output), /Hint for one/);
+  t.quit();
+});
+
+test('i shows the bring plan; y brings the files in, backs up first, then checks', async () => {
+  const labsDir = chainCourse({
+    'lab-00/easy': { src: { 'app.js': 'v1\n' }, sol: { 'app.js': 'v1\n', 'done.txt': 'x\n' } },
+    'lab-01/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+  });
+  writeChain({ labsDir, result: computeChain({ catalog: loadCatalog(labsDir), course: loadCourse(labsDir), manifest: null, bootstrap: true }) });
+  const catalog = loadCatalog(labsDir);
+  const { ex } = exerciseByKey(catalog, 'lab-00/easy');
+  fs.writeFileSync(path.join(ex.src, 'done.txt'), 'x\n');
+  fs.writeFileSync(path.join(ex.src, 'AGENTS.md'), 'my rules\n');
+  progressStore(labsDir).recordChecks(ex.key, { state: 'pass', allPass: true, passed: 1, total: 1, results: [] }, captureEvidence(ex));
+  let checked = 0;
+  const runChecks = async () => { checked++; return { state: 'fail', allPass: false, complete: true, results: [res(0, 'done.txt exists', 'fail', null)], passed: 0, failed: 1, skipped: 0, blocked: 0, total: 1, fatal: null, stdout: '', stderr: '', planMilestones: [null], milestones: {} }; };
+  const t = await app({ labsDir, open: 'lab-01/easy', deps: { runChecks } });
+  press(t.input, 'i');
+  assert.equal(t.state.screen, 'bring');
+  assert.match(text(t.output), /AGENTS\.md\s+← lab-00 easy\s+new/);
+  press(t.input, 'y');
+  await waitFor(() => checked === 1 && t.state.run && !t.state.run.running);
+  const target = exerciseByKey(catalog, 'lab-01/easy').ex;
+  assert.equal(fs.readFileSync(path.join(target.src, 'AGENTS.md'), 'utf8'), 'my rules\n');
+  assert.ok(fs.readdirSync(path.join(labsDir, '.recovery', 'lab-01-easy', 'backups')).length >= 1, 'a backup was taken first');
+  assert.deepEqual(progressStore(labsDir).get('lab-01/easy').brought.files, [{ file: 'AGENTS.md', from: 'lab-00/easy' }]);
+  press(t.input, 'b');
+  assert.match(text(t.output), /your work brought in\s+on/);
+  t.quit();
+});
+
+test('nothing to bring is explained, and n leaves the bring screen', async () => {
+  const t = await app({ open: 'lab-02/easy' });
+  press(t.input, 'i');
+  assert.match(text(t.output), /no seed record|Nothing to bring yet/);
+  press(t.input, 'n');
+  assert.equal(t.state.screen, 'exercise');
+  t.quit();
+});
+
+test('NO_COLOR and --no-anim: plain frames that fit 80 columns', () => {
+  const { labsDir } = fixtureWorkshop();
+  const script = `
+    import { PassThrough } from 'node:stream';
+    const { startTui } = await import(process.env.TUI_URL);
+    const input = new PassThrough(); input.isTTY = true; input.setRawMode = () => input;
+    const output = new PassThrough(); Object.assign(output, { columns: 80, rows: 24, isTTY: true });
+    const writes = []; output.write = (s) => { writes.push(String(s)); return true; };
+    const app = await startTui({ labsDir: process.env.LABS, input, output, anim: false, intro: true, onExit: () => {},
+      deps: { inspectEnvironment: async () => ({ ready: true, coreReady: true, items: [] }) } });
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    await wait(50);
+    for (const [s, name] of [['', 'return'], ['1', '1'], ['?', '?'], ['b', 'b'], ['i', 'i'], ['b', 'b'], ['b', 'b'], ['b', 'b']]) { input.emit('keypress', s, { name }); await wait(20); }
+    const frames = writes.filter((w) => w.startsWith('\\x1b[H'));
+    process.stdout.write(JSON.stringify({ screens: frames.length, colour: writes.some((w) => /\\x1b\\[(38|48);5;/.test(w)), frames }));
+    app.quit();
+  `;
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', timeout: 60000, env: { ...process.env, NO_COLOR: '1', LABS: labsDir, TUI_URL: pathToFileURL(path.join(import.meta.dirname, '..', 'tui.mjs')).href } });
+  assert.equal(r.status, 0, r.stderr);
+  const out = JSON.parse(r.stdout.slice(r.stdout.indexOf('{')));
+  assert.ok(out.screens >= 8, `${out.screens} screens drawn`);
+  assert.equal(out.colour, false, 'NO_COLOR means no colour codes');
+  for (const f of out.frames) for (const line of stripAnsi(f).split('\r\n')) assert.ok(width(line) <= 80, line);
+  const all = out.frames.map((f) => stripAnsi(f)).join('\n');
+  for (const want of [/Workshop 0\/8/, /CHOOSE YOUR LEVEL/, /Starts from/, /HOW THE LABS WORK/, /BRING YOUR WORK FORWARD/]) assert.match(all, want);
 });
