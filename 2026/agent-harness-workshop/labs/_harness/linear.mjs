@@ -20,6 +20,7 @@ import { bringLines } from './screens/bring.mjs';
 import { answerQuiz, quizUnlocked } from './screens/learn.mjs';
 import { levelClock, suggestedMinutes, timerText, shouldNudge } from './timer.mjs';
 import { creditSummary, meterLine } from './credits.mjs';
+import { loadGlossary, glossaryLines } from './glossary.mjs';
 
 const HELP = `Commands (type one and press Enter):
   list [path=ID] [level=L] [status=S] [minutes=N] [bookmarked] [words…]   numbered exercises, filtered
@@ -36,6 +37,7 @@ const HELP = `Commands (type one and press Enter):
   history           agent run history for this exercise
   compare [FILE]    compare your work with the reference solution
   changes           your changes since your latest commit, file by file (needs git)
+  glossary [WORD]   the words this workshop uses, in one line each
   recovery          the starter, your checkpoints and backups
   checkpoint NAME   save your current work as a checkpoint
   restore starter | restore checkpoint:NAME | restore backup:NAME | restore commit
@@ -372,6 +374,12 @@ export function runLinear({
       }
       case 'compare': case 'diff': compare(args[0]); return;
       case 'changes': changes(); return;
+      case 'glossary': {
+        const lines = glossaryLines(loadGlossary(labsDir), { query: args.join(' ') });
+        if (!lines.length) say(args.length ? `No term matches "${args.join(' ')}".` : 'There is no glossary (labs/glossary.md).');
+        else lines.forEach((l) => say(l));
+        return;
+      }
       case 'quiz': case 'takeaway': quiz(); return;
       case 'answer': answer(args[0]); return;
       case 'recovery': recovery(); return;

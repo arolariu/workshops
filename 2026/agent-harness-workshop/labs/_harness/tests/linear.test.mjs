@@ -188,3 +188,10 @@ test('history starts with the credit meter', async () => {
   const { text } = await session(['open lab-01 easy', 'history', 'quit'], { deps: { listRuns: () => runs } });
   assert.match(text, /💳 1 agent-check run this month · at most 30 credits · \/usage has the real number/);
 });
+test('glossary works in linear mode too', async () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.writeFileSync(path.join(labsDir, 'glossary.md'), '- **Hook**: your code that runs before a tool call. (Lab 05)\n');
+  const { text } = await session(['glossary hook', 'glossary zebra', 'quit'], { labsDir });
+  assert.match(text, /Hook: your code that runs before a tool call\. \(Lab 05\)/);
+  assert.match(text, /No term matches "zebra"/);
+});

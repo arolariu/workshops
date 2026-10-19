@@ -560,3 +560,11 @@ test('home shows the credit meter: agent-check runs this month and the bound fro
   assert.match(text(none.output), /💳 No agent-check runs this month/);
   none.quit();
 });
+test('the help screen ends with the glossary', async () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.writeFileSync(path.join(labsDir, 'glossary.md'), '- **Hook**: your code that runs before a tool call. (Lab 05)\n');
+  const t = await app({ labsDir, size: { columns: 100, rows: 300 } });
+  press(t.input, '?');
+  assert.match(text(t.output), /GLOSSARY[\s\S]*Hook: your code that runs before a tool call\. \(Lab 05\)/);
+  t.quit();
+});

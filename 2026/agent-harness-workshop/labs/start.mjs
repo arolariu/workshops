@@ -44,6 +44,7 @@ const COMMANDS = {
   bookmark: { args: [2, 2], opts: { remove: 'flag', ascii: 'flag' } },
   bring: { args: [2, 2], opts: { 'dry-run': 'flag', ascii: 'flag' } },
   path: { args: [0, 1], opts: { ascii: 'flag' } },
+  glossary: { args: [0, 1], opts: { ascii: 'flag' } },
   export: { args: [0, 0], opts: { format: 'value', name: 'value', dir: 'value', path: 'value', ascii: 'flag' } },
   doctor: { args: [0, 0], opts: { full: 'flag', lab: 'value', json: 'flag', ascii: 'flag' } },
   verify: { args: [0, 1], opts: { chain: 'flag', bring: 'flag', verbose: 'flag', ascii: 'flag' } },
@@ -118,6 +119,7 @@ function usage() {
   row('node labs/start.mjs bring lab-05 hard [--dry-run]', 'bring your own harness forward from earlier levels');
   row('node labs/start.mjs bookmark lab-01 easy', 'bookmark an exercise (--remove to undo)');
   row('node labs/start.mjs history lab-01 easy', 'agent check runs kept for this exercise');
+  row('node labs/start.mjs glossary [word]', 'the words this workshop uses, in one line each');
   say();
   say(`  ${white('Start over (your current files are always backed up first)')}`);
   row('node labs/start.mjs recovery lab-01 easy', 'the starter, your checkpoints and backups');
@@ -334,6 +336,17 @@ if (cmd === '' || cmd === 'open') {
   const current = progress.get('_ui').path ?? 'all';
   say();
   for (const p of L.PATHS) say(`  ${p.id === current ? bright('❯') : ' '} ${p.id === current ? bold(bright(p.label)) : white(p.label)} ${dim(`(${p.id}) — ${p.description}`)}`);
+  say();
+} else if (cmd === 'glossary') {
+  const { loadGlossary, glossaryLines } = await import('./_harness/glossary.mjs');
+  const lines = glossaryLines(loadGlossary(labsDir), { query: pos[1] ?? '' });
+  if (!lines.length) fail(pos[1] ? `No term matches "${pos[1]}".` : 'There is no glossary (labs/glossary.md).', 1);
+  say();
+  say(`  📖 ${bold(bright('GLOSSARY'))}${pos[1] ? dim(` · terms matching "${pos[1]}"`) : ''}`);
+  for (const l of lines) {
+    const [term, ...rest] = l.split(': ');
+    say(`   ${white(`${term}:`)} ${dim(rest.join(': '))}`);
+  }
   say();
 } else if (cmd === 'hint') {
   const { lab, ex } = pickExercise();

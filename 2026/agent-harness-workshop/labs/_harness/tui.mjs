@@ -28,6 +28,7 @@ import { answerQuiz, quizLines, takeawayLines, quizUnlocked } from './screens/le
 import { layerMapLines } from './screens/layers.mjs';
 import { levelClock, suggestedMinutes, timerText, shouldNudge } from './timer.mjs';
 import { creditSummary, meterLine } from './credits.mjs';
+import { loadGlossary } from './glossary.mjs';
 import { KEYMAP, MENU_KEYS, binding } from './keys.mjs';
 import { checkGroupLines, milestoneListLines, hintDots } from './screens/milestones.mjs';
 
@@ -79,6 +80,7 @@ export async function startTui({
   const inp = input;
   const rootDir = path.dirname(labsDir);
   const catalog = loadCatalog(labsDir);
+  const glossary = loadGlossary(labsDir);
   const store = progressStore(labsDir);
   const view = progressView(store, catalog);
   const order = courseOrder(catalog);
@@ -1181,13 +1183,16 @@ ${levelKeyRows()}
 
 ## Good to know
 - 🔐 **Trust the workshop folder once**: run \`copilot\` in the workshop root and choose "Yes, and remember this folder".
-- 💻 **Without this app**: \`node labs/start.mjs test lab-01 easy\` runs the checks; \`node labs/start.mjs help\` lists every command.
+- 💻 **Without this app**: \`node labs/start.mjs test lab-01 easy\` runs the checks; \`node labs/start.mjs help\` lists every command; \`node labs/start.mjs glossary\` prints the glossary below.
 - 🎬 Calmer screen? \`--no-anim\` (no animations), \`--no-intro\` (no welcome screen), \`--ascii\` (plain characters) or \`--linear\` (one line at a time, for screen readers).
 
 ## About
 - ✨ ${creditLine()}
 - 📧 Questions, ideas or feedback: **${BRAND.email}**
-`, W()));
+${glossary.length ? `
+## 📖 Glossary
+${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(4)})` : ''}`).join('\n')}
+` : ''}`, W()));
     L.push('');
     return { lines: L, footer: footer([['↑↓', 'scroll'], ['b', 'back'], ['q', 'quit']]) };
   }

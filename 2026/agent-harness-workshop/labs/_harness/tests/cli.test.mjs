@@ -216,3 +216,19 @@ test('sync-seeds refuses a course.json with a typo', () => {
   assert.match(r.out, /"lab-00\/medum", which is not a level/);
   assert.ok(!fs.existsSync(path.join(labsDir, 'lab-01/easy/src/FINDINGS.md')), 'nothing was written');
 });
+
+test('glossary prints the terms, or the ones matching a word', () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.writeFileSync(path.join(labsDir, 'glossary.md'), '# Glossary\n\n- **Hook**: your code that runs before a tool call. (Lab 05)\n- **Harness**: everything around the model.\n');
+  const all = cli(labsDir, ['glossary']);
+  assert.equal(all.code, 0);
+  assert.match(all.out, /Hook: your code that runs before a tool call\. \(Lab 05\)/);
+  assert.match(all.out, /Harness: everything around the model\./);
+  const one = cli(labsDir, ['glossary', 'hook']);
+  assert.match(one.out, /Hook:/);
+  assert.doesNotMatch(one.out, /Harness:/);
+  const none = cli(labsDir, ['glossary', 'zebra']);
+  assert.equal(none.code, 1);
+  assert.match(none.out, /No term matches "zebra"/);
+  assert.match(cli(labsDir, ['help']).out, /glossary \[word\]/);
+});
