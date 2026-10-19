@@ -46,6 +46,7 @@ A green-on-dark terminal app that guides you through every level. On a level you
 | **i** | 🧳 bring your own harness forward: the harness files you changed in earlier levels that pass (your files are backed up first) |
 | **v** | 📝 view your changes since your latest commit, file by file (needs git) |
 | **l** | 🧠 learn: the level's takeaway and a check-yourself question, once your checks pass (answer with **1**–**4**) |
+| **u** | 🔬 under the hood: X-ray your harness: what it adds to every turn of the model's context, what you added, and its maturity level (L0–L5); **s** there switches to the reference |
 | **m** | more: watch, guide, compare, bring, your changes, bookmark, start over, run history, doctor, export |
 | **w** | watch: the checks run again every time you save a file |
 | **g** / **r** | read the lab guide: concepts, under the hood, in the enterprise, examples, links |
