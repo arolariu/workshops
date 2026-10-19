@@ -1215,3 +1215,17 @@ test('the readme has the 110-minute agenda, the five tiers and every homework pa
 - Spec §5.7 Phase 2 rows → Tasks 7 (takeaway and quiz), 8 (layer map), 9 (timer and nudge), 6 (diff view; solution diff kept from PR #1), 10 (credit meter), 11 (glossary). §6 Phase 2 content → Task 4; readme → Task 13. §5.3 parsing → Task 3. §5.8 fields → Tasks 3, 7, 9. §5.9 rows "git isn't installed" (Task 6) and "no Takeaway/Check yourself" (Task 7 hides). §5.10 catalog tests (quiz 2–4 options, valid answer) → Tasks 3–4.
 - Coordinator decisions 1–5 → Tasks 1, 2, 5, 10, 12.
 - Names used across tasks: `parseQuiz`/`quizProblems` (3, 4), `binding`/`KEYMAP`/`HANDLERS`/`keyState` (5, 6, 7), `changesDiff` (6), `answerQuiz`/`quizLines`/`takeawayLines`/`quizUnlocked` (7), `layerMapLines` (8), `levelClock`/`timerText`/`shouldNudge` (9), `creditSummary`/`meterLine` (10), `parseGlossary`/`loadGlossary`/`glossaryLines` (11), `pathMinutes` (12).
+
+## Implementation notes (what changed against this plan)
+
+- **Task 1.** All 11 stale overrides were clean copies (the level's `sol/` never changed those files). `sync-seeds` carried 43 files per side down the chain with no conflicts. lab-03/hard keeps its `sol/deadlines.js` unfixed on purpose: its agent check runs the learner's loop on a copy and requires the fixer to change `deadlines.js` and end green, so medium's inherited red test is exactly what the loop must fix. Agent checks re-run (cap 30): lab-00/hard, lab-02/medium, lab-03/easy, lab-03/hard, lab-06/easy, all ✅. lab-01/hard was not re-run (flaky, deferred to Phase 4). The lab-05/easy `.gitignore` override was removed as decided; the root `.gitignore` still ignores `.agent-logs/` (see open issues).
+- **Task 2.** The guard log of the agent run confirmed the old flakiness: on Windows the agent writes `Remove-Item … -Recurse -Force`, which `shell(rm)` alone never let reach the hook. With `shell(Remove-Item)` allowed, the hook denies it; the check passes.
+- **Task 4.** After the review, the eight quizzes were rebalanced: answers sit at positions 3·1·2·2·1·3·1·3, and the right answer is no longer the longest option by default. A content test keeps it that way.
+- **Task 5.** Every screen and key state dispatches through `keys.mjs` (not only the main screens), and the app exposes `unhandled()` for the test. One behaviour change: caps lock now also works in the "more" menu, as everywhere else.
+- **Task 6.** PR #1's `changes()` now parses `git status --porcelain -z`, so names with non-ASCII characters or quotes are no longer octal-escaped (found in review). The diff view says "An empty file." rather than "Only the line endings changed." for empty files.
+- **Task 9.** Linear mode credits time per command (before it runs) and nudges after it.
+- **Task 10.** The meter's wording is `… · /usage has the real number` (the plan's longer wording wrapped at the 96-column content width).
+- **Task 11.** 26 terms.
+- **Task 12.** `pathTime()` shows each path's time from its levels; under an hour it says minutes. `next`/`path` fall back to `all` when progress still holds a PR #1 path id (found in review).
+- **Task 13.** The readme labels the tier times as target times, because today's medium and hard levels are shorter (Phase 4 grows them).
+- **Open issues (reported):** PR #1's "noisy learner output" check test hung once for 10 minutes under the full parallel suite and passes alone (pre-existing race, not touched here); the `.gitignore` trade-off above; the help screen's tier times are targets too.
