@@ -26,7 +26,7 @@ make.
 { "version": 1, "default": "allow" | "deny", "rules": [
   { "id": "no-recursive-force-delete",
     "decision": "deny", "severity": "critical",
-    "reason": "Recursive force-deletes … Delete specific files instead.",
+    "reason": "No rm -rf here … ask the human.",
     "match": { "tool": "shell",
                "command": "^delete --force --recursive\\b" } } ] }
 
@@ -60,8 +60,9 @@ match: every key given must match; regexes are case-insensitive
 - `normalize()` gives `delete --force --recursive build` for `rm -r -fo build` (PowerShell), `sudo -E bash -c "rm -Rf
   build"`, `cmd /c "rd /s /q build"` and `Remove-Item build -Recurse`, and `delete --recursive empty-folder` for
   `rm -r empty-folder`
-- All 37 spellings in `tests/fixtures/spellings.json` are denied (`bash -lc`, `sudo -u root`, `xargs -I {}`, `(…)`,
-  `$(…)`, `find -exec`, `& { … }`, `rd /s/q`, …); its 17 look-alikes (`git rm -r --cached`, `grep -rf`, `cp -rf`,
+- All 53 spellings in `tests/fixtures/spellings.json` are denied (`bash -lc`, `sudo -u root`, `xargs -I {}`, `(…)`,
+  `$(…)`, `find -exec`, `& { … }`, `rd /s/q`, `nice timeout 5 env A=1 sudo …`, `iex -Command '…'`, a second line, a
+  PowerShell script block, …); its 21 look-alikes (`git rm -r --cached`, `grep -rf`, `cp -rf`,
   `echo "rm -rf …"`, `Remove-Item -LiteralPath x -Force`, …) are allowed
 - Your hard-level suite (`node --test .github/hooks/scripts/guard.test.mjs`) still passes: keep `decide(toolName,
   args)` returning a reason or `null`
@@ -85,8 +86,9 @@ code .github/hooks/policies/repo.json .github/hooks/scripts/engine.mjs
 code .github/hooks/scripts/guard.mjs
 node labs/start.mjs test lab-05 hard+        # from the workshop folder
 ```
-`engine.mjs` gives you the plumbing (`segments`, `tokens`, `base`, `compile`) and a working `normalize()` that calls
-your `canonical()` and `unwrap()`. `guard.mjs` is still the hard level's guard: you'll turn it into a thin client.
+`engine.mjs` gives you the plumbing (`segments`, `tokens`, `blocks`, `base`, `compile`) and a working `normalize()`:
+it splits lines and `;`, `&&`, `|`, finds the code in `$(…)`, backticks and `{ … }` blocks, and calls your
+`canonical()` and `unwrap()` on every command. `guard.mjs` is still the hard level's guard: you'll turn it into a thin client.
 The policy lives in `.github/hooks/policies/`, not next to `guardrails.json`: Copilot reads **every**
 `.github/hooks/*.json` as a hook configuration, and a policy isn't one.
 
@@ -111,8 +113,9 @@ backslash twice: `"\\.env"`.
 ### M2
 <details><summary>Matching a rule</summary>
 
-A rule matches when **every** key it has matches: `tool` (the call's `kind` or its tool name), `command` (any of
-`call.commands[].line`), `commandLine`, `path` (any of `call.paths`), `text`. Then: `denies.reduce((a, b) =>
+A rule matches when **every** key it has matches: `tool` (the call's `kind` or its tool name), `command` (for a
+deny rule, any of `call.commands[].line`; for an allow rule, every one of them), `commandLine`, `path` (any of
+`call.paths`), `text`. Then: `denies.reduce((a, b) =>
 SEVERITY.indexOf(b.severity) > SEVERITY.indexOf(a.severity) ? b : a)`.
 
 </details>
@@ -137,8 +140,11 @@ validate `policies/repo.json` (from the guard: `path.join(HERE, '..', 'policies'
 <details><summary>Shells inside shells</summary>
 
 `unwrap()` returns `{ command, dialect }` for the inner command, and `normalize()` calls it again on the result (up
-to three levels). Prefixes (`sudo -E`, `env A=1`, `VAR=1`, `xargs`) just drop words. `bash -c`, `cmd /c`,
-`powershell -Command` (or `-c`) and `Invoke-Expression` hand over the rest of the words.
+to five levels). Prefixes just drop words, **as many as there are** (`nice timeout 5 env A=1 sudo rm …`), with
+their values (`VALUE_FLAGS`: `sudo -u root`, `xargs -I {}`; `timeout` also takes a duration). Grouping and
+keywords peel off (`(rm …)`, `{ rm …; }`, `then rm …`, `& { … }`). `find … -exec rm … \;` hands over the words
+after `-exec`. `bash -c`/`-lc`/`-ec`, `cmd /c`, `powershell -Command` (or `-c`, or just `powershell "…"`) and
+`Invoke-Expression` (`iex -Command '…'`) hand over the rest of the words.
 
 </details>
 
@@ -193,8 +199,8 @@ the guard decides in a worker with its own, shorter deadline, and denies when th
 </details>
 
 ## 🚀 Going further
-- **Know the limits.** A denylist never sees every spelling: `eval "$CMD"`, a script the agent writes and then runs,
-  an alias, a symlink. That's why this is one layer, not the whole defence: keep the permission flags tight
+- **Know the limits.** A denylist never sees every spelling: `eval "$CMD"`, `echo … | sh`, a script the agent writes
+  and then runs, an alias, a symlink, `git clean -fdx`. That's why this is one layer, not the whole defence: keep the permission flags tight
   (`--deny-tool`), run unattended work in `/sandbox`, and keep tests on the outcome (the folder is still there).
 - Add `"decision": "ask"` (Copilot supports `permissionDecision: "ask"` in interactive sessions) for medium-severity
   rules, and keep `deny` for the rest.

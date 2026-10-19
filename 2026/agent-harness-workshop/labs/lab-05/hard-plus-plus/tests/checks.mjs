@@ -15,7 +15,7 @@ const fixture = (t, name) => path.join(t.exDir, 'tests', 'fixtures', name);
 const text = (file) => fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 const sha = (file) => crypto.createHash('sha256').update(text(file)).digest('hex');
 // The hooks run with the repository's own org policy, whatever HARNESS_ORG_POLICY says on this machine.
-const hook = (t, script, payload, opts = {}) => t.hook(script, payload, { ...opts, env: { HARNESS_ORG_POLICY: '', ...(opts.env ?? {}) } });
+const hook = (t, script, payload, opts = {}) => t.hook(script, payload, { ...opts, env: { HARNESS_ORG_POLICY: undefined, ...(opts.env ?? {}) } });
 
 // The checks' own reading of the chain format (todo.md, M4), independent of your verify().
 const canonical = (v) => (Array.isArray(v) ? `[${v.map(canonical).join(',')}]` : v && typeof v === 'object'
@@ -161,12 +161,12 @@ export default (t) => [
     fs.mkdirSync(path.join(flagged, '.agent-logs', 'flags'), { recursive: true });
     fs.writeFileSync(path.join(flagged, '.agent-logs', 'flags', 'harness-check.json'), JSON.stringify({ signals: ['override'] }));
     const ask = (cwd, payload) => hook(t, path.join(cwd, GUARD), payload, { cwd });
-    const denied = [shell('npm install'), shell('node -e "console.log(1)"'), shell('npm test && node -e "console.log(1)"'), tool('edit', { path: 'grades.js', old_str: 'a', new_str: 'b' }), tool('web_fetch', { url: 'https://example.com/notes' })];
+    const denied = [shell('npm install'), shell('node -e "console.log(1)"'), shell('npm test && node -e "console.log(1)"'), shell('npm test\nnode -e "console.log(1)"'), shell('node --test scripts/leash.mjs'), tool('edit', { path: 'grades.js', old_str: 'a', new_str: 'b' }), tool('web_fetch', { url: 'https://example.com/notes' })];
     for (const p of denied) {
       const r = ask(flagged, p);
       if (r.decision !== 'deny') return `In a flagged session (.agent-logs/flags/<sessionId>.json exists), ${p.toolName} ${JSON.stringify(p.toolArgs).slice(0, 60)} was allowed. Lockdown is an allow-list: only reads, and calls a "lockdown": true allow rule covers completely.`;
     }
-    for (const p of [tool('view', { path: 'README.md' }), shell('npm test')]) {
+    for (const p of [tool('view', { path: 'README.md' }), shell('npm test'), shell('npm test 2>&1')]) {
       const r = ask(flagged, p);
       if (r.decision !== 'allow') return `In lockdown, ${p.toolName} ${JSON.stringify(p.toolArgs).slice(0, 50)} should still be allowed (reading; the tests through an allow rule marked "lockdown": true). Got: ${r.reason}`;
     }
@@ -193,7 +193,9 @@ export default (t) => [
       if (r?.ok !== false) return `verify() did not notice ${what}.`;
       if (!r.problems?.some((p) => kinds.includes(p.kind) && Number.isInteger(p.line))) return `For ${what}, report a problem of kind ${kinds.map((k) => `"${k}"`).join(' or ')} with its line number. Got ${JSON.stringify(r.problems).slice(0, 160)}`;
     }
-    return true;
+    const both = verify(tamperedChain(t, (lines) => { lines[3] = lines[3].replace('"deny"', '"allow"'); lines.pop(); }));
+    const kinds = new Set((both?.problems ?? []).map((p) => p.kind));
+    return (kinds.has('hash') && kinds.has('head')) || `An edited line 4 and a cut-off tail are two problems: report every one, not just the first. Got ${JSON.stringify(both?.problems).slice(0, 160)}`;
   }, { milestone: 'M4' }),
   t.check('A damaged last line doesn\'t stop the log: append() links to the last entry that parses', async () => {
     const { append, verify } = await t.import(CHAIN_LIB);

@@ -19,7 +19,9 @@ export function governanceReport(entries) {
 }
 
 // ---------- plumbing: you don't need to change anything below this line ----------
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths on both sides: through a symlink (macOS /var), a junction or an 8.3 name the spellings differ.
+const sameFile = (a, b) => { try { return fs.realpathSync.native(a) === fs.realpathSync.native(b); } catch { return false; } };
+const isMain = process.argv[1] && sameFile(process.argv[1], fileURLToPath(import.meta.url));
 if (isMain) {
   const file = process.argv[2] ?? path.join('.agent-logs', 'audit-chain.jsonl');
   if (!fs.existsSync(file)) {

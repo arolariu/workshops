@@ -21,26 +21,85 @@ const WRITE = new Set(['edit', 'create', 'write', 'apply_patch', 'str_replace_ed
 const READ = new Set(['view', 'read', 'grep', 'glob', 'rg']);
 
 // ---------- plumbing: you don't need to change anything in this block ----------
-/** Split a shell command into segments at &&, ||, ;, |, & and newlines (not inside quotes). */
-export function segments(command) {
+/**
+ * Split a shell command into segments at &&, ||, ;, |, & and newlines: not inside quotes, not inside ( ), { } or $( ),
+ * and not in a redirection (2>&1, >&2, &>). A backslash (bash), backtick (PowerShell) or caret (cmd) escapes the next
+ * character. If the brackets don't balance (`echo {; rm -rf x`), it splits as if there were none.
+ */
+export function segments(command, dialect = 'bash') {
+  return split(String(command ?? ''), dialect, true) ?? split(String(command ?? ''), dialect, false);
+}
+function split(s, dialect, nest) {
   const out = [];
+  const esc = dialect === 'powershell' ? '`' : dialect === 'cmd' ? '^' : '\\';
   let cur = '';
   let quote = null;
-  const s = String(command ?? '');
+  let depth = 0;
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
+    if (ch === esc && quote !== "'" && i + 1 < s.length && s[i + 1] !== '\n') { cur += ch + s[i + 1]; i++; continue; }
     if (quote) { cur += ch; if (ch === quote) quote = null; continue; }
     if (ch === '"' || ch === "'") { quote = ch; cur += ch; continue; }
-    if (ch === ';' || ch === '\n' || ch === '|' || ch === '&') { if (cur.trim()) out.push(cur.trim()); cur = ''; if (s[i + 1] === ch) i++; continue; }
+    if (nest && (ch === '(' || ch === '{')) depth++;
+    if (nest && (ch === ')' || ch === '}') && depth > 0) depth--;
+    const redirect = ch === '&' && (/[<>]$/.test(cur) || s[i + 1] === '>');
+    if (!depth && !redirect && (ch === ';' || ch === '\n' || ch === '|' || ch === '&')) { if (cur.trim()) out.push(cur.trim()); cur = ''; if (s[i + 1] === ch) i++; continue; }
     cur += ch;
   }
+  if (depth) return null;
   if (cur.trim()) out.push(cur.trim());
   return out;
 }
-/** Split one segment into words; quotes group words and are removed: `rd /s "my dir"` → ['rd', '/s', 'my dir']. */
-export function tokens(segment) {
+/**
+ * Split one segment into words; quotes group words and are removed: `rd /s "my dir"` → ['rd', '/s', 'my dir']. Escaped
+ * quotes stay in their word: bash `"say \\"hi\\""`, PowerShell `"say `"hi`""` and `'it''s'`.
+ */
+export function tokens(segment, dialect = 'bash') {
   const out = [];
-  for (const m of String(segment).matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)) out.push(m[1] ?? m[2] ?? m[3]);
+  const s = String(segment);
+  const esc = dialect === 'powershell' ? '`' : '\\';
+  let word = '';
+  let has = false;
+  let quote = null;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (quote === "'") {
+      if (ch === "'" && dialect === 'powershell' && s[i + 1] === "'") { word += "'"; i++; continue; }
+      if (ch === "'") quote = null; else word += ch;
+      continue;
+    }
+    if (quote === '"') {
+      if (ch === esc && (s[i + 1] === '"' || s[i + 1] === esc)) { word += s[i + 1]; i++; continue; }
+      if (ch === '"' && dialect === 'powershell' && s[i + 1] === '"') { word += '"'; i++; continue; }
+      if (ch === '"') quote = null; else word += ch;
+      continue;
+    }
+    if (ch === esc && (s[i + 1] === '"' || s[i + 1] === "'")) { word += s[i + 1]; has = true; i++; continue; }
+    if (ch === '"' || ch === "'") { quote = ch; has = true; continue; }
+    if (/\s/.test(ch)) { if (has) out.push(word); word = ''; has = false; continue; }
+    word += ch;
+    has = true;
+  }
+  if (has) out.push(word);
+  return out;
+}
+/** The bodies of the { … } blocks in a segment (script blocks, function bodies), not ${…} or @{…}, not in quotes. */
+export function blocks(segment, dialect = 'bash') {
+  const out = [];
+  const s = String(segment);
+  const esc = dialect === 'powershell' ? '`' : '\\';
+  let depth = 0;
+  let start = -1;
+  let skip = false;
+  let quote = null;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === esc && quote !== "'") { i++; continue; }
+    if (quote) { if (ch === quote) quote = null; continue; }
+    if (ch === '"' || ch === "'") { quote = ch; continue; }
+    if (ch === '{') { if (!depth) { skip = /[$@]/.test(s[i - 1] ?? ''); start = i + 1; } depth++; continue; }
+    if (ch === '}' && depth > 0 && --depth === 0 && !skip) out.push(s.slice(start, i));
+  }
   return out;
 }
 /** A command's name without its folder or extension, in lower case: C:\Windows\System32\cmd.exe → cmd. */
@@ -65,7 +124,11 @@ export function validatePolicy(policy) {
 // Names you will need in canonical() and unwrap():
 const DELETE = new Set(['rm', 'remove-item', 'ri', 'del', 'erase', 'rd', 'rmdir']);
 const CMD_DELETE = new Set(['del', 'erase', 'rd', 'rmdir']);
-const PREFIXES = new Set(['sudo', 'doas', 'env', 'command', 'exec', 'nohup', 'time', 'xargs']);
+const PREFIXES = new Set(['sudo', 'doas', 'env', 'command', 'exec', 'nohup', 'time', 'xargs', 'nice', 'ionice', 'timeout', 'stdbuf']);
+// Flags of a prefix that take a value (sudo -u root, xargs -I {}, nice -n 10, timeout -s KILL); timeout also takes a duration.
+const VALUE_FLAGS = { sudo: /^-[ugCphrtD]$/, doas: /^-[uC]$/, env: /^-[uSC]$/, xargs: /^-[IinLPdsEa]$/, nice: /^-n$/, ionice: /^-[cnp]$/, timeout: /^-[sk]$/ };
+// Words that start a compound command (`then rm …`, `! rm …`); unwrap() can drop them like a prefix.
+const KEYWORDS = new Set(['then', 'do', 'else', 'elif', 'if', 'while', 'until', '!', '&']);
 const SHELLS = { bash: 'bash', sh: 'bash', zsh: 'bash', dash: 'bash', cmd: 'cmd', powershell: 'powershell', pwsh: 'powershell' };
 
 /**
@@ -91,11 +154,20 @@ export function unwrap(words, dialect = 'bash') {
   return null;
 }
 
+const MAX_DEPTH = 5;
 function commandsOf(command, dialect, depth) {
-  return segments(command).flatMap((segment) => {
-    const words = tokens(segment);
-    const inner = depth < 3 ? unwrap(words, dialect) : null;
-    return inner ? commandsOf(inner.command, inner.dialect, depth + 1) : [canonical(words, dialect)];
+  return segments(command, dialect).flatMap((segment) => {
+    const words = tokens(segment, dialect);
+    const inner = depth < MAX_DEPTH ? unwrap(words, dialect) : null;
+    // Code inside a command runs too: `echo $(rm -rf x)`, `A=$(rm -rf x) ls`, bash backticks, and the script blocks of
+    // `gci | ForEach-Object { Remove-Item $_ -Recurse -Force }`, `if ($x) { … }` or `f() { …; }`.
+    const code = depth < MAX_DEPTH ? [
+      ...[...segment.matchAll(/\$\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g)].map((m) => m[1]),
+      ...(dialect === 'powershell' ? [] : [...segment.matchAll(/`([^`]+)`/g)].map((m) => m[1])),
+      ...blocks(segment, dialect),
+    ] : [];
+    const hidden = code.filter((c) => c.trim()).flatMap((c) => commandsOf(c, dialect, depth + 1));
+    return [...(inner ? commandsOf(inner.command, inner.dialect, depth + 1) : [canonical(words, dialect)]), ...hidden];
   });
 }
 
@@ -104,8 +176,12 @@ export function normalize(toolName, args = {}) {
   const tool = String(toolName ?? '');
   const a = args && typeof args === 'object' ? args : {};
   const kind = SHELL.has(tool) ? 'shell' : WRITE.has(tool) ? 'write' : READ.has(tool) ? 'read' : 'other';
-  const commandLine = kind === 'shell' ? String(a.command ?? '').replace(/\s+/g, ' ').trim() : '';
-  const commands = kind === 'shell' ? commandsOf(commandLine, tool === 'powershell' ? 'powershell' : 'bash', 0) : [];
+  const dialect = tool === 'powershell' ? 'powershell' : 'bash';
+  // A newline separates commands like `;` does (a line ending in \\ or a PowerShell backtick goes on), so only the
+  // spaces in a line are collapsed before splitting; commandLine is the whole call on one line.
+  const raw = kind === 'shell' ? String(a.command ?? '').replace(/\r\n?/g, '\n').replace(dialect === 'powershell' ? /`\n/g : /\\\n/g, ' ') : '';
+  const commandLine = raw.replace(/\s+/g, ' ').trim();
+  const commands = kind === 'shell' ? commandsOf(raw.replace(/[ \t]+/g, ' ').trim(), dialect, 0) : [];
   const paths = [...(typeof a.path === 'string' ? [a.path] : []), ...commands.flatMap((c) => c.args)];
   return { tool, kind, commands, commandLine, paths, text: JSON.stringify(a) };
 }

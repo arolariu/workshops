@@ -97,7 +97,9 @@ function log(entry) {
     fs.appendFileSync(path.join('.agent-logs', 'guard.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`);
   } catch { /* logging must never break the agent */ }
 }
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths on both sides: through a symlink (macOS /var), a junction or an 8.3 name the spellings differ.
+const sameFile = (a, b) => { try { return fs.realpathSync.native(a) === fs.realpathSync.native(b); } catch { return false; } };
+const isMain = process.argv[1] && sameFile(process.argv[1], fileURLToPath(import.meta.url));
 const input = isMain ? readInput() : null;
 if (input && typeof input === 'object') {
   let args = input.toolArgs ?? {};

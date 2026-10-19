@@ -143,7 +143,7 @@
       "reason": "This looks like a call a prompt injection would make: it pipes a download straight into a shell. Download, read and review the file first, or ask the human.",
       "match": {
         "tool": "shell",
-        "commandLine": "\\b(curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\\b[^|]*\\|\\s*(sudo\\s+)?(sh|bash|zsh|iex|invoke-expression|python3?|node)\\b"
+        "commandLine": "\\b(curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\\b[^|]*\\|\\s*((sudo|doas|env)(\\s+-\\S+)*\\s+)*(\\S*[\\\\/])?(env\\s+)?(sh|bash|zsh|dash|iex|invoke-expression|python3?|node)\\b"
       }
     },
     {
@@ -210,10 +210,10 @@
       "id": "allow-tests-in-lockdown",
       "decision": "allow",
       "lockdown": true,
-      "reason": "Running the tests changes nothing, so it stays allowed in a locked-down session.",
+      "reason": "Running the test files changes nothing, so it stays allowed in a locked-down session (only *.test.js files: node --test runs any file it is given).",
       "match": {
         "tool": "shell",
-        "command": "^(npm test|npm run test|node --test)( [\\w./-]+)*$"
+        "command": "^(npm test|npm run test|node --test( [\\w./-]+\\.test\\.m?js)*)( 2>&1)?$"
       }
     }
   ]

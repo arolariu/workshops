@@ -22,7 +22,7 @@
       "reason": "This looks like a call a prompt injection would make: it pipes a download straight into a shell. Download, read and review the file first, or ask the human.",
       "match": {
         "tool": "shell",
-        "commandLine": "\\b(curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\\b[^|]*\\|\\s*(sudo\\s+)?(sh|bash|zsh|iex|invoke-expression|python3?|node)\\b"
+        "commandLine": "\\b(curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\\b[^|]*\\|\\s*((sudo|doas|env)(\\s+-\\S+)*\\s+)*(\\S*[\\\\/])?(env\\s+)?(sh|bash|zsh|dash|iex|invoke-expression|python3?|node)\\b"
       }
     },
     {

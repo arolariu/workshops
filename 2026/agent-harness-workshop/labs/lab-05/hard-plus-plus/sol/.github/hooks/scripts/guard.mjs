@@ -97,9 +97,12 @@ if (!isMainThread && workerData?.guardWorker) {
   parentPort.postMessage(d);
 }
 
-const isMain = isMainThread && process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths on both sides: through a symlink (macOS /var), a junction or an 8.3 name the spellings differ.
+const sameFile = (a, b) => { try { return fs.realpathSync.native(a) === fs.realpathSync.native(b); } catch { return false; } };
+const isMain = isMainThread && process.argv[1] && sameFile(process.argv[1], fileURLToPath(import.meta.url));
 const input = isMain ? readInput() : null;
-if (isMain && (input === undefined || (input !== null && typeof input !== 'object'))) {
+// A call the guard can't read (broken JSON, nothing, or no toolName) can't be vouched for: deny it.
+if (isMain && (!input || typeof input !== 'object' || Array.isArray(input) || !input.toolName)) {
   const reason = 'The guard could not read this tool call, so it is blocked to be safe.';
   log({ session: 'unknown', tool: 'unknown', decision: 'deny', rule: 'unreadable-call', layer: 'org', severity: 'critical', reason });
   process.stdout.write(JSON.stringify({ permissionDecision: 'deny', permissionDecisionReason: reason }));

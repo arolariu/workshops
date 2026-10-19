@@ -49,7 +49,7 @@ for: what was denied, by which rule, in which session.
   `.agent-logs/flags/<sessionId>.json` and a `prompt-flag` chain entry, and it prints nothing
 - With a flag file for the session, lockdown is an **allow-list**: reads (`view`, `grep`, `glob`) stay allowed;
   everything else (shell commands, file changes, `web_fetch`, MCP tools, sub-agents) is denied, reason: the session
-  is in lockdown, unless an allow rule marked `"lockdown": true` covers the whole call (add one for `npm test`)
+  is in lockdown, unless an allow rule marked `"lockdown": true` covers the whole call (add one for `npm test` and `*.test.js` files: `node --test` runs any file it's given)
 
 ### M4 · A tamper-evident audit log
 - `append(file, entry)` writes `{ ...entry, seq, prev, hash }` with `hash = sha256(prev + "\n" + canonical(entry
@@ -60,7 +60,9 @@ for: what was denied, by which rule, in which session.
 - `append()` survives a damaged last line: it links to the last entry that parses (and starts a new line), and
   `verify()` still reports the damaged one
 - A repository rule denies changing `.agent-logs/` (from tools and from the shell: `rm`, `>>`, `sed -i`, …); reading
-  it, or naming it in `.gitignore`, stays allowed
+  it, or naming it in `.gitignore`, stays allowed. It's best effort (`cd .agent-logs && rm …`, `find -delete`,
+  `git clean -fdX` or a patch slip past a path rule): the head file, kept where the agent can't write, is the real
+  protection
 - The guard, the session hook and the prompt hook all append to `.agent-logs/audit-chain.jsonl`;
   `node scripts/verify-audit.mjs` exits 0 on an intact chain and 1 (naming the line) on a tampered one
 

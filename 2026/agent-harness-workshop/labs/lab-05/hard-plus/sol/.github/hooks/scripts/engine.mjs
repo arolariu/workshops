@@ -17,26 +17,85 @@ const WRITE = new Set(['edit', 'create', 'write', 'apply_patch', 'str_replace_ed
 const READ = new Set(['view', 'read', 'grep', 'glob', 'rg']);
 
 // ---------- plumbing: you don't need to change anything in this block ----------
-/** Split a shell command into segments at &&, ||, ;, |, & and newlines (not inside quotes). */
-export function segments(command) {
+/**
+ * Split a shell command into segments at &&, ||, ;, |, & and newlines: not inside quotes, not inside ( ), { } or $( ),
+ * and not in a redirection (2>&1, >&2, &>). A backslash (bash), backtick (PowerShell) or caret (cmd) escapes the next
+ * character. If the brackets don't balance (`echo {; rm -rf x`), it splits as if there were none.
+ */
+export function segments(command, dialect = 'bash') {
+  return split(String(command ?? ''), dialect, true) ?? split(String(command ?? ''), dialect, false);
+}
+function split(s, dialect, nest) {
   const out = [];
+  const esc = dialect === 'powershell' ? '`' : dialect === 'cmd' ? '^' : '\\';
   let cur = '';
   let quote = null;
-  const s = String(command ?? '');
+  let depth = 0;
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
+    if (ch === esc && quote !== "'" && i + 1 < s.length && s[i + 1] !== '\n') { cur += ch + s[i + 1]; i++; continue; }
     if (quote) { cur += ch; if (ch === quote) quote = null; continue; }
     if (ch === '"' || ch === "'") { quote = ch; cur += ch; continue; }
-    if (ch === ';' || ch === '\n' || ch === '|' || ch === '&') { if (cur.trim()) out.push(cur.trim()); cur = ''; if (s[i + 1] === ch) i++; continue; }
+    if (nest && (ch === '(' || ch === '{')) depth++;
+    if (nest && (ch === ')' || ch === '}') && depth > 0) depth--;
+    const redirect = ch === '&' && (/[<>]$/.test(cur) || s[i + 1] === '>');
+    if (!depth && !redirect && (ch === ';' || ch === '\n' || ch === '|' || ch === '&')) { if (cur.trim()) out.push(cur.trim()); cur = ''; if (s[i + 1] === ch) i++; continue; }
     cur += ch;
   }
+  if (depth) return null;
   if (cur.trim()) out.push(cur.trim());
   return out;
 }
-/** Split one segment into words; quotes group words and are removed: `rd /s "my dir"` → ['rd', '/s', 'my dir']. */
-export function tokens(segment) {
+/**
+ * Split one segment into words; quotes group words and are removed: `rd /s "my dir"` → ['rd', '/s', 'my dir']. Escaped
+ * quotes stay in their word: bash `"say \\"hi\\""`, PowerShell `"say `"hi`""` and `'it''s'`.
+ */
+export function tokens(segment, dialect = 'bash') {
   const out = [];
-  for (const m of String(segment).matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)) out.push(m[1] ?? m[2] ?? m[3]);
+  const s = String(segment);
+  const esc = dialect === 'powershell' ? '`' : '\\';
+  let word = '';
+  let has = false;
+  let quote = null;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (quote === "'") {
+      if (ch === "'" && dialect === 'powershell' && s[i + 1] === "'") { word += "'"; i++; continue; }
+      if (ch === "'") quote = null; else word += ch;
+      continue;
+    }
+    if (quote === '"') {
+      if (ch === esc && (s[i + 1] === '"' || s[i + 1] === esc)) { word += s[i + 1]; i++; continue; }
+      if (ch === '"' && dialect === 'powershell' && s[i + 1] === '"') { word += '"'; i++; continue; }
+      if (ch === '"') quote = null; else word += ch;
+      continue;
+    }
+    if (ch === esc && (s[i + 1] === '"' || s[i + 1] === "'")) { word += s[i + 1]; has = true; i++; continue; }
+    if (ch === '"' || ch === "'") { quote = ch; has = true; continue; }
+    if (/\s/.test(ch)) { if (has) out.push(word); word = ''; has = false; continue; }
+    word += ch;
+    has = true;
+  }
+  if (has) out.push(word);
+  return out;
+}
+/** The bodies of the { … } blocks in a segment (script blocks, function bodies), not ${…} or @{…}, not in quotes. */
+export function blocks(segment, dialect = 'bash') {
+  const out = [];
+  const s = String(segment);
+  const esc = dialect === 'powershell' ? '`' : '\\';
+  let depth = 0;
+  let start = -1;
+  let skip = false;
+  let quote = null;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === esc && quote !== "'") { i++; continue; }
+    if (quote) { if (ch === quote) quote = null; continue; }
+    if (ch === '"' || ch === "'") { quote = ch; continue; }
+    if (ch === '{') { if (!depth) { skip = /[$@]/.test(s[i - 1] ?? ''); start = i + 1; } depth++; continue; }
+    if (ch === '}' && depth > 0 && --depth === 0 && !skip) out.push(s.slice(start, i));
+  }
   return out;
 }
 /** A command's name without its folder or extension, in lower case: C:\Windows\System32\cmd.exe → cmd. */
@@ -87,6 +146,9 @@ const CMD_DELETE = new Set(['del', 'erase', 'rd', 'rmdir']);
 const PREFIXES = new Set(['sudo', 'doas', 'env', 'command', 'exec', 'nohup', 'time', 'xargs', 'nice', 'ionice', 'timeout', 'stdbuf']);
 const SHELLS = { bash: 'bash', sh: 'bash', zsh: 'bash', dash: 'bash', cmd: 'cmd', powershell: 'powershell', pwsh: 'powershell' };
 
+// PowerShell common parameters of Remove-Item that take a value, which is not a path to delete.
+const PS_WITH_VALUE = /^(erroraction|ea|warningaction|wa|informationaction|infa|errorvariable|ev|warningvariable|wv|informationvariable|iv|outvariable|ov|outbuffer|ob|pipelinevariable|pv|filter|include|exclude|credential|stream)$/;
+
 /**
  * The words of one command in a canonical form. The delete family (rm, Remove-Item, ri, del, erase, rd, rmdir) becomes
  * name "delete" with sorted flags: `rm -rf x`, `Remove-Item x -Recurse -Force` and `rd /s /q x` all become
@@ -99,7 +161,8 @@ export function canonical(words, dialect = 'bash') {
   const flags = new Set();
   const args = [];
   const ps = dialect === 'powershell' || name === 'remove-item' || name === 'ri';
-  for (const w of rest) {
+  for (let i = 0; i < rest.length; i++) {
+    const w = rest[i];
     if (/^(\/[a-z])+$/i.test(w) && (dialect === 'cmd' || CMD_DELETE.has(name))) {        // cmd: rd /s /q, rd /s/q
       if (/\/s/i.test(w)) flags.add('recursive');
       if (/\/q/i.test(w)) flags.add('force');
@@ -107,6 +170,7 @@ export function canonical(words, dialect = 'bash') {
     }
     if (ps && /^-[a-z]+(:\S*)?$/i.test(w)) {                                              // PowerShell parameters
       const p = w.slice(1).split(':')[0].toLowerCase();
+      if (PS_WITH_VALUE.test(p)) { if (!w.includes(':')) i++; continue; }  // -ErrorAction SilentlyContinue: not a path
       if ('recurse'.startsWith(p)) { flags.add('recursive'); flags.add('force'); continue; } // PowerShell never asks
       if (p.length >= 2 && 'force'.startsWith(p)) { flags.add('force'); continue; }
       if (!/^[rf]+$/.test(p)) continue;  // -LiteralPath, -ErrorAction, -WhatIf …: not about recursion or force
@@ -156,20 +220,27 @@ export function unwrap(words, dialect = 'bash') {
   }
   if (peeled) return w.length ? { command: requote(w), dialect } : null;
 
-  const first = base(w[0]);
-  if (/^\w+=/.test(w[0] ?? '') || PREFIXES.has(first)) {
-    let i = 1;
-    while (i < w.length && (/^-/.test(w[i]) || /^\w+=/.test(w[i]))) i += VALUE_FLAGS[first]?.test(w[i]) ? 2 : 1;
-    if (first === 'timeout' && i < w.length) i++;  // the duration
-    return i < w.length ? { command: requote(w.slice(i)), dialect } : null;
+  // Prefixes, as many as there are (`nice timeout 5 env A=1 sudo rm …`), each with its flags and their values.
+  let i = 0;
+  while (i < w.length && (/^\w+=/.test(w[i]) || PREFIXES.has(base(w[i])))) {
+    const p = base(w[i++]);
+    if (!PREFIXES.has(p)) continue;  // VAR=value
+    while (i < w.length && (/^-/.test(w[i]) || /^\w+=/.test(w[i]))) i += VALUE_FLAGS[p]?.test(w[i]) ? 2 : 1;
+    if (p === 'timeout' && i < w.length) i++;  // the duration
   }
+  if (i > 0) return i < w.length ? { command: requote(w.slice(i)), dialect } : null;
+  const first = base(w[0]);
   if (first === 'find') {
     const at = w.findIndex((x) => /^-(exec|execdir|ok|okdir)$/.test(x));
     if (at < 0) return null;
     const end = w.findIndex((x, j) => j > at && /^(\\?;|\+)$/.test(x));
     return { command: requote(w.slice(at + 1, end > 0 ? end : undefined)), dialect };
   }
-  if (first === 'iex' || first === 'invoke-expression') return w.length > 1 ? { command: w.slice(1).join(' '), dialect: 'powershell' } : null;
+  if (first === 'iex' || first === 'invoke-expression') {
+    const rest = w.slice(1);
+    if (/^-c[a-z]*$/i.test(rest[0] ?? '') && 'command'.startsWith(rest[0].slice(1).toLowerCase())) rest.shift();
+    return rest.length ? { command: rest.join(' '), dialect: 'powershell' } : null;
+  }
   const shell = SHELLS[first];
   if (shell === 'bash') {
     const at = w.findIndex((x, j) => j > 0 && /^-[a-z]*c[a-z]*$/i.test(x));        // -c, -lc, -ec
@@ -192,12 +263,19 @@ export function unwrap(words, dialect = 'bash') {
   return null;
 }
 
+const MAX_DEPTH = 5;
 function commandsOf(command, dialect, depth) {
-  return segments(command).flatMap((segment) => {
-    const words = tokens(segment);
-    const inner = depth < 3 ? unwrap(words, dialect) : null;
-    // A command substitution runs too: `echo $(rm -rf x)` and `echo \`rm -rf x\`` hide a second command.
-    const hidden = depth < 3 && !inner ? [...segment.matchAll(/\$\(([^()]+)\)|`([^`]+)`/g)].flatMap((m) => commandsOf(m[1] ?? m[2], dialect, depth + 1)) : [];
+  return segments(command, dialect).flatMap((segment) => {
+    const words = tokens(segment, dialect);
+    const inner = depth < MAX_DEPTH ? unwrap(words, dialect) : null;
+    // Code inside a command runs too: `echo $(rm -rf x)`, `A=$(rm -rf x) ls`, bash backticks, and the script blocks of
+    // `gci | ForEach-Object { Remove-Item $_ -Recurse -Force }`, `if ($x) { … }` or `f() { …; }`.
+    const code = depth < MAX_DEPTH ? [
+      ...[...segment.matchAll(/\$\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g)].map((m) => m[1]),
+      ...(dialect === 'powershell' ? [] : [...segment.matchAll(/`([^`]+)`/g)].map((m) => m[1])),
+      ...blocks(segment, dialect),
+    ] : [];
+    const hidden = code.filter((c) => c.trim()).flatMap((c) => commandsOf(c, dialect, depth + 1));
     return [...(inner ? commandsOf(inner.command, inner.dialect, depth + 1) : [canonical(words, dialect)]), ...hidden];
   });
 }
@@ -207,8 +285,12 @@ export function normalize(toolName, args = {}) {
   const tool = String(toolName ?? '');
   const a = args && typeof args === 'object' ? args : {};
   const kind = SHELL.has(tool) ? 'shell' : WRITE.has(tool) ? 'write' : READ.has(tool) ? 'read' : 'other';
-  const commandLine = kind === 'shell' ? String(a.command ?? '').replace(/\s+/g, ' ').trim() : '';
-  const commands = kind === 'shell' ? commandsOf(commandLine, tool === 'powershell' ? 'powershell' : 'bash', 0) : [];
+  const dialect = tool === 'powershell' ? 'powershell' : 'bash';
+  // A newline separates commands like `;` does (a line ending in \\ or a PowerShell backtick goes on), so only the
+  // spaces in a line are collapsed before splitting; commandLine is the whole call on one line.
+  const raw = kind === 'shell' ? String(a.command ?? '').replace(/\r\n?/g, '\n').replace(dialect === 'powershell' ? /`\n/g : /\\\n/g, ' ') : '';
+  const commandLine = raw.replace(/\s+/g, ' ').trim();
+  const commands = kind === 'shell' ? commandsOf(raw.replace(/[ \t]+/g, ' ').trim(), dialect, 0) : [];
   const paths = [...(typeof a.path === 'string' ? [a.path] : []), ...commands.flatMap((c) => c.args)];
   return { tool, kind, commands, commandLine, paths, text: JSON.stringify(a) };
 }

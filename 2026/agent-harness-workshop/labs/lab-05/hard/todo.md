@@ -45,7 +45,7 @@ nobody tests is a guard that quietly stopped working three commits ago.
 ```bash
 cd labs/lab-05/hard/src
 node --test .github/hooks/scripts/guard.test.mjs     # your suite
-node scripts/leash.mjs --dry-run                     # the leash's arguments
+node scripts/leash.mjs --dry-run       # the leash's arguments
 ```
 
 ## 💡 Hints

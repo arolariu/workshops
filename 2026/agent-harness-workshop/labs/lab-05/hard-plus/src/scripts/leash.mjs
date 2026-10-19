@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // 🐕 Run Copilot autonomously, on a leash: exactly the permissions this job needs, and a budget.
 //   node scripts/leash.mjs "Make upcoming() skip assignments that are already done, and add a test."
+import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,7 +25,9 @@ export function leashArgs(prompt) {
 }
 
 // ---------- you don't need to change anything below this line ----------
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths on both sides: through a symlink (macOS /var), a junction or an 8.3 name the spellings differ.
+const sameFile = (a, b) => { try { return fs.realpathSync.native(a) === fs.realpathSync.native(b); } catch { return false; } };
+const isMain = process.argv[1] && sameFile(process.argv[1], fileURLToPath(import.meta.url));
 if (isMain) {
   const prompt = process.argv.slice(2).filter((a) => a !== '--dry-run').join(' ') || 'Make upcoming() skip assignments that are already done, and add a test.';
   const args = leashArgs(prompt);
