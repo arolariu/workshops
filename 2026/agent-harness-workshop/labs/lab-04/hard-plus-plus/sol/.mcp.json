@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "studybuddy": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["mcp/studybuddy-server.mjs"],
+      "env": { "STUDYBUDDY_BOARD_TOKEN": "${STUDYBUDDY_BOARD_TOKEN:-}" }
+    }
+  }
+}

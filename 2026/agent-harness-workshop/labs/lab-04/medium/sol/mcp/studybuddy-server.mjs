@@ -48,22 +48,66 @@ const tools = [
   },
   {
     name: 'get_exam_dates',
-    description: 'All upcoming exams, soonest first: course code and name, exam date, days left until the exam, and how much the exam counts towards the final grade (examWeight, in percent). Use for questions about exams and study planning.',
-    inputSchema: { type: 'object', properties: {} },
-    annotations: { readOnlyHint: true },
-    handler: () => DATA.courses
-      .map(({ code, name, examDate, examWeight }) => ({ course: code, name, examDate, daysLeft: daysLeft(examDate), examWeight }))
-      .filter((e) => e.daysLeft >= 0)
-      .sort((a, b) => a.daysLeft - b.daysLeft),
+    description: 'Upcoming exams, soonest first: course code and name, exam date (YYYY-MM-DD), days left, and how much the exam counts towards the final grade (examWeight, in percent). Use it for questions about exams, revision and study planning. Optionally filter by course code or by how many days ahead to look.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        course: { type: 'string', description: 'Only this course, by code (e.g. DB220). Leave out for every course.' },
+        withinDays: { type: 'integer', minimum: 1, maximum: 365, description: 'Only exams in the next N days (1-365). Leave out for all upcoming exams.' },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    handler: ({ course, withinDays } = {}) => {
+      const wanted = course === undefined ? null : String(course).trim().toUpperCase();
+      if (wanted !== null && !DATA.courses.some((c) => c.code === wanted)) {
+        throw new Error(`Unknown course "${course}". Known courses: ${DATA.courses.map((c) => c.code).join(', ')}.`);
+      }
+      return DATA.courses
+        .filter((c) => wanted === null || c.code === wanted)
+        .map(({ code, name, examDate, examWeight }) => ({ course: code, name, examDate, daysLeft: daysLeft(examDate), examWeight }))
+        .filter((e) => e.daysLeft >= 0 && (withinDays === undefined || e.daysLeft <= withinDays))
+        .sort((a, b) => a.daysLeft - b.daysLeft);
+    },
   },
   // 👉 Lab 04 · hard: add a mark_done tool here (and remember what is done).
 ];
 
+// ---------- argument checks: every call is checked against its tool's inputSchema before the handler runs ----------
+const TYPES = {
+  string: (v) => typeof v === 'string',
+  number: (v) => typeof v === 'number' && Number.isFinite(v),
+  integer: (v) => Number.isInteger(v),
+  boolean: (v) => typeof v === 'boolean',
+};
+const NOUN = { string: 'a string', number: 'a number', integer: 'a whole number', boolean: 'true or false' };
+/** The problems with `args` for this schema, as sentences the model can act on ([] when the call is fine). */
+function checkArgs(schema = {}, args = {}) {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) return ['The arguments must be a JSON object.'];
+  const props = schema.properties ?? {};
+  const problems = [];
+  for (const key of schema.required ?? []) if (args[key] === undefined) problems.push(`"${key}" is required.`);
+  for (const [key, value] of Object.entries(args)) {
+    const p = props[key];
+    if (!p) {
+      if (schema.additionalProperties === false) problems.push(`Unknown argument "${key}". This tool accepts: ${Object.keys(props).join(', ') || 'no arguments'}.`);
+      continue;
+    }
+    const range = p.minimum !== undefined && p.maximum !== undefined ? ` between ${p.minimum} and ${p.maximum}` : '';
+    if (p.type && TYPES[p.type] && !TYPES[p.type](value)) problems.push(`${key} must be ${NOUN[p.type]}${range} (got ${JSON.stringify(value)}).`);
+    else if ((p.minimum !== undefined && value < p.minimum) || (p.maximum !== undefined && value > p.maximum)) problems.push(`${key} must be${range || ` at least ${p.minimum ?? '-'} and at most ${p.maximum ?? '-'}`} (got ${value}).`);
+    else if (p.minLength !== undefined && String(value).trim().length < p.minLength) problems.push(`${key} must not be empty.`);
+    else if (p.enum && !p.enum.includes(value)) problems.push(`${key} must be one of ${p.enum.join(', ')} (got ${JSON.stringify(value)}).`);
+  }
+  return problems;
+}
+
 // ---------- JSON-RPC plumbing ----------
 const send = (msg) => process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', ...msg })}\n`);
+const toolError = (text) => ({ content: [{ type: 'text', text }], isError: true });
 
 const rl = readline.createInterface({ input: process.stdin });
-rl.on('line', (line) => {
+rl.on('line', async (line) => {
   if (!line.trim()) return;
   let msg;
   try { msg = JSON.parse(line); } catch { return send({ id: null, error: { code: -32700, message: 'Parse error' } }); }
@@ -77,12 +121,15 @@ rl.on('line', (line) => {
   if (method === 'tools/call') {
     const tool = tools.find((t) => t.name === params?.name);
     if (!tool) return send({ id, error: { code: -32602, message: `Unknown tool: ${params?.name}` } });
+    const args = params.arguments ?? {};
+    const problems = checkArgs(tool.inputSchema, args);
+    // Tool errors are results with isError: true, so the model can read them and recover.
+    if (problems.length) return send({ id, result: toolError(`Invalid arguments for ${tool.name}: ${problems.join(' ')}`) });
     try {
-      const data = tool.handler(params.arguments ?? {});
+      const data = await tool.handler(args);
       return send({ id, result: { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] } });
     } catch (e) {
-      // Tool errors are results with isError: true, so the model can read them and recover.
-      return send({ id, result: { content: [{ type: 'text', text: e.message }], isError: true } });
+      return send({ id, result: toolError(e.message) });
     }
   }
   return send({ id, error: { code: -32601, message: `Method not found: ${method}` } });
