@@ -269,6 +269,22 @@ test('updates written by another process are not lost', () => {
   assert.equal(a.reload(), false, 'nothing new since our own write');
 });
 
+test('a fresh lock is not broken just because its owner has exited', async () => {
+  // On Windows a just-released lock can linger for a moment ("delete pending") with an owner that already exited.
+  // Breaking it on sight deleted the next writer's brand-new lock, so two processes wrote at once and lost updates.
+  const labsDir = fixtureLabs();
+  const dead = await new Promise((resolve) => { const c = spawn(process.execPath, ['-e', '']); c.on('exit', () => resolve(c.pid)); });
+  const lock = path.join(labsDir, '.progress.json.lock');
+  fs.writeFileSync(lock, `${dead}\n`);
+  const store = progressStore(labsDir);
+  const started = Date.now();
+  store.set('lab-01/easy', { hints: 1 });
+  const waited = Date.now() - started;
+  assert.ok(waited >= 800, `waited only ${waited} ms before breaking a fresh lock`);
+  assert.equal(store.get('lab-01/easy').hints, 1);
+  assert.ok(!fs.existsSync(lock), 'the lock is released');
+});
+
 test('concurrent writers in separate processes never drop each other\'s updates', async () => {
   const labsDir = fixtureLabs();
   const progress = pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'progress.mjs')).href;

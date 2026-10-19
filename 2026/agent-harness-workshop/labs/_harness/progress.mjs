@@ -131,6 +131,9 @@ function migrate(raw) {
 
 const stamp = () => new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const LOCK_STALE_MS = 5000;
+// A lock whose owner has exited is broken only once it is this old: a younger one was just released (Windows can keep
+// a deleted file visible for a moment), and removing it could delete the next writer's brand-new lock.
+const LOCK_GONE_MS = 1000;
 const LOCK_WAIT_MS = 6000;
 const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const gone = (pid) => {
@@ -166,7 +169,8 @@ export function progressStore(labsDir, { fileName = '.progress.json' } = {}) {
         try {
           const st = fs.statSync(lockFile);
           const owner = Number.parseInt(fs.readFileSync(lockFile, 'utf8'), 10);
-          if (Date.now() - st.mtimeMs > LOCK_STALE_MS || gone(owner)) { fs.rmSync(lockFile, { force: true }); continue; }
+          const age = Date.now() - st.mtimeMs;
+          if (age > LOCK_STALE_MS || (age > LOCK_GONE_MS && gone(owner))) { fs.rmSync(lockFile, { force: true }); continue; }
         } catch { continue; }
         if (Date.now() > until) break;
         pause(5 + Math.floor(Math.random() * 20));
