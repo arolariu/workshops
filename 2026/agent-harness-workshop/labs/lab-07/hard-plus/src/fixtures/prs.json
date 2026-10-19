@@ -1,0 +1,17 @@
+{
+  "_about": "A month of StudyBuddy pull requests: the files each one changed, how many times its author pushed after opening it, and how often it was reopened.",
+  "prs": [
+    { "number": 101, "title": "Fix the exam rule in hasPassed", "files": ["grades.js", "grades.test.js"], "pushes": 2 },
+    { "number": 102, "title": "Typo in the README", "files": ["README.md"], "pushes": 0 },
+    { "number": 103, "title": "Add attendance streaks", "files": ["attendance.js", "attendance.test.js", "README.md"], "pushes": 4 },
+    { "number": 104, "title": "Docs: how to run one test file", "files": ["docs/testing.md"], "pushes": 1 },
+    { "number": 105, "title": "Bump the Node.js engine", "files": ["package.json"], "pushes": 0 },
+    { "number": 106, "title": "upcoming() skips done items", "files": ["deadlines.js", "deadlines.test.js"], "pushes": 3, "reopens": 1 },
+    { "number": 107, "title": "An issue template for bugs", "files": [".github/ISSUE_TEMPLATE/bug.md"], "pushes": 0 },
+    { "number": 108, "title": "Clarify the boundaries in AGENTS.md", "files": ["AGENTS.md"], "pushes": 1 },
+    { "number": 109, "title": "New module: reminders", "files": ["src/reminders/reminders.js", "src/reminders/reminders.test.js", "index.js"], "pushes": 5 },
+    { "number": 110, "title": "Fix a broken link in the docs", "files": ["docs/index.md", "README.md"], "pushes": 0 },
+    { "number": 111, "title": "Guard: block yarn add too", "files": [".github/hooks/scripts/guard.mjs"], "pushes": 2 },
+    { "number": 112, "title": "Changelog for 1.2", "files": ["CHANGELOG.md"], "pushes": 0 }
+  ]
+}

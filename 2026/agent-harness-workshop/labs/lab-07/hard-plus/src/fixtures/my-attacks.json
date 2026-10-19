@@ -1,0 +1,4 @@
+{
+  "_todo": "TODO(M5): add at least two hostile cases of your own to \"cases\", in the format of ../tests/fixtures/hostile.json. Each must get through the starter's issue-assistant.md (or the hard level's issue-triage.md) and be blocked by yours. This is inert data: nothing in it runs.",
+  "cases": []
+}

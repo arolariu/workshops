@@ -1,8 +1,10 @@
 ---
-description: Triage new issues - add one label and post one welcome comment
+description: Triage new issues, and once a day label an issue nobody triaged yet
 on:
   issues:
     types: [opened]
+  schedule: daily
+  workflow_dispatch:
 permissions:
   contents: read
   issues: read
@@ -15,9 +17,11 @@ safe-outputs:
   add-labels:
     allowed: [bug, enhancement, question, documentation, "good first issue"]
     max: 1
+    target: "*"
   add-comment:
     max: 1
 max-ai-credits: 50
+max-daily-ai-credits: 200
 timeout-minutes: 10
 ---
 
@@ -32,5 +36,8 @@ Read issue #${{ github.event.issue.number }} in ${{ github.repository }} and:
 3. If it is a bug report and the author did not say which operating system and Node.js version they use,
    ask for both in your comment.
 4. Add `good first issue` instead of the other labels only if the fix is small and well explained.
+
+On a scheduled (or manual) run there is no triggering issue: find the oldest open issue without a label, add
+the single best label to it, and don't comment. If every open issue already has a label, call `noop`.
 
 Keep it short. Never promise dates.
