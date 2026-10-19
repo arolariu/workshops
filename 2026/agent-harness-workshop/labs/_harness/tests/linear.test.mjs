@@ -181,3 +181,10 @@ test('show includes the time on the level; past 1.5x the suggestion, one nudge t
   await done;
   assert.equal(progressStore(labsDir).get('lab-01/easy').activeMs, 18 * 60_000);
 });
+
+test('history starts with the credit meter', async () => {
+  const startedAt = new Date().toISOString();
+  const runs = [{ runId: 'r1', startedAt, state: 'pass', budget: { cases: [{ configuredCap: 30 }] }, cases: [{ name: 'one', status: 'pass', startedAt, launched: true }] }];
+  const { text } = await session(['open lab-01 easy', 'history', 'quit'], { deps: { listRuns: () => runs } });
+  assert.match(text, /💳 1 agent-check run this month · at most 30 credits · \/usage has the real number/);
+});

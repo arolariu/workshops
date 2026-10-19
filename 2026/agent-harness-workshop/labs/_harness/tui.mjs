@@ -27,6 +27,7 @@ import { changesLines } from './screens/changes.mjs';
 import { answerQuiz, quizLines, takeawayLines, quizUnlocked } from './screens/learn.mjs';
 import { layerMapLines } from './screens/layers.mjs';
 import { levelClock, suggestedMinutes, timerText, shouldNudge } from './timer.mjs';
+import { creditSummary, meterLine } from './credits.mjs';
 import { KEYMAP, MENU_KEYS, binding } from './keys.mjs';
 import { checkGroupLines, milestoneListLines, hintDots } from './screens/milestones.mjs';
 
@@ -100,6 +101,7 @@ export async function startTui({
     agent: null,
     agentRun: null,
     agentToken: 0,
+    credits: null,
     sol: null,
     celebrate: null,
     toast: null,
@@ -310,6 +312,11 @@ export async function startTui({
     render();
   };
 
+  // ---------- the credit meter (credits.mjs): read from the run history on the home screen, never per frame ----------
+  function loadCredits() {
+    try { S.credits = creditSummary(deps.listRuns(labsDir), { now: new Date(deps.now()) }); } catch { S.credits = null; }
+  }
+
   // ---------- the level timer (timer.mjs) ----------
   const clock = levelClock({ now: () => deps.now() });
   const levelKey = () => (ON_LEVEL.has(S.screen) ? exObj()?.key ?? null : null);
@@ -436,6 +443,7 @@ export async function startTui({
     if (width(progressLine + extra) <= W() + 2) L.push(progressLine + extra);
     else { L.push(progressLine); if (extra) L.push(`            ${extra.trim()}`); }
     L.push(...para(`🧭 ${white('Path:')} ${bright(pathLabel())} ${dim('— press p to change, / to search')}`));
+    if (S.credits) L.push(...para(dim(meterLine(S.credits))));
     L.push('');
     const wide = W() >= 36 + tiers.length * 11;
     const cellW = wide ? 11 : 5;
@@ -1204,6 +1212,7 @@ ${levelKeyRows()}
     if ((screen === 'home' || screen === 'lab') && S.screen !== screen && S.watch) stopWatch();
     if (screen === 'lab' && !['exercise', 'readme', 'help'].includes(S.screen)) S.t.lab = now();
     if (['home', 'lab', 'browse', 'exercise'].includes(screen) && screen !== S.screen) refresh();
+    if (screen === 'home' && screen !== S.screen) loadCredits();
     S.screen = screen;
     if (screen === 'exercise' || screen === 'lab') saveUi();
     if (screen === 'exercise') { S.changes = gitChanges(exObj().src); firstVisit(); }
@@ -1219,6 +1228,7 @@ ${levelKeyRows()}
     S.follow = true;
     S.t.home = now();
     refresh();
+    loadCredits();
     render();
   }
 
@@ -1376,6 +1386,7 @@ ${levelKeyRows()}
     (res.results ?? []).forEach((r, i) => { S.agent.results[i] = r; });
     if (res.runId) store.recordAgent(ex.key, res, evidence);
     view.tracker.invalidate(ex.key);
+    loadCredits();
     if (res.state === 'pass') S.celebrate = { at: now(), from: doneBefore };
     render();
   }
@@ -1880,6 +1891,7 @@ ${levelKeyRows()}
     S.t.home = ANIM ? now() : 0;
   }
   const st = store.status();
+  loadCredits();
   if (st.error || st.warning) toast(`⚠️  ${yellow(st.error ?? st.warning)}`, 12000);
   if (ANIM) ticker = setInterval(tick, 45);
   render();

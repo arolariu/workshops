@@ -158,3 +158,11 @@ test('budget preview is honest: verified caps for direct Copilot calls, unknown 
   assert.deepEqual(mixed.cases[1], { name: 's', kind: 'script', configuredCap: null, estimatedPrompts: 4 });
   assert.equal(budgetPreview([{ ...direct, extraArgs: ['--max-ai-credits=99'] }]).configuredCap, null, 'conflicting caps are not a verified limit');
 });
+
+test('history marks the cases that started the agent, for the credit meter', async () => {
+  const { base } = fixture(`export default [{ name: 'runs', command: ['node', '-e', '0'], expect: () => true }];`);
+  const ran = await runAgentChecks(base);
+  assert.equal(listRuns(base.labsDir).find((r) => r.runId === ran.runId).cases[0].launched, true);
+  const blocked = await runAgentChecks({ ...base, target: path.join(base.target, 'missing') });
+  assert.equal(listRuns(base.labsDir).find((r) => r.runId === blocked.runId).cases[0].launched, undefined, 'never started: not counted');
+});

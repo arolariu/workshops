@@ -107,6 +107,7 @@ test('diff, history, hint, export and doctor', () => {
   assert.match(diff.out, /done\.txt \(only in the reference\)/);
   assert.match(diff.out, /\+done/);
   assert.match(cli(labsDir, ['history', 'lab-00', 'easy']).out, /No agent runs yet/);
+  assert.match(cli(labsDir, ['history', 'lab-00', 'easy']).out, /💳 No agent-check runs this month/);
   assert.match(cli(labsDir, ['hint', 'lab-00', 'easy']).out, /Hint 1 of 1 · First hint/);
   const dir = tmpdir();
   const exp = cli(labsDir, ['export', '--format=json', '--name=summary', `--dir=${dir}`]);

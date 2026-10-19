@@ -115,6 +115,8 @@ export async function run(ctx) {
     if (opt.json) { process.stdout.write(`${JSON.stringify(runs, null, 2)}\n`); return; }
     say();
     say(`  🕘 ${bold(bright(`Agent runs · Lab ${lab.num} · ${ex.label}`))}`);
+    const { creditSummary, meterLine } = await import('./credits.mjs');
+    say(`   ${dim(meterLine(creditSummary(listRuns(labsDir))))}`);
     say(`   ${dim('Run folders stay on this computer and can contain generated or sensitive output; they are never uploaded or exported.')}`);
     if (!runs.length) say(`   ${dim('No agent runs yet.')}`);
     for (const r of runs) {

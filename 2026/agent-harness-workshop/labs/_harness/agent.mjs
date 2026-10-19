@@ -230,6 +230,8 @@ async function runSuite({ exDir, target, labsDir, labId, level, signal, onEvent 
       ? [spec.command[0] === 'node' ? process.execPath : spec.command[0], spec.command.slice(1), spec.command[0]]
       : [copilot, copilotArgs(spec, kit), 'copilot'];
     c.command = displayCommand(shown, args);
+    c.launched = true;
+    persist();
     onEvent({ type: 'start', idx, name: spec.name, command: c.command, runDir: work });
     const started = Date.now();
     const tick = setInterval(() => onEvent({ type: 'tick', idx, seconds: Math.round((Date.now() - started) / 1000) }), 1000);

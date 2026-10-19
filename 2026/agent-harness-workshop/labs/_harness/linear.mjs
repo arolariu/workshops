@@ -19,6 +19,7 @@ import { revealNextHint, revealedHints, groupChecks, milestoneBar } from './mile
 import { bringLines } from './screens/bring.mjs';
 import { answerQuiz, quizUnlocked } from './screens/learn.mjs';
 import { levelClock, suggestedMinutes, timerText, shouldNudge } from './timer.mjs';
+import { creditSummary, meterLine } from './credits.mjs';
 
 const HELP = `Commands (type one and press Enter):
   list [path=ID] [level=L] [status=S] [minutes=N] [bookmarked] [words…]   numbered exercises, filtered
@@ -363,6 +364,7 @@ export function runLinear({
       case 'history': {
         if (!need()) return;
         const runs = deps.listRuns(labsDir, { labId: current.ex.labId, level: current.ex.level });
+        say(meterLine(creditSummary(deps.listRuns(labsDir), { now: new Date(deps.now()) })));
         say('Run folders stay on this computer and can contain generated or sensitive output.');
         if (!runs.length) say('No agent runs yet.');
         runs.forEach((r) => say(`  ${r.startedAt ?? ''} ${r.state} ${r.runId}: ${(r.cases ?? []).map((c) => `${c.name} ${c.status}`).join('; ')}`));

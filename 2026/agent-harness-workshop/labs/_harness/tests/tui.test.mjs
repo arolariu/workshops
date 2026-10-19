@@ -550,3 +550,13 @@ test('the mission screen shows time on the level; past 1.5x the suggestion, one 
   assert.equal(progressStore(t.labsDir).get('lab-01/easy').activeMs, 61 * MIN, 'time off the level does not count');
   t.quit();
 });
+test('home shows the credit meter: agent-check runs this month and the bound from their caps, never an estimate', async () => {
+  const startedAt = new Date().toISOString();
+  const suite = { runId: 'r1', startedAt, state: 'pass', budget: { cases: [{ configuredCap: 30 }, { configuredCap: 30 }] }, cases: [{ startedAt, launched: true }, { startedAt, launched: true }] };
+  const t = await app({ size: { columns: 120, rows: 40 }, deps: { listRuns: () => [suite] } });
+  assert.match(text(t.output), /💳 2 agent-check runs this month · at most 60 credits · \/usage has the real number/);
+  t.quit();
+  const none = await app({ size: { columns: 120, rows: 40 }, deps: { listRuns: () => [] } });
+  assert.match(text(none.output), /💳 No agent-check runs this month/);
+  none.quit();
+});
