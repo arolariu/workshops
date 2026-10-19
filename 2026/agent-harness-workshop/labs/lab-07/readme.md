@@ -1,6 +1,8 @@
 # Lab 07 · 🚀 Agentic workflows — Agents in CI
 
-> **Harness layer:** Automation · 🟢 easy (together) · 🟡 medium · 🔴 hard
+> **Harness layer:** Automation · **Maturity:** L5 Governed · 🟢 together · 🟡 🔴 homework
+>
+> **Threads:** 🕵️ The reviewer · 💉 Prompt injection · 🔐 Least privilege
 
 ## In one minute
 **GitHub Agentic Workflows** (`gh aw`) run an AI agent inside GitHub Actions, triggered by events like a new
@@ -14,6 +16,20 @@ all the work: **read-only** permissions for the agent, a **firewall** for the ne
 (the agent *proposes* a label or a comment; a separate job with write access applies it, within limits you
 set) and a **budget**. Get this right and you have "continuous AI": triage, reviews and reports that run on
 their own.
+
+## 🔬 Under the hood
+```text
+ issue opened
+  ├─ job 1 · the agent · read-only, firewalled ─▶ proposes: add-labels ["bug"], add-comment
+  └─ job 2 · no model  · the only write token  ─▶ checks the allow-list and max, then applies
+```
+It's the same loop as on your laptop (Lab 00), but **headless**: no human sees the tool calls or answers a
+permission prompt. So the harness splits the work in two. The model only **proposes** actions, as structured
+safe outputs. A separate job with no model in it, and the only write token, **carries them out** after checking
+them against your limits. Whatever the agent reads, and whatever it gets tricked into writing, it can't push code
+or add a label you didn't allow, because it never holds the means to.
+The issue text is untrusted input written by strangers (Lab 04), which is exactly why the job that reads it is
+the one that can't write.
 
 ## Anatomy of a workflow
 ```markdown
@@ -56,6 +72,14 @@ gh aw logs                                    # what did the agent do, and what 
 ```
 To run for real you need your own GitHub repository, Actions enabled, and a Copilot token stored as a
 repository secret (see the gh-aw docs). The exercises check the **design**, so they work without any of that.
+
+## 🏛️ In the enterprise
+- **At scale:** "continuous AI": triage, reviews and weekly reports running in many repositories, on every event,
+  without anyone watching each run.
+- **The risk:** an agent with a write token reading hostile input, or a workflow that loops on a big budget.
+  Nobody is there to say no.
+- **The control:** read-only agent permissions, safe outputs with allow-lists and a `max`, a network firewall, a
+  credit limit and a timeout on every workflow, and the run logs (`gh aw logs`) kept for review.
 
 ## Exercises
 | Level | Mission | You practise |

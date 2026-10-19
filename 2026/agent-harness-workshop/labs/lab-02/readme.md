@@ -1,6 +1,8 @@
 # Lab 02 · 🧩 Skills — Know-how on demand
 
-> **Harness layer:** Capabilities · 🟢 easy (together) · 🟡 medium · 🔴 hard
+> **Harness layer:** Capabilities · **Maturity:** L2 Equipped · 🟢 together · 🟡 🔴 homework
+>
+> **Threads:** 📏 Measurement · 🪙 Tokens and budget
 
 ## In one minute
 A **skill** is a folder that teaches the agent how to do one specific job: a `SKILL.md` with instructions,
@@ -13,6 +15,19 @@ Instructions are for rules that *always* apply. Skills are for **know-how you on
 create a module", "how we write release notes", "how we debug a crash". Putting everything in AGENTS.md
 bloats every prompt; a skill loads only when it's needed. And because skills follow an open standard
 ([agentskills.io](https://agentskills.io)), the same folder works in Copilot CLI, VS Code and other agents.
+
+## 🔬 Under the hood
+```text
+ every turn │ … · skills: the name and description of each one           │ ─▶ 🧠
+ when used  │ … · new-module/SKILL.md: the full steps, loaded on demand │ ─▶ 🧠
+```
+This is **progressive disclosure**. Every turn, the context holds only each skill's name and description, a line
+or two. When the model decides a skill fits the request, the harness loads that skill's `SKILL.md` (and the
+model can then read the files it points to). Twenty skills cost about as much as twenty sentences until one is used.
+- **The description is a routing prompt.** The model picks a skill by comparing your request with the descriptions
+  alone. "Helps with modules" never wins; "Create a StudyBuddy module. Use when the user asks for a new module" does.
+- **Scripts take exact work away from the model.** Parsing a git log or counting commits in prose invites
+  mistakes; a bundled script gives the same answer every time, and the model only reads its output.
 
 ## Anatomy of a skill
 ```text
@@ -43,6 +58,14 @@ argument-hint: "[version]"
 | inside a plugin | everyone who installs the plugin (Lab 06) |
 
 Inspect with `/skills` in a session or `copilot skill list` in the terminal.
+
+## 🏛️ In the enterprise
+- **At scale:** a shared skill library (in a plugin or an APM package, Lab 06) gives every team the same recipes:
+  how to release, how to debug, how to add a service.
+- **The risk:** skills that ship scripts run code on your machine, and a third-party skill is untrusted code with a
+  friendly description.
+- **The control:** vet skills like any dependency: review the scripts, check for network calls and writes outside
+  the repo, pin the version, and give each skill an owner.
 
 ## Exercises
 | Level | Mission | You practise |

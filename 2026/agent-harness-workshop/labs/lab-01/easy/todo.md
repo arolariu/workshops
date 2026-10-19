@@ -1,12 +1,12 @@
 # 🟢 Easy · The rules nobody wrote down
 
-> 🕐 10 min · 🆓 free checks · 🤖 optional agent check (about 1 prompt)
+> 🕐 10 min · 👥 together · 🆓 free checks · 🤖 optional agent check (about 1 prompt) · 🧱 builds on: Lab 00 · easy
 
 ## 🎯 Mission
-The team's rules live in a messy chat dump (`team-notes.md`). The agent can't read minds, so every time
-someone asks it to fix the red build, it "fixes" the test instead of the code. Turn the notes into an
-`AGENTS.md` the agent will actually follow, prove that it's loaded, then let the agent fix the build.
-The right way this time.
+The team's rules live in a messy chat dump (`team-notes.md`), and your Lab 00 `FINDINGS.md` says which rule the
+code forgets. The agent can't read minds, so every time someone asks it to fix the red build, it "fixes" the test
+instead of the code. Turn the notes into an `AGENTS.md` the agent will actually follow, prove that it's loaded,
+then let the agent fix the build. The right way this time.
 
 ## 📂 Work here
 ```bash
@@ -20,6 +20,22 @@ copilot
 - It contains a canary rule: every answer ends with `Harness check: AGENTS.md loaded`
 - Copilot lists it (`/instructions` or `copilot instruction list`)
 - `npm test` is green and `grades.test.js` is untouched
+
+## 🧠 Takeaway
+Instructions are always in the context: keep them short and specific, and prove they load with a canary.
+
+## ❓ Check yourself
+Your `AGENTS.md` grows from 40 to 400 lines. What happens?
+1. Nothing much: the agent reads it once when the session starts.
+2. All 400 lines go along with every turn: more tokens per prompt, and the rules that matter get diluted.
+3. Copilot ignores everything after the first 100 lines.
+
+<details><summary>Answer</summary>
+
+**2.** Instructions are context, not memory: the harness sends them on every turn. Long files cost more and make
+the important rules easier to miss. Keep the root file short, and scope the rest with `applyTo`.
+
+</details>
 
 ## 💡 Hints
 <details><summary>Let Copilot draft, you edit</summary>

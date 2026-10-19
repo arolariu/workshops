@@ -1,6 +1,8 @@
 # Lab 01 · 📜 Instructions — What the agent knows
 
-> **Harness layer:** Context · 🟢 easy (together) · 🟡 medium · 🔴 hard
+> **Harness layer:** Context · **Maturity:** L1 Instructed · 🟢 together · 🟡 🔴 homework
+>
+> **Threads:** 🔴 The red build · 📏 Measurement · 🪙 Tokens and budget
 
 ## In one minute
 Instruction files are plain Markdown that Copilot loads into **every** conversation, automatically. They
@@ -13,6 +15,19 @@ Without instructions, the agent guesses. It guesses your test command, your styl
 rules. Remember the red build in Lab 00? A rule like *"you pass only with an exam grade of at least 5"*
 lives in a professor's email, not in the code. If the agent doesn't know it, it may "fix" the test instead
 of the code. Instructions are the cheapest, highest-leverage part of the harness.
+
+## 🔬 Under the hood
+```text
+ every turn │ system · AGENTS.md · *.instructions.md (applyTo matches) · tools · history · prompt │ ─▶ 🧠
+```
+Instruction files are not "read once and remembered": the harness puts them **into the context on every turn**,
+next to the conversation (see Lab 00). Two things follow:
+- **You pay for them every turn.** A 400-line file costs tokens on every prompt of every session, used or not.
+- **Long files dilute attention.** The model weighs everything in its context; ten vague rules make the one rule
+  that matters easier to miss. Scoped files (`applyTo`) only join the context when matching files are involved.
+
+Even a loaded rule is a strong hint, not a guarantee: output varies from run to run. So you **measure**: a canary
+proves the file is loaded, and an A/B run (Lab 01 hard) shows whether the rules actually change behaviour.
 
 ## Where instructions live
 | File | Applies to | Good for |
@@ -45,6 +60,14 @@ description: How we write tests
 | Run without any instructions (for comparisons) | `copilot --no-custom-instructions` |
 
 Instructions are read when a session starts. After editing them, start a new session (`/new` or restart).
+
+## 🏛️ In the enterprise
+- **At scale:** treat instructions as code. They live in the repo, change through pull requests, and have owners
+  (a `CODEOWNERS` line for `AGENTS.md` and `.github/instructions/`).
+- **The risk:** drift and bloat. Rules pile up, contradict each other and mention commands that no longer exist,
+  and every one of them is paid for on every turn.
+- **The control:** a short root file, scoped files for the rest, a canary to prove they load, and a review of the
+  instructions whenever the build or the conventions change.
 
 ## Exercises
 | Level | Mission | You practise |

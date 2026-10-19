@@ -1,6 +1,6 @@
 # 🟢 Easy · Make it safe
 
-> 🕐 10 min · 🆓 free checks (design checks, nothing runs on GitHub)
+> 🕐 8 min · 👥 together · 🆓 free checks (design checks, nothing runs on GitHub) · 🧱 builds on: Lab 06 · easy
 
 ## 🎯 Mission
 `.github/workflows/issue-triage.md` labels new issues and welcomes their authors. It works, and that's the
@@ -19,6 +19,22 @@ code .github/workflows/issue-triage.md
 - No unrestricted shell; network locked down to the defaults
 - Safe outputs: only labels (from an allow-list, max 1) and one comment (max 1). Nothing that can change code.
 - A budget: `max-ai-credits` (100 or less) and `timeout-minutes` (15 or less)
+
+## 🧠 Takeaway
+In CI nobody is watching: the agent only proposes, and a separate job applies its safe outputs within your limits.
+
+## ❓ Check yourself
+In your locked-down triage workflow, how does the `bug` label end up on the issue?
+1. The agent calls the GitHub API with a write token.
+2. The agent proposes it as a safe output; a separate job with write access checks it against your allow-list and `max`, then applies it.
+3. A maintainer approves each label by hand before it's added.
+
+<details><summary>Answer</summary>
+
+**2.** The agent's own permissions are read-only. Writes happen in a separate job without a model, and only within
+the limits in `safe-outputs`.
+
+</details>
 
 ## 💡 Hints
 <details><summary>Who writes, then?</summary>

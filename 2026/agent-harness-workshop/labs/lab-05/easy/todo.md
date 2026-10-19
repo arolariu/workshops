@@ -1,6 +1,6 @@
 # 🟢 Easy · A hook that says no
 
-> 🕐 10 min · 🆓 free checks · 🤖 optional agent check (about 1 prompt)
+> 🕐 10 min · 👥 together · 🆓 free checks · 🤖 optional agent check (about 1 prompt) · 🧱 builds on: Lab 04 · easy
 
 ## 🎯 Mission
 One day an agent *will* try `rm -rf` on the wrong folder. Make sure that in this project it physically can't.
@@ -19,6 +19,23 @@ code .github/hooks/scripts/guard.mjs
   `rm --recursive --force`, inside `cd x && …`, behind `sudo`, and PowerShell's `Remove-Item -Recurse`
 - Normal work is allowed: `rm notes.txt`, `rm -f notes.txt`, `rm -r empty-folder`, `npm test`, `ls`, reading files
 - Denials come with a reason the model can understand
+
+## 🧠 Takeaway
+Instructions are wishes; hooks are guarantees: they run outside the model, and when in doubt they fail closed.
+
+## ❓ Check yourself
+`AGENTS.md` says "never run rm -rf", and your `preToolUse` hook denies it. The model insists it has a good reason
+to delete the folder. What holds?
+1. Whichever the model finds more convincing: it weighs both.
+2. The hook: it runs outside the model, so no argument can reach it.
+3. `AGENTS.md`, because it's in the context on every turn.
+
+<details><summary>Answer</summary>
+
+**2.** The model only ever sees the hook's decision, never its code. Instructions shape what the model *tries*;
+the hook decides what actually *runs*.
+
+</details>
 
 ## 💡 Hints
 <details><summary>What arrives</summary>

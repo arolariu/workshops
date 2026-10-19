@@ -1,6 +1,8 @@
 # Lab 06 · 📦 Plugins, extensions & APM — Extend and share
 
-> **Harness layer:** Distribution · 🟢 easy (together) · 🟡 medium · 🔴 hard
+> **Harness layer:** Distribution · **Maturity:** L5 Governed · 🟢 together · 🟡 🔴 homework
+>
+> **Threads:** 🕵️ The reviewer
 
 ## In one minute
 So far you built harness pieces by hand, in one project. This lab is about **sharing and extending**:
@@ -14,6 +16,21 @@ So far you built harness pieces by hand, in one project. This lab is about **sha
 A great harness that lives in one person's folder helps one person. Teams need the same agents, skills and
 guardrails everywhere, kept up to date like any other dependency. And some jobs don't need an AI at all:
 a deterministic slash command is faster, cheaper and always right.
+
+## 🔬 Under the hood
+```text
+ apm.yml ─▶ apm install ─▶ .github/: agents · skills · instructions ─▶ every teammate's context
+                 └──▶ apm.lock.yaml: the exact versions, so everyone gets the same files
+```
+Everything a package deploys ends up where the harness reads it, so it ends up **in the model's context**:
+instructions on every turn, skill descriptions on every turn, agents and hooks whenever they apply. Two people
+with the same lockfile give their agents the same context, which is what makes a team's results comparable and
+a bug reproducible.
+That also means a skill or plugin is a **dependency made of prompts and code**. An upstream change to one
+sentence of an instruction can change how your agent behaves, without a single line of your code changing. Pin
+it, lock it, and review upgrades like you'd review a library upgrade.
+An extension is the other way round: deterministic code the harness runs itself, so a slash command spends no
+tokens at all.
 
 ## Plugins
 ```text
@@ -66,6 +83,14 @@ const session = await joinSession({
 ```
 Start Copilot with `copilot --experimental`, then `/extensions` lists them. Extensions can also register
 tools for the model and listen to session events.
+
+## 🏛️ In the enterprise
+- **At scale:** an internal marketplace or APM registry: the platform team publishes the approved agents, skills,
+  hooks and MCP servers, and every project installs them pinned.
+- **The risk:** supply-chain attacks and silent drift: an unpinned package changes under you, a malicious skill
+  ships a script, or a project file quietly shadows the approved plugin item.
+- **The control:** pinned versions and a lockfile in every repo, review of every upgrade, a verified marketplace,
+  and prefixed names so nothing shadows the shared items by accident.
 
 ## Exercises
 | Level | Mission | You practise |

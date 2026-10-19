@@ -1,6 +1,8 @@
 # Lab 03 · 🎭 Custom agents — Roles with least privilege
 
-> **Harness layer:** Roles · 🟢 easy (together) · 🟡 medium · 🔴 hard
+> **Harness layer:** Roles · **Maturity:** L3 Scoped · 🟢 together · 🟡 🔴 homework
+>
+> **Threads:** 🕵️ The reviewer · 🔐 Least privilege
 
 ## In one minute
 A **custom agent** is a specialist teammate defined in one Markdown file: who it is (instructions), what it's
@@ -12,6 +14,18 @@ agent delegate work to it as a subagent with its own clean context.
 "Be careful and don't edit anything" in a prompt is a *wish*. A tool list without `edit` is a *guarantee*.
 Least privilege is the oldest rule in security, and it applies to AI agents too. Specialists with narrow
 jobs and narrow permissions are also simply better at their job: focused context, focused instructions.
+
+## 🔬 Under the hood
+```text
+ main agent │ … · tools: read, search, edit, execute, … · history │ ─▶ 🧠 ─▶ "use the reviewer"
+ reviewer   │ its own instructions · tools: read, search · task   │ ─▶ 🧠   (a fresh context window)
+```
+The model can only call a tool whose **schema** the harness put in its context. A custom agent's `tools` list
+decides which schemas are sent at all: leave out `edit` and the model never learns that editing exists for this
+turn, so no prompt ("fix it now!") can make it edit. That's why it's a guarantee and not a wish.
+When the main agent delegates, the **subagent gets a fresh context window**: its own instructions, its tool list
+and the task, not the main conversation. It returns only its answer, so a long review doesn't fill the main
+agent's context.
 
 ## Anatomy of an agent
 ```markdown
@@ -46,6 +60,14 @@ Leave `tools` out and the agent gets **everything**, so always set it.
 | Delegate from the main agent | *"Use the reviewer agent to check deadlines.js"* |
 
 Agents live in `.github/agents/` (project), `~/.copilot/agents/` (personal) or in a plugin (Lab 06).
+
+## 🏛️ In the enterprise
+- **At scale:** separation of duties, as in any engineering team: the reviewer is not the fixer, and the agent that
+  writes code is not the one that approves it.
+- **The risk:** privilege escalation by delegation. A read-only agent that can call a powerful agent (the `agent`
+  tool) is not read-only any more, and an agent without a `tools` line can do everything.
+- **The control:** an explicit `tools` list for every agent, a role policy saying what each role may do, and a
+  review of agent files like any other permission change.
 
 ## Exercises
 | Level | Mission | You practise |

@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { test } from 'node:test';
 import { loadCatalog } from '../catalog.mjs';
+import { courseOrder, predecessorOf } from '../chain.mjs';
+import { quizProblems } from '../quiz.mjs';
 
 const labsDir = path.resolve(import.meta.dirname, '..', '..');
 const catalog = loadCatalog(labsDir);
@@ -32,5 +34,45 @@ test('levels with milestones say what done means per milestone, not in a separat
   for (const ex of levels.filter((e) => e.milestones.length)) {
     assert.equal(ex.done, '', `${ex.key}: move "Done when" into the milestones`);
     for (const m of ex.milestones) assert.ok(m.body, `${ex.key}: ${m.id} needs at least one "done" bullet`);
+  }
+});
+
+const order = courseOrder(catalog);
+const prose = (md) => md.replace(/```[\s\S]*?```/g, '').split('\n').filter((l) => l.trim()).length;
+
+test('every lab guide has the spine: layer, maturity, threads, under the hood, in the enterprise', () => {
+  for (const lab of catalog.filter((l) => !l.capstone)) {
+    assert.ok(lab.layer, `${lab.id}: **Harness layer:**`);
+    assert.match(lab.maturity?.level ?? '', /^L[0-5]$/, `${lab.id}: **Maturity:** L0-L5 and a name`);
+    assert.ok(lab.maturity.name, `${lab.id}: the maturity level's name`);
+    assert.ok(lab.threads.length, `${lab.id}: **Threads:**`);
+    assert.ok(lab.underTheHood, `${lab.id}: 🔬 Under the hood`);
+    assert.ok(prose(lab.underTheHood) <= 12, `${lab.id}: 🔬 Under the hood has ${prose(lab.underTheHood)} lines besides its diagram (at most 12)`);
+    assert.equal(lab.enterprise.split('\n').filter((l) => /^\s*[-*] /.test(l)).length, 3, `${lab.id}: 🏛️ In the enterprise has 3 bullets`);
+  }
+});
+
+test('every easy level: 8-10 min, together, builds on its predecessor, one takeaway and a valid quiz', () => {
+  for (const lab of catalog.filter((l) => !l.capstone)) {
+    const ex = lab.levels.find((e) => e.level === 'easy');
+    const [lo, hi] = ex.minutesRange ?? [];
+    assert.ok(lo >= 8 && hi <= 10, `${ex.key}: 🕐 between 8 and 10 min (${ex.time})`);
+    assert.match(ex.meta, /👥 together/, ex.key);
+    const pred = predecessorOf(order, ex.key);
+    assert.equal(ex.buildsOn, pred ? pred.key : 'start', `${ex.key}: 🧱 builds on`);
+    assert.ok(ex.takeaway, `${ex.key}: 🧠 Takeaway`);
+    assert.ok(!ex.takeaway.includes('\n'), `${ex.key}: the takeaway is one sentence or two, on one line`);
+    assert.ok(ex.quiz, `${ex.key}: ❓ Check yourself`);
+    assert.deepEqual(quizProblems(ex.quiz), [], ex.key);
+  }
+});
+
+test('any level that says what it builds on names its real predecessor, and any quiz is valid', () => {
+  for (const ex of levels) {
+    if (ex.buildsOn) {
+      const pred = predecessorOf(order, ex.key);
+      assert.equal(ex.buildsOn, pred ? pred.key : 'start', `${ex.key}: 🧱 builds on`);
+    }
+    assert.deepEqual(quizProblems(ex.quiz), [], ex.key);
   }
 });
