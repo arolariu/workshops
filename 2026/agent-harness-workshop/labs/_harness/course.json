@@ -17,6 +17,7 @@
     "lab-00/hard": { "overrides": ["grades.js", "grades.test.js"] },
     "lab-00/medium": { "overrides": ["grades.js"] },
     "lab-01/hard": { "overrides": ["grades.test.js"] },
+    "lab-01/easy": { "local": ["FINDINGS.md", "team-notes.md"] },
     "lab-02/easy": { "overrides": ["README.md"] },
     "lab-02/medium": { "overrides": ["README.md", "index.js"] },
     "lab-03/easy": { "overrides": ["README.md", "index.js"] },
