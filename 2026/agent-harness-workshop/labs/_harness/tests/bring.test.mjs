@@ -9,6 +9,7 @@ import { progressStore, captureEvidence } from '../progress.mjs';
 import { progressView } from '../learning.mjs';
 import { runChecks } from '../checks.mjs';
 import { bringPlan, applyBring, perfectLearnerPlan, simulateBring } from '../bring.mjs';
+import { bringLines } from '../screens/bring.mjs';
 import { chainCourse } from './helpers.mjs';
 
 /** A chain course, synced like the published workshop (bootstrap accepts differing files as overrides). */
@@ -153,4 +154,48 @@ test('levels with your work that do not pass are listed with the reason', async 
   const plan = bringPlan({ ...c, target: c.node('lab-01/easy') });
   assert.deepEqual(plan.skipped.map((s) => [s.key, s.reason]), [['lab-00/medium', 'its checks fail now'], ['lab-00/hard', 'its checks have not been run yet']]);
   assert.deepEqual(plan.items, []);
+});
+
+// A level can ship files on the harness paths that its solution uses but doesn't change (an organisation policy, a
+// role policy). They travel with the level's work as support files, but only into a level that doesn't have them.
+const SUPPORT = { '.github/policies/org.json': 'org v1\n', 'scripts/audit.mjs': 'todo\n' };
+test('support files (new starters on the harness paths) travel with a level\'s work, where the target lacks them', () => {
+  const labsDir = synced({
+    'lab-00/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+    'lab-00/medium': { src: { 'done.txt': 'x\n', ...SUPPORT }, sol: { 'done.txt': 'x\n', ...SUPPORT, 'scripts/audit.mjs': 'done\n' } },
+    'lab-01/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+  });
+  const c = ctx(labsDir);
+  const plan = perfectLearnerPlan({ ...c, target: c.node('lab-01/easy') });
+  assert.deepEqual(plan.items.map((i) => [i.file, i.from, i.action, Boolean(i.support)]), [['.github/policies/org.json', 'lab-00/medium', 'new', true], ['scripts/audit.mjs', 'lab-00/medium', 'new', false]]);
+  const sim = simulateBring({ labsDir, ...c, target: c.node('lab-01/easy') });
+  assert.equal(fs.readFileSync(path.join(sim.sol, '.github/policies/org.json'), 'utf8'), 'org v1\n', 'the brought audit script finds its policy');
+  const id = (x) => x;
+  const lines = bringLines({ skipped: [], ...plan }, { W: 120, fmt: { dim: id, white: id, yellow: id, bright: id } });
+  assert.match(lines.find((l) => l.includes('org.json')), /new · a file your work there uses/);
+  assert.match(lines.find((l) => l.includes('audit.mjs')), /new$/);
+});
+
+test('support files never replace a file the target has, never beat real work, and never make a level look skipped', async () => {
+  const labsDir = synced({
+    'lab-00/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+    'lab-00/medium': { src: { 'done.txt': 'x\n', ...SUPPORT }, sol: { 'done.txt': 'x\n', ...SUPPORT, 'scripts/audit.mjs': 'done\n' } },
+    'lab-00/hard': { src: { 'done.txt': 'x\n', ...SUPPORT, 'scripts/audit.mjs': 'done\n', '.github/hard.json': 'hard support\n' }, sol: { 'done.txt': 'x\n', ...SUPPORT, 'scripts/audit.mjs': 'done\n', '.github/hard.json': 'hard support\n', '.github/policies/org.json': 'org v2\n' } },
+    'lab-00/hard-plus': { src: { 'done.txt': 'x\n', ...SUPPORT, 'scripts/audit.mjs': 'done\n', '.github/hard.json': 'hard support\n', '.github/policies/org.json': 'org v2\n' }, sol: { 'done.txt': 'x\n', ...SUPPORT, 'scripts/audit.mjs': 'done\n', '.github/hard.json': 'hard support\n', '.github/policies/org.json': 'org v2\n' } },
+    'lab-01/easy': { src: {}, sol: { 'done.txt': 'x\n' } },
+  });
+  const c = ctx(labsDir);
+  write(labsDir, 'lab-00/easy/src/done.txt', 'x\n');
+  await pass(c.store, c.ex('lab-00/easy'));
+  write(labsDir, 'lab-00/medium/src/scripts/audit.mjs', 'mine\n');
+  await pass(c.store, c.ex('lab-00/medium'));
+  c.view.refresh();
+  const later = bringPlan({ ...c, target: c.node('lab-00/hard-plus') });
+  assert.deepEqual(later.items.map((i) => [i.file, i.from]), [['scripts/audit.mjs', 'lab-00/medium']], 'org v2 (from the hard level) is newer than the support file: it stays');
+  assert.deepEqual(later.skipped, [], 'lab-00/hard has only support files, no work of yours: it is not "skipped"');
+  write(labsDir, 'lab-00/easy/src/.github/policies/org.json', 'my own org\n');
+  await pass(c.store, c.ex('lab-00/easy'));
+  c.view.refresh();
+  const next = bringPlan({ ...c, target: c.node('lab-01/easy') });
+  assert.deepEqual(next.items.map((i) => [i.file, i.from, i.buf.toString()]), [['.github/policies/org.json', 'lab-00/easy', 'my own org\n'], ['scripts/audit.mjs', 'lab-00/medium', 'mine\n']], 'your own org.json beats a later level\'s untouched support file');
 });

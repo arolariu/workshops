@@ -64,6 +64,19 @@ test('agents: an explicit tool list reaches L3; a reviewer that can edit does no
     assert.match(star.rule('agent-tools').message, /reviewer: tools .* allows every tool/);
     assert.equal(star.rule('agent-readonly').ok, false, `${every} is not read-only`);
   }
+  const none = run({ ...base, '.github/agents/reviewer.agent.md': REVIEWER('[]') });
+  assert.equal(none.rule('agent-tools').ok, true, 'tools: [] is an explicit list: no tools at all (Copilot docs), the least privilege there is');
+  assert.equal(none.rule('agent-readonly').ok, true);
+});
+
+test('workflows: global safe-output options are not handlers, so they need no max', () => {
+  const wf = (outputs) => `---\non: issues\npermissions: read-all\nsafe-outputs:\n${outputs}timeout-minutes: 10\nmax-ai-credits: 50\n---\nGo.\n`;
+  const global = run({ '.github/workflows/t.md': wf('  add-comment:\n    max: 1\n  mentions:\n    allowed: [maintainer]\n  allowed-domains: [example.com]\n  messages:\n    footer: "x"\n  report-failure-as-issue:\n    labels: [ci]\n  missing-tool:\n    create-issue: true\n') });
+  assert.equal(global.rule('workflow-safe-outputs').ok, true, global.rule('workflow-safe-outputs').message);
+  const handler = run({ '.github/workflows/t.md': wf('  add-labels:\n    allowed: [bug]\n  mentions:\n    allowed: [maintainer]\n') });
+  assert.equal(handler.rule('workflow-safe-outputs').ok, false);
+  assert.match(handler.rule('workflow-safe-outputs').message, /add-labels has no max/);
+  assert.doesNotMatch(handler.rule('workflow-safe-outputs').message, /mentions/);
 });
 
 test('MCP: tools are measured when given; a server that did not answer is "not measured", never a failure', () => {

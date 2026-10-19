@@ -9,6 +9,11 @@ test('defaults when there is no course.json', () => {
   const c = loadCourse(tmpdir());
   assert.equal(c.capstone, 'lab-08');
   assert.ok(c.harnessPaths.includes('.github/**'));
+  assert.ok(isHarnessPath(c, 'packages/api/AGENTS.md'), 'AGENTS.md files at any depth are harness');
+  for (const f of ['.mcp.json', 'apm.yml', 'apm.lock.yaml']) {
+    assert.ok(isHarnessPath(c, f), `${f} at the root is harness`);
+    assert.ok(!isHarnessPath(c, `studybuddy-plugin/${f}`), `${f} inside a plugin folder is that plugin's, not the project's harness`);
+  }
   assert.deepEqual(levelRules(c, 'lab-01/easy'), { local: [], keep: [], overrides: [], drop: [] });
 });
 

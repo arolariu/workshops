@@ -112,8 +112,9 @@ down the easy column for the live session (Lab 02 easy starts where Lab 01 easy 
 the homework (Lab 05 hard starts where Lab 05 medium ended). Because every start is the *reference* result, you can
 skip a level or start anywhere. Want your **own** harness to grow instead? Press **i** on a level (or run
 `node labs/start.mjs bring lab-05 hard`): the harness files you changed in earlier levels that pass (`AGENTS.md`,
-`.github/…`, `.mcp.json`, `mcp/…`, `apm.yml`, `scripts/…`) come with you; app code never does. Your work stays in
-`src/`. Commit early (`git add -A && git commit -m "lab 01 easy"`).
+`.github/…`, `.mcp.json`, `mcp/…`, `apm.yml`, `scripts/…`) come with you; app code never does. Files a level gave
+you that your work relies on (an organisation policy, a role policy) come along too, but only where the level you
+bring them into doesn't have them. Your work stays in `src/`. Commit early (`git add -A && git commit -m "lab 01 easy"`).
 
 ### ♻️ Starting over (with or without git)
 Press **x** in the app, or use the commands below. Your current files are always backed up first (to

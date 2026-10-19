@@ -49,6 +49,9 @@ function walk(root) {
   go(root, '', 0);
   return out.sort();
 }
+// Keys under safe-outputs that configure every output (or are the always-on system types), not handlers with a max.
+// https://github.github.com/gh-aw/reference/safe-outputs/ (Global Configuration Options, System Types)
+const SAFE_OUTPUT_OPTIONS = new Set(['allowed-domains', 'allowed-github-references', 'mentions', 'max-bot-mentions', 'messages', 'report-failure-as-issue', 'failure-issue-repo', 'group-reports', 'github-token', 'github-app', 'app', 'environment', 'needs', 'data', 'max-patch-size', 'allow-full-history-fetch', 'runs-on', 'concurrency-group', 'staged', 'env', 'jobs', 'actions', 'threat-detection', 'noop', 'missing-tool', 'missing-data']);
 const toolList = (v) => (v == null ? null : (Array.isArray(v) ? v : String(v).split(',')).map((x) => String(x).trim().replace(/^['"]|['"]$/g, '')).filter(Boolean));
 
 /** What the folder holds, layer by layer. Broken JSON or YAML becomes a `problems` entry, never a throw. */
@@ -178,8 +181,9 @@ export function scorecard(scan, { mcpTools } = {}) {
   // Agents
   if (!scan.agents.length) ['agent-tools', 'agent-readonly'].forEach(none('agents', 'custom agents'));
   else {
-    const open = scan.agents.filter((a) => !a.tools?.length || a.tools.some((t) => EVERY_TOOL.test(t)));
-    const why = (a) => (a.tools?.length ? `${a.name}: tools [${a.tools.join(', ')}] allows every tool` : `${a.name}: no tools list, so it can use every tool`);
+    // No tools key means every tool; `tools: []` is an explicit list with no tools at all (the least privilege there is).
+    const open = scan.agents.filter((a) => a.tools == null || a.tools.some((t) => EVERY_TOOL.test(t)));
+    const why = (a) => (a.tools != null ? `${a.name}: tools [${a.tools.join(', ')}] allows every tool` : `${a.name}: no tools list, so it can use every tool`);
     add('agent-tools', 'agents', !open.length, open.length ? list(open.map(why)) : 'Every agent has an explicit tools list.', open.map((a) => a.path));
     const ro = scan.agents.filter(READ_ONLY_ROLE);
     const leaks = ro.map((a) => ({ a, w: (a.tools ?? ['(every tool)']).filter((x) => WRITE_TOOLS.test(x) || x === '(every tool)') })).filter((x) => x.w.length);
@@ -242,7 +246,7 @@ export function scorecard(scan, { mcpTools } = {}) {
       return Object.values(p).some((v) => /write/i.test(String(v)));
     });
     add('workflow-readonly', 'workflows', !writes.length, writes.length ? list(writes.map(({ w, d }) => `${w.path}: ${d.permissions == null ? 'no permissions block, so the default token may write' : 'the agent has write permission'}`)) : "The agents' permissions are read-only.", writes.map(({ w }) => w.path));
-    const unbounded = fm.flatMap(({ w, d }) => Object.entries(d['safe-outputs'] ?? {}).filter(([, v]) => v && typeof v === 'object' && !(Number(v.max) > 0)).map(([k]) => `${w.path}: ${k} has no max`));
+    const unbounded = fm.flatMap(({ w, d }) => Object.entries(d['safe-outputs'] ?? {}).filter(([k, v]) => !SAFE_OUTPUT_OPTIONS.has(k) && v && typeof v === 'object' && !(Number(v.max) > 0)).map(([k]) => `${w.path}: ${k} has no max`));
     add('workflow-safe-outputs', 'workflows', !unbounded.length, unbounded.length ? list(unbounded) : 'Every safe output has a max.', scan.workflows.map((w) => w.path));
     const limits = fm.filter(({ d }) => d['timeout-minutes'] == null || d['max-ai-credits'] == null);
     add('workflow-limits', 'workflows', !limits.length, limits.length ? list(limits.map(({ w, d }) => `${w.path}: needs ${[d['timeout-minutes'] == null && 'timeout-minutes', d['max-ai-credits'] == null && 'max-ai-credits'].filter(Boolean).join(' and ')}`)) : 'Every workflow has a timeout and a credit limit.', scan.workflows.map((w) => w.path));

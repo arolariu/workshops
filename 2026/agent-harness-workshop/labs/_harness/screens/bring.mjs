@@ -24,7 +24,7 @@ export function bringLines(plan, { W = 96, fmt }) {
   const fileW = Math.min(36, Math.max(10, ...plan.items.map((i) => width(i.file))));
   for (const it of plan.items) {
     const also = it.alsoIn.length ? ` · also changed in ${it.alsoIn.map(describeKey).join(', ')}` : '';
-    put(`${fmt.white(pad(it.file, fileW))} ${fmt.bright(`← ${describeKey(it.from)}`)}  ${fmt.dim(`${ACTION[it.action]}${also}`)}`, '   ', `   ${' '.repeat(Math.min(fileW + 1, 24))}`);
+    put(`${fmt.white(pad(it.file, fileW))} ${fmt.bright(`← ${describeKey(it.from)}`)}  ${fmt.dim(`${it.support ? 'new · a file your work there uses' : ACTION[it.action]}${also}`)}`, '   ', `   ${' '.repeat(Math.min(fileW + 1, 24))}`);
   }
   for (const s of plan.skipped) put(`⏩ ${fmt.yellow(`${describeKey(s.key)} skipped:`)} ${fmt.dim(s.reason)}`);
   for (const k of plan.kept) put(`🔒 ${fmt.white(`kept: ${k.file}`)} ${fmt.dim(`(${k.reason === 'drop' ? 'this level asks you to create it yourself' : k.reason === 'keep' ? 'this level needs its own version' : "this level's starter"}; yours is in ${describeKey(k.from)})`)}`);

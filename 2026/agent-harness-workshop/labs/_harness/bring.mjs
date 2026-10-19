@@ -3,17 +3,34 @@
 // one, only the files under the harness paths (course.json) that differ from that level's seed travel: your work.
 // App code never travels. A later source wins for the same file. This level's own starter files (and the files in
 // its `keep` list) are never overwritten. Everything is backed up first, and "x" can restore the starter.
+// Support files travel too: the new starter files a source level ships on the harness paths and that your work uses
+// without changing (an organisation policy, a role policy). They only fill a gap: a target that has the file keeps it,
+// and real work from any source wins over them.
 import fs from 'node:fs';
 import path from 'node:path';
 import { isHarnessPath, levelRules, matchAny } from './course.mjs';
 import { courseOrder, snapshot, manifestFile, chainEntry } from './chain.mjs';
 import { backupWork, ensureStarter } from './workspace.mjs';
 
-/** Harness files in `dir` that differ from the seed ({ rel: blobId }) or that the seed doesn't have (minus `local` files). */
-export function workIn(dir, seed, course, local = []) {
+/**
+ * Harness files in `dir` that differ from the seed ({ rel: blobId }) or that the seed doesn't have (minus `local`
+ * files), plus the `support` files (rel paths) that are still exactly as the seed has them, marked `support: true`.
+ */
+export function workIn(dir, seed, course, local = [], support = []) {
   const out = new Map();
-  for (const [f, e] of snapshot(dir)) if (isHarnessPath(course, f) && !matchAny(local, f) && seed?.[f] !== e.id) out.set(f, { ...e, added: !seed?.[f] });
+  const carry = new Set(support);
+  for (const [f, e] of snapshot(dir)) {
+    if (!isHarnessPath(course, f) || matchAny(local, f)) continue;
+    if (seed?.[f] !== e.id) out.set(f, { ...e, added: !seed?.[f] });
+    else if (carry.has(f)) out.set(f, { ...e, added: false, support: true });
+  }
   return out;
+}
+
+/** A level's support files: its new starter files (not overrides) on the harness paths. */
+export function supportFiles(manifest, course, key) {
+  const rules = levelRules(course, key);
+  return Object.keys(chainEntry(manifest, key)?.starter ?? {}).filter((f) => isHarnessPath(course, f) && !matchAny(rules.overrides, f) && !matchAny(rules.local, f));
 }
 
 /** Merge the sources' work (later sources win) and apply the target level's rules. */
@@ -25,13 +42,15 @@ export function planFor({ sources, target, manifest, course }) {
   for (const s of sources) {
     for (const [file, e] of s.work) {
       const prev = merged.get(file);
-      merged.set(file, { file, from: s.key, id: e.id, buf: e.buf, alsoIn: prev ? [...prev.alsoIn, prev.from] : [] });
+      if (e.support && prev && !prev.support) continue;
+      merged.set(file, { file, from: s.key, id: e.id, buf: e.buf, support: Boolean(e.support), alsoIn: prev ? [...prev.alsoIn, prev.from] : [] });
     }
   }
   const now = snapshot(target.ex.src);
   const items = [];
   const kept = [];
   for (const it of [...merged.values()].sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0))) {
+    if (it.support && now.has(it.file)) continue;
     if (matchAny(rules.drop, it.file)) { kept.push({ ...it, reason: 'drop' }); continue; }
     if (matchAny(rules.keep, it.file)) { kept.push({ ...it, reason: 'keep' }); continue; }
     if (starter.has(it.file) && !matchAny(rules.overrides, it.file)) { kept.push({ ...it, reason: 'starter' }); continue; }
@@ -60,9 +79,10 @@ export function bringPlan({ catalog, course, manifest, view, target }) {
     const seed = manifest.exercises[node.key];
     const status = view.checks(node.ex);
     if (!seed) { if (status === 'pass') skipped.push({ key: node.key, node, reason: 'it has no seed record in starters.json' }); continue; }
-    const work = workIn(node.ex.src, seed, course, levelRules(course, node.key).local);
+    const work = workIn(node.ex.src, seed, course, levelRules(course, node.key).local, supportFiles(manifest, course, node.key));
     if (!work.size) continue;
     if (status !== 'pass') {
+      if (![...work.values()].some((e) => !e.support)) continue;
       const wasPass = status === 'stale' && view.entry(node.ex).checks === 'pass';
       skipped.push({ key: node.key, node, reason: wasPass ? 'changed since its checks last passed: run them again to bring it' : WHY_NOT[status] ?? 'its checks have not passed' });
       continue;
@@ -99,7 +119,7 @@ export function perfectLearnerPlan({ catalog, course, manifest, target }) {
   const idx = order.findIndex((n) => n.key === target.key);
   const sources = order.slice(0, Math.max(0, idx))
     .filter((n) => manifest?.exercises?.[n.key])
-    .map((n) => ({ key: n.key, node: n, work: workIn(n.ex.sol, manifest.exercises[n.key], course, levelRules(course, n.key).local) }))
+    .map((n) => ({ key: n.key, node: n, work: workIn(n.ex.sol, manifest.exercises[n.key], course, levelRules(course, n.key).local, supportFiles(manifest, course, n.key)) }))
     .filter((s) => s.work.size);
   return { sources: sources.map((s) => s.key), ...planFor({ sources, target, manifest, course }) };
 }

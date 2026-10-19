@@ -1,14 +1,14 @@
 {
-  "_about": "Maintainers: the rules of the seeded chain (node labs/start.mjs sync-seeds). harnessPaths: what `bring` carries forward from earlier levels. Per level: local = files that don't pass to the next level; keep = starter files `bring` never overwrites; overrides = inherited files this level's starter changes on purpose; drop = inherited files this level must not have; _why = a sentence explaining the level's rules.",
+  "_about": "Maintainers: the rules of the seeded chain (node labs/start.mjs sync-seeds). harnessPaths: what `bring` carries forward from earlier levels (gitignore-style: a leading slash pins a name to the level's root). Per level: local = files that don't pass to the next level; keep = starter files `bring` never overwrites; overrides = inherited files this level's starter changes on purpose; drop = inherited files this level must not have; _why = a sentence explaining the level's rules.",
   "capstone": "lab-08",
   "harnessPaths": [
     "AGENTS.md",
     "*.instructions.md",
     ".github/**",
-    ".mcp.json",
+    "/.mcp.json",
     "mcp/**",
-    "apm.yml",
-    "apm.lock.yaml",
+    "/apm.yml",
+    "/apm.lock.yaml",
     "scripts/**",
     "evals/**",
     "HARNESS.md"

@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { globToRegExp } from './kit.mjs';
 
-export const DEFAULT_HARNESS_PATHS = ['AGENTS.md', '*.instructions.md', '.github/**', '.mcp.json', 'mcp/**', 'apm.yml', 'apm.lock.yaml', 'scripts/**', 'evals/**', 'HARNESS.md'];
+// A leading slash pins a name to the level's root: a plugin folder's own apm.yml or .mcp.json is not the project's harness.
+export const DEFAULT_HARNESS_PATHS = ['AGENTS.md', '*.instructions.md', '.github/**', '/.mcp.json', 'mcp/**', '/apm.yml', '/apm.lock.yaml', 'scripts/**', 'evals/**', 'HARNESS.md'];
 const RULES = ['local', 'keep', 'overrides', 'drop'];
 export const courseFile = (labsDir) => path.join(labsDir, '_harness', 'course.json');
 
