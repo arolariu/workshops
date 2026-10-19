@@ -27,9 +27,9 @@ Only a skill's name and description are always in the context, so write the desc
 
 ## ❓ Check yourself
 Twenty skills are installed in a project. Before any of them is used, what is in the model's context?
-1. All twenty `SKILL.md` files, in full.
-2. Each skill's name and description; a skill's full instructions load only when the model picks it.
-3. Nothing, until you call a skill by name with `/skill-name`.
+1. All twenty `SKILL.md` files in full, so the model can compare their steps before it picks one.
+2. Each skill's name and description; a skill's full instructions load when the model picks it.
+3. Nothing at all, until you call one of the skills yourself by name, with `/skill-name`.
 
 <details><summary>Answer</summary>
 

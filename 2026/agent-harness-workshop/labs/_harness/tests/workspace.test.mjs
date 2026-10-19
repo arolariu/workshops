@@ -241,3 +241,19 @@ test('changesDiff explains why it cannot work: no git, no repository, no commit'
   git(plain, 'init', '-q');
   assert.equal(changesDiff(plain).why, 'no-commit');
 });
+test('changesDiff: non-ASCII names, empty files and renames are named right', { skip: !hasGit && 'git is not installed' }, () => {
+  const root = tmpdir();
+  git(root, 'init', '-q');
+  writeTree(root, { 'src/été notes.md': 'one\n', 'src/old name.txt': 'moved\n' });
+  git(root, 'add', '-A');
+  git(root, 'commit', '-qm', 'start');
+  writeTree(root, { 'src/été notes.md': 'two\n', 'src/empty.txt': '' });
+  git(root, 'mv', 'src/old name.txt', 'src/new name.txt');
+  const r = changesDiff(path.join(root, 'src'));
+  assert.equal(r.ok, true, r.message);
+  const byPath = Object.fromEntries(r.files.map((f) => [f.path, f]));
+  assert.deepEqual(Object.keys(byPath).sort(), ['empty.txt', 'new name.txt', 'été notes.md']);
+  assert.match(byPath['été notes.md'].diff, /-one\n\+two/);
+  assert.equal(byPath['empty.txt'].note, 'An empty file.');
+  assert.match(byPath['new name.txt'].diff, /\+moved/);
+});

@@ -23,13 +23,13 @@ A shared harness is a dependency made of prompts and code: install it pinned and
 
 ## ❓ Check yourself
 Why pin the APM package to a tag (`owner/repo#v1.0.0`) instead of following its main branch?
-1. Pinned installs download faster.
-2. Everyone gets the same prompts and scripts, and an upstream change can't silently change how your agent behaves.
-3. APM refuses to install anything that isn't pinned.
+1. Everyone gets the same prompts and scripts; an upstream change can't silently change your agent.
+2. Pinned packages install faster, because APM can skip asking GitHub whether a newer version exists.
+3. APM refuses to install a package without a tag, so the install would fail otherwise.
 
 <details><summary>Answer</summary>
 
-**2.** What a package deploys lands in the agent's context. Pinning (plus the lockfile) keeps that context the same
+**1.** What a package deploys lands in the agent's context. Pinning (plus the lockfile) keeps that context the same
 for every teammate until you choose to upgrade, and review the change.
 
 </details>

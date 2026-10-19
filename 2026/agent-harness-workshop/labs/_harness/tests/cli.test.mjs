@@ -5,6 +5,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { fixtureWorkshop, tmpdir, chainCourse } from './helpers.mjs';
+import { progressStore } from '../progress.mjs';
 
 const START = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'start.mjs');
 const cli = (labsDir, args, extraEnv = {}) => {
@@ -231,4 +232,13 @@ test('glossary prints the terms, or the ones matching a word', () => {
   assert.equal(none.code, 1);
   assert.match(none.out, /No term matches "zebra"/);
   assert.match(cli(labsDir, ['help']).out, /glossary \[word\]/);
+});
+
+test('a path saved by an older version (no longer a path) falls back to all, it never breaks next or path', () => {
+  const { labsDir } = fixtureWorkshop();
+  progressStore(labsDir).set('_ui', { path: 'foundations' });
+  const next = cli(labsDir, ['next', '--json']);
+  assert.equal(next.code, 0, next.out);
+  assert.equal(JSON.parse(next.out).key, 'lab-00/easy');
+  assert.match(cli(labsDir, ['path']).out, /❯ All exercises/);
 });

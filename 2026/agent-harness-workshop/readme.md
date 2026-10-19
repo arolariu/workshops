@@ -180,7 +180,7 @@ reference result, so they keep up with the room.
 Every level above easy is optional and goes deeper. Doing all of them takes many hours, so the homework is a menu, not
 a mandate: every level starts from its own reference starting point, so you can skip levels or start anywhere.
 
-| Tier | Theme | Time | Where |
+| Tier | Theme | Target time | Where |
 |---|---|---|---|
 | 🟢 easy | **Use it.** Apply the layer once, with guidance. | 8–10 min | 👥 together, live |
 | 🟡 medium | **Shape it.** Design the layer well for a real need. | 30–45 min | 🏠 homework |
@@ -188,7 +188,8 @@ a mandate: every level starts from its own reference starting point, so you can 
 | 🟣 hard-plus (hard+) | **Break it.** Attacks, failure modes and edge cases. | 1.5–2 h | 🏠 homework |
 | 💎 hard-plus-plus (hard++) | **Scale it.** Make it work at org scale, or build the mechanism yourself. | 2–3 h | 🏠 homework |
 
-The 🟣 and 💎 tiers appear in a lab as soon as they are written. Suggested paths (press **p** in the app, or use
+The 🟣 and 💎 tiers appear in a lab as soon as they are written, and the 🟡 and 🔴 levels grow toward these target
+times; each level's own 🕐 says how long it takes today. Suggested paths (press **p** in the app, or use
 `--path=`; **n** always goes to the path's next unfinished level, and `node labs/start.mjs path` shows each path's time):
 
 | Path | Levels |

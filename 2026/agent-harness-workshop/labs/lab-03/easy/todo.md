@@ -23,9 +23,9 @@ A tool list is a guarantee: a tool that isn't listed never reaches the model, wh
 
 ## ❓ Check yourself
 Why does a reviewer agent without `edit` stay read-only, even when the prompt says "fix it"?
-1. The instructions tell it not to edit.
+1. The instructions tell it not to edit, and the model follows its instructions.
 2. The edit tool is never offered to the model, so the model can't call it.
-3. Copilot asks for permission before every edit.
+3. Copilot asks you for permission before every edit, and you would say no.
 
 <details><summary>Answer</summary>
 

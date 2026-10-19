@@ -319,7 +319,7 @@ if (cmd === '' || cmd === 'open') {
   const L = await learningView();
   let nu;
   const ui = progress.get('_ui');
-  try { nu = L.nextExercise(catalog, L.view, { path: opt.path ?? ui.path ?? 'all', last: ui.lab && ui.level ? `${ui.lab}/${ui.level}` : null }); } catch (e) { fail(e.message); }
+  try { nu = L.nextExercise(catalog, L.view, { path: opt.path ?? (L.pathById(ui.path) ? ui.path : 'all'), last: ui.lab && ui.level ? `${ui.lab}/${ui.level}` : null }); } catch (e) { fail(e.message); }
   if (opt.json) { process.stdout.write(`${JSON.stringify(nu ? { key: nu.key, title: nu.ex.title, checks: nu.progress.checks } : null)}\n`); process.exit(0); }
   say();
   if (!nu) say(`  🏁 ${bright('Everything on this path passes on your current files.')}`);
@@ -333,7 +333,8 @@ if (cmd === '' || cmd === 'open') {
   if (pos[1]) {
     try { L.choosePath(progress, pos[1]); } catch (e) { fail(e.message); }
   }
-  const current = progress.get('_ui').path ?? 'all';
+  const saved = progress.get('_ui').path;
+  const current = L.pathById(saved) ? saved : 'all';
   say();
   for (const p of L.PATHS) say(`  ${p.id === current ? bright('❯') : ' '} ${p.id === current ? bold(bright(p.label)) : white(p.label)} ${dim(`(${p.id}${L.pathTime(catalog, p.id) ? `, ${L.pathTime(catalog, p.id)}` : ''}) — ${p.description}`)}`);
   say();

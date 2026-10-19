@@ -76,3 +76,11 @@ test('any level that says what it builds on names its real predecessor, and any 
     assert.deepEqual(quizProblems(ex.quiz), [], ex.key);
   }
 });
+test('the live track does not teach "it is always answer 2": answers vary, and the right one is not always the longest', () => {
+  const quizzes = catalog.filter((l) => !l.capstone).map((l) => l.levels.find((e) => e.level === 'easy').quiz);
+  const at = quizzes.map((q) => q.answer);
+  const most = Math.max(...[1, 2, 3, 4].map((n) => at.filter((a) => a === n).length));
+  assert.ok(most <= Math.ceil(at.length / 2), `answers ${at.join(' ')}: one position is used too often`);
+  const longest = quizzes.filter((q) => q.options[q.answer - 1].length === Math.max(...q.options.map((o) => o.length))).length;
+  assert.ok(longest <= Math.ceil(quizzes.length / 2), `the right answer is the longest option in ${longest} of ${quizzes.length} quizzes`);
+});

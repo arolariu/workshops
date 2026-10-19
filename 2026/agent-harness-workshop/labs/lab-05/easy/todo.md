@@ -26,13 +26,13 @@ Instructions are wishes; hooks are guarantees: they run outside the model, and w
 ## ❓ Check yourself
 `AGENTS.md` says "never run rm -rf", and your `preToolUse` hook denies it. The model insists it has a good reason
 to delete the folder. What holds?
-1. Whichever the model finds more convincing: it weighs both.
-2. The hook: it runs outside the model, so no argument can reach it.
-3. `AGENTS.md`, because it's in the context on every turn.
+1. Whichever the model finds more convincing: it weighs the rule, the hook and its own reason.
+2. `AGENTS.md`, because it's in the context on every turn and the model reads it first.
+3. The hook: it runs outside the model, so no argument the model makes can reach it.
 
 <details><summary>Answer</summary>
 
-**2.** The model only ever sees the hook's decision, never its code. Instructions shape what the model *tries*;
+**3.** The model only ever sees the hook's decision, never its code. Instructions shape what the model *tries*;
 the hook decides what actually *runs*.
 
 </details>

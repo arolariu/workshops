@@ -26,13 +26,13 @@ Instructions are always in the context: keep them short and specific, and prove 
 
 ## ❓ Check yourself
 Your `AGENTS.md` grows from 40 to 400 lines. What happens?
-1. Nothing much: the agent reads it once when the session starts.
-2. All 400 lines go along with every turn: more tokens per prompt, and the rules that matter get diluted.
-3. Copilot ignores everything after the first 100 lines.
+1. All 400 lines go along with every turn: more tokens, and the rules that matter get diluted.
+2. Nothing much: the agent reads the file once at the start of a session and remembers it.
+3. Copilot reads only the first 100 lines of an instruction file and silently skips the rest.
 
 <details><summary>Answer</summary>
 
-**2.** Instructions are context, not memory: the harness sends them on every turn. Long files cost more and make
+**1.** Instructions are context, not memory: the harness sends them on every turn. Long files cost more and make
 the important rules easier to miss. Keep the root file short, and scope the rest with `applyTo`.
 
 </details>

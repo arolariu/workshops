@@ -25,14 +25,14 @@ In CI nobody is watching: the agent only proposes, and a separate job applies it
 
 ## ❓ Check yourself
 In your locked-down triage workflow, how does the `bug` label end up on the issue?
-1. The agent calls the GitHub API with a write token.
-2. The agent proposes it as a safe output; a separate job with write access checks it against your allow-list and `max`, then applies it.
-3. A maintainer approves each label by hand before it's added.
+1. The agent calls the GitHub API itself, using a narrow token that is only allowed to add labels to issues.
+2. A maintainer approves each label by hand before the workflow is allowed to add it.
+3. The agent proposes it; a separate job with write access checks it against your limits and adds it.
 
 <details><summary>Answer</summary>
 
-**2.** The agent's own permissions are read-only. Writes happen in a separate job without a model, and only within
-the limits in `safe-outputs`.
+**3.** The agent's own permissions are read-only. Writes happen in a separate job without a model, and only within
+the limits in `safe-outputs` (the allow-list and the `max`).
 
 </details>
 

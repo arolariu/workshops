@@ -43,18 +43,23 @@ export function changes(dir, { gitBin = 'git' } = {}) {
   const prefix = gitText(gitBin, ['rev-parse', '--show-prefix'], { cwd: dir });
   if (prefix.missing || prefix.status !== 0) return null;
   if (gitText(gitBin, ['rev-parse', '--verify', '-q', 'HEAD'], { cwd: dir }).status !== 0) return null;
-  const r = gitText(gitBin, ['status', '--porcelain', '--untracked-files=all', '--', '.'], { cwd: dir });
+  const r = gitText(gitBin, ['status', '--porcelain', '-z', '--untracked-files=all', '--', '.'], { cwd: dir });
   if (r.status !== 0) return null;
   const pre = prefix.text.trim();
-  return r.text.split('\n').filter(Boolean).map((line) => {
-    const code = line.slice(0, 2);
-    let file = line.slice(3).trim();
-    if (file.includes(' -> ')) file = file.split(' -> ').pop();
-    file = file.replace(/^"|"$/g, '');
+  // -z: "XY path" entries separated by NUL, never quoted or escaped; a rename or copy is followed by its old path.
+  const parts = r.text.split('\0');
+  const out = [];
+  for (let i = 0; i < parts.length; i++) {
+    const entry = parts[i];
+    if (entry.length < 4) continue;
+    const code = entry.slice(0, 2);
+    if (/[RC]/.test(code)) i++;
+    let file = entry.slice(3);
     if (pre && file.startsWith(pre)) file = file.slice(pre.length);
     const status = code.includes('?') || code.includes('A') ? 'new' : code.includes('D') ? 'deleted' : 'changed';
-    return { file, status };
-  });
+    out.push({ file, status });
+  }
+  return out;
 }
 
 const NO_GIT = {
@@ -81,7 +86,11 @@ export function changesDiff(dir, { gitBin = 'git' } = {}) {
     if (status !== 'deleted') { try { after = fs.readFileSync(path.join(dir, ...file.split('/'))); } catch { /* removed meanwhile */ } }
     if (!isText(before) || !isText(after)) return { path: file, status, binary: true, diff: '', note: 'A binary file: no line-by-line view.' };
     const diff = text(before) === text(after) ? '' : unifiedDiff(text(before), text(after), { from: 'last commit', to: 'yours' });
-    return { path: file, status, binary: false, diff, note: diff ? null : 'Only the line endings changed.' };
+    const note = diff ? null
+      : !before.length && !after.length ? 'An empty file.'
+        : before.equals(after) ? 'The content is the same (perhaps only its permissions changed).'
+          : 'Only the line endings changed.';
+    return { path: file, status, binary: false, diff, note };
   }).sort((a, b) => a.path.localeCompare(b.path));
   return { ok: true, files };
 }

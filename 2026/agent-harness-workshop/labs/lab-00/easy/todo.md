@@ -23,13 +23,13 @@ The model is stateless: every turn, the harness sends the whole context again an
 
 ## ❓ Check yourself
 You ask Copilot a follow-up question in the same session. What does the model receive?
-1. Only your new prompt: it remembers the rest of the conversation.
-2. The whole conversation so far (instructions, earlier turns and tool results), plus your new prompt.
-3. A short summary it wrote of the earlier turns, plus your new prompt.
+1. Only your new prompt: the model still remembers the earlier turns from before.
+2. A short summary of the earlier turns that the model wrote for itself, plus your new prompt.
+3. The whole conversation so far (instructions, turns, tool results), plus your new prompt.
 
 <details><summary>Answer</summary>
 
-**2.** The model keeps no memory between calls, so the harness resends the context on every turn. That's why long
+**3.** The model keeps no memory between calls, so the harness resends the context on every turn. That's why long
 sessions cost more tokens, and why `/context` and `/compact` exist.
 
 </details>
