@@ -34,8 +34,8 @@ imports it.
 
 ## The budget alarm went off
 
-1. `gh aw logs --json > logs.json`, then `node scripts/cost-report.mjs logs.json`: which workflow, which day,
-   which runs.
+1. `gh aw logs --json -c 200 --start-date -1d > logs.json` (without `-c` you get only the last 10 runs), then
+   `node scripts/cost-report.mjs logs.json`: which workflow, which day, which runs.
 2. Runs near the run budget: the task got bigger (a larger diff, a busier week) or the agent loops. Tighten the
    instructions or path filters before you raise `max-ai-credits`.
 3. A day over the daily budget: look for a burst (many issues at once, repeated manual runs). The daily guardrail
@@ -53,7 +53,8 @@ imports it.
 
 ## Reading the logs
 
-- `gh aw logs` downloads the runs of every workflow (`-c` for how many, `--start-date -1w` for a week).
-- `gh aw logs --json` is what `scripts/cost-report.mjs` reads: `aic` is AI credits, `conclusion` and
-  `failure_kind` explain failures, `turns` and `token_usage` show how hard the agent worked.
+- `gh aw logs` downloads the runs of every workflow: only the last **10** unless you pass `-c` (how many) and
+  `--start-date -1w` (since when).
+- `gh aw logs --json -c 500 --start-date -1w` is what `scripts/cost-report.mjs` reads: `aic` is AI credits,
+  `conclusion` and `failure_kind` explain failures, `turns` and `token_usage` show how hard the agent worked.
 - Keep a week of `logs.json` with the weekly report, so next week's numbers have something to compare with.

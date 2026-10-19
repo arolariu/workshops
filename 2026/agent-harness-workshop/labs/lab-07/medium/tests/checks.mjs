@@ -1,18 +1,20 @@
 // Free checks for Lab 07 · medium: two kinds of change (frontmatter vs body), a schedule and a budget.
-import { readOnly, compileStrict, scheduleProblem, tableRows } from './common.mjs';
+import { readOnly, compileStrict, scheduleProblem, tableRows, front } from './common.mjs';
 
 const WF = '.github/workflows/issue-triage.md';
-const fm = (t) => t.frontmatter(WF);
+const fm = (t) => front(t, WF);
 
 /** NOTES.md's change table: [{ text, change, part: 'frontmatter'|'body'|null, recompile: true|false|null }]. */
 function changeRows(s) {
   return tableRows(s).map((cells) => {
-    const rest = cells.slice(1).join(' | ');
-    const answer = cells.slice(1).map((c) => c.replace(/[*_`]/g, '').trim()).find((c) => /^(yes|no)\b/i.test(c));
+    const rest = cells.slice(1).map((c) => c.replace(/[*_`]/g, '').trim());
+    // The first cell that starts with the answer counts, so a "why" column that mentions the other part doesn't.
+    const where = rest.map((c) => c.match(/^(?:(?:in )?the )?(front ?matter|body)\b/i)?.[1]).find(Boolean);
+    const answer = rest.find((c) => /^(yes|no)\b/i.test(c));
     return {
       text: cells.join(' | '),
       change: cells[0],
-      part: /front ?matter/i.test(rest) ? 'frontmatter' : /\bbody\b/i.test(rest) ? 'body' : null,
+      part: where ? (/front/i.test(where) ? 'frontmatter' : 'body') : null,
       recompile: answer ? /^yes/i.test(answer) : null,
     };
   });

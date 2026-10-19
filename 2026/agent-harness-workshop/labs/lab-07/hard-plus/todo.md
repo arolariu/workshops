@@ -11,11 +11,11 @@ then tighten the safe outputs, the network and what the agent reads, in the assi
 every attack is blocked and the normal work still works. Then write two attacks of your own.
 
 ## 📋 Requirements
-1. No agent can add `approved`, even if someone later opens its allow-list to `"*"`, and no call adds a pile of
-   labels.
+1. No agent can add `approved`, even if someone later opens its allow-list to `"*"`, and no call adds more than one
+   label.
 2. The agents ping nobody, and the assistant writes only on the issue it was called to.
-3. Nothing leaves: no request to a host the project doesn't need, no shell that can send, no wildcard in the
-   firewall.
+3. Nothing leaves: no wildcard in the firewall, and no tool that can send (a shell beyond read-only commands,
+   `web-fetch`, a browser, an MCP server), even behind `network: defaults`.
 4. The assistant reads only trusted content through the GitHub tool, gets the comment through the sanitized channel,
    and is told it's data.
 5. The normal work still works: answers, escalation with a label, the triage label and welcome, the daily sweep.
@@ -23,8 +23,8 @@ every attack is blocked and the normal work still works. Then write two attacks 
 
 ## 🧭 Milestones
 ### M1 · Labels it can't give
-- `approve-myself`, `label-pile`, `triage-approved` and `triage-label-pile` are blocked, also with every
-  `add-labels.allowed` opened to `"*"` (so you need a `blocked` list and `max-labels`)
+- `approve-myself`, `label-pile`, `triage-approved` and `triage-label-pile` (two labels in one call) are blocked,
+  also with every `add-labels.allowed` opened to `"*"` (so you need a `blocked` list and `max-labels: 1`)
 - `assistant-escalates`, `triage-labels` and `triage-sweep` still add their labels
 
 ### M2 · Nobody gets pinged
@@ -34,7 +34,9 @@ every attack is blocked and the normal work still works. Then write two attacks 
 
 ### M3 · Nothing leaves
 - `exfil-fetch`, `phishing-link` and `triage-exfil` are blocked
-- No `*` in either workflow's `network`, and no shell that can send (`curl`, `wget`, `node`, …)
+- No `*` anywhere in either workflow's `network` (not even `*.example`), and no tool that can send: a shell
+  command beyond read-only ones like `cat` and `grep`, `web-fetch`, a browser or an MCP server. That holds even
+  behind `network: defaults`: one more allow-list entry later, and the door is open
 
 ### M4 · Less to read, all of it data
 - `poisoned-read` is blocked; `assistant-reads-maintainer` still works
@@ -54,8 +56,7 @@ cd labs/lab-07/hard-plus/src
 code .github/workflows/issue-assistant.md
 code .github/workflows/issue-triage.md fixtures/my-attacks.json
 node scripts/aw-sim.mjs ../tests/fixtures/hostile.json
-node scripts/aw-sim.mjs ../tests/fixtures/hostile.json \
-  fixtures/my-attacks.json
+node scripts/aw-sim.mjs fixtures/my-attacks.json
 node labs/start.mjs test lab-07 hard+      # from the workshop folder
 ```
 The simulator (`scripts/aw-sim.mjs`) is shipped: it models what gh aw enforces outside the model, from the v0.92.0
@@ -99,9 +100,10 @@ escalate with a label instead. `target: "*"` lets a comment land on any issue: d
 ### M3
 <details><summary>Two doors out</summary>
 
-A request needs a tool that can send (`bash` with `curl`, `web-fetch`) **and** a host the firewall allows
-(`network`). Close both. Links in what the agent writes are a third door, and gh aw already redacts links outside
-GitHub unless `allowed-domains` says otherwise: keep it that way.
+A request needs a tool that can send **and** a host the firewall allows (`network`). Close both. A shell that runs
+`sh`, `node`, `curl` or `gh` can send anything; one that runs only `cat`, `ls` and `grep` can't. Links in what the
+agent writes are a third door, and gh aw already redacts links outside GitHub unless `allowed-domains` says
+otherwise: keep it that way.
 
 </details>
 

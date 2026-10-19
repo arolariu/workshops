@@ -42,7 +42,8 @@ how many reviews a month of real pull requests would start, and what the worst c
 - No unrestricted shell, `network` set, `max-ai-credits` ≤ 200, `timeout-minutes` ≤ 20
 
 ### M5 · Measure it before it runs
-- `globToRegExp()` follows the GitHub Actions rules (`**` crosses folders, `*` and `?` don't)
+- `globToRegExp()` follows GitHub's filter pattern rules: `**` crosses folders, `*` doesn't, `?` and `+` apply to the
+  character before them, `[0-9]` is one character from a set
 - `estimate(prs, trigger, maxAiCredits)` returns `{ prs, reviewed, skipped, runs, worstCase }`: one run per PR
   opened, push and reopen (only for the types you trigger on), for the PRs your filters let through
 - `node scripts/review-plan.mjs fixtures/prs.json` prints the numbers for **your** workflow and exits 0; a missing
@@ -68,6 +69,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "**/*.js"
+      - "**/*.mjs"
 ```
 In the body, `${{ github.event.pull_request.number }}` is the PR number. `pull_request_target` runs with a write
 token in the context of the base branch: never point an agent at untrusted code with it.
@@ -77,7 +79,8 @@ token in the context of the base branch: never point an agent at untrusted code 
 <details><summary>Which files count</summary>
 
 `AGENTS.md` ends in `.md`, but it's the rule book the reviewer enforces, so a change to it deserves a review.
-A filter like `paths-ignore: ["**/*.md"]` would skip it. Quote globs that start with `*` in YAML.
+A filter like `paths-ignore: ["**/*.md"]` would skip it. Quote globs that start with `*` in YAML. GitHub's patterns
+have no `{js,mjs}`: list each pattern on its own line.
 
 </details>
 
@@ -119,8 +122,10 @@ Leave out `bash` (a reviewer reads; it doesn't run things), add `network: defaul
 ### M5
 <details><summary>Globs to regular expressions</summary>
 
-Walk the glob one character at a time: `**/` becomes `(?:.*/)?`, a lone `**` becomes `.*`, `*` becomes `[^/]*`,
-`?` becomes `[^/]`, and every other character is escaped. Anchor it: `^…$`.
+Walk the glob one character at a time: `**/` becomes `(?:.*/)?`, a lone `**` becomes `.*`, `*` becomes `[^/]*`.
+GitHub's cheat sheet gives `?` ("zero or one of the preceding character"), `+` ("one or more of the preceding
+character") and `[…]` the meaning they have in a regex, so they pass through; escape everything else. Anchor it:
+`^…$`.
 
 </details>
 

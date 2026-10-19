@@ -1,5 +1,5 @@
 // The fleet's cost report, from a recorded `gh aw logs --json` (its format: `gh aw json-schema logs`).
-//   gh aw logs --json > logs.json            # on a real repository, with a token
+//   gh aw logs --json -c 100 --start-date -1w > logs.json   # on a real repository (the default is 10 runs)
 //   node scripts/cost-report.mjs logs.json   # here: ../tests/fixtures/fleet-logs.json
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,15 +14,15 @@ export function workflowId(run) {
  *  own value wins; otherwise it comes from a shared file the workflow imports (gh aw's merge, v0.92.0). */
 export function readBudgets(dir = '.') {
   const folder = path.join(dir, '.github', 'workflows');
-  const front = (file) => { try { return fs.readFileSync(file, 'utf8').replace(/\r/g, '').match(/^---\n([\s\S]*?)\n---/)?.[1] ?? ''; } catch { return ''; } };
-  const num = (text, key) => { const m = text.match(new RegExp(`^${key}:\\s*(\\d+(?:\\.\\d+)?)`, 'm')); return m ? Number(m[1]) : null; };
+  const data = (file) => { try { return parseFrontmatter(fs.readFileSync(file, 'utf8'))?.data ?? {}; } catch { return {}; } };
   const out = {};
   for (const f of fs.existsSync(folder) ? fs.readdirSync(folder).filter((n) => n.endsWith('.md')) : []) {
-    const own = front(path.join(folder, f));
-    const block = own.match(/^imports:[ \t]*\[(.*)\]/m)?.[1] ?? own.match(/^imports:[ \t]*\n((?:[ \t]+-.*\n?)+)/m)?.[1] ?? '';
-    const imported = [...block.matchAll(/["']?([^"',\s\]]+\.md)/g)].map((m) => m[1].replace(/^-/, ''))
-      .map((p) => front(p.startsWith('.github/') ? path.join(dir, p) : path.join(folder, p)));
-    const pick = (key) => num(own, key) ?? imported.map((text) => num(text, key)).find((v) => v != null) ?? null;
+    const own = data(path.join(folder, f));
+    const shared = (Array.isArray(own.imports) ? own.imports : own.imports ? [own.imports] : [])
+      .map((i) => String(typeof i === 'string' ? i : i?.uses ?? i?.path ?? '').replace(/[?]$/, '').replace(/^\/+/, ''))
+      .filter((p) => p && !p.startsWith('.github/agents/'))
+      .map((p) => data(p.startsWith('.github/') ? path.join(dir, p) : path.join(folder, p)));
+    const pick = (key) => Number(own[key] ?? shared.map((s) => s[key]).find((v) => v != null)) || null;
     out[f.replace(/\.md$/, '')] = { run: pick('max-ai-credits'), daily: pick('max-daily-ai-credits') };
   }
   return out;
@@ -44,7 +44,119 @@ export function toMarkdown(report) {
   return '';
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// ---- given: a small YAML reader (the subset workflow frontmatter uses, the same rules as the checks) ----
+function stripComment(line) {
+  let q = null;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (q) { if (ch === q) q = null; } else if (ch === '"' || ch === "'") q = ch;
+    else if (ch === '#' && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i);
+  }
+  return line;
+}
+function depthOf(s) {
+  let d = 0, q = null;
+  for (const ch of s) {
+    if (q) { if (ch === q) q = null; continue; }
+    if (ch === '"' || ch === "'") q = ch;
+    else if (ch === '[' || ch === '{') d++;
+    else if (ch === ']' || ch === '}') d--;
+  }
+  return d;
+}
+function splitFlow(s) {
+  const parts = [];
+  let depth = 0, q = null, cur = '';
+  for (const ch of s) {
+    if (q) { cur += ch; if (ch === q) q = null; continue; }
+    if (ch === '"' || ch === "'") { q = ch; cur += ch; continue; }
+    if (ch === '[' || ch === '{') depth++;
+    if (ch === ']' || ch === '}') depth--;
+    if (ch === ',' && depth === 0) { parts.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  if (cur.trim()) parts.push(cur);
+  return parts.map((p) => p.trim());
+}
+const unquote = (s) => { s = s.trim(); return /^(["']).*\1$/.test(s) ? s.slice(1, -1) : s; };
+function scalar(v) {
+  v = v.trim();
+  if (v.startsWith('[') && v.endsWith(']')) return splitFlow(v.slice(1, -1)).map(scalar);
+  if (v.startsWith('{') && v.endsWith('}')) {
+    const o = {};
+    for (const part of splitFlow(v.slice(1, -1))) {
+      const m = part.match(/^("[^"]*"|'[^']*'|[^:]+?)\s*:\s*(.*)$/);
+      if (m) o[unquote(m[1])] = scalar(m[2]);
+    }
+    return o;
+  }
+  if (/^(["']).*\1$/.test(v)) return v.slice(1, -1);
+  if (/^(true|yes)$/i.test(v)) return true;
+  if (/^(false|no)$/i.test(v)) return false;
+  if (/^(null|~)$/i.test(v) || v === '') return null;
+  if (/^-?\d+(\.\d+)?$/.test(v)) return Number(v);
+  return v;
+}
+export function parseYaml(src) {
+  const raw = String(src).replace(/\r/g, '').replace(/\t/g, '  ').split('\n');
+  const lines = [];
+  for (let k = 0; k < raw.length; k++) {
+    let s = stripComment(raw[k]);
+    if (!s.trim() || /^---\s*$/.test(s)) continue;
+    // A flow list or map that wraps onto the next lines is joined back into one line.
+    while (/(:\s+|^\s*-\s+)[[{]/.test(s) && depthOf(s) > 0 && k + 1 < raw.length) s = `${s.trimEnd()} ${stripComment(raw[++k]).trim()}`;
+    lines.push({ indent: s.match(/^ */)[0].length, text: s.trim() });
+  }
+  let i = 0;
+  const isItem = (l) => l.text === '-' || l.text.startsWith('- ');
+  const isKey = (t) => /^("[^"]*"|'[^']*'|[^\s"'[{][^:]*?)\s*:(\s|$)/.test(t);
+  const block = (indent) => (isItem(lines[i]) ? list(indent) : map(indent));
+  function map(indent) {
+    const obj = {};
+    while (i < lines.length && lines[i].indent === indent && !isItem(lines[i])) {
+      const m = lines[i].text.match(/^("[^"]*"|'[^']*'|[^:]+?)\s*:(?:\s+(.*))?$/);
+      if (!m) throw new Error(`cannot read the line "${lines[i].text}"`);
+      const key = unquote(m[1]);
+      const rest = m[2] ?? '';
+      i++;
+      if (rest === '') {
+        if (i < lines.length && lines[i].indent > indent) obj[key] = block(lines[i].indent);
+        else if (i < lines.length && lines[i].indent === indent && isItem(lines[i])) obj[key] = list(indent);
+        else obj[key] = null;
+      } else if (/^[|>][-+]?$/.test(rest)) {
+        const parts = [];
+        while (i < lines.length && lines[i].indent > indent) parts.push(lines[i++].text);
+        obj[key] = parts.join(rest.startsWith('|') ? '\n' : ' ');
+      } else obj[key] = scalar(rest);
+    }
+    return obj;
+  }
+  function list(indent) {
+    const arr = [];
+    while (i < lines.length && lines[i].indent === indent && isItem(lines[i])) {
+      const content = lines[i].text === '-' ? '' : lines[i].text.slice(2).trim();
+      if (!content) {
+        i++;
+        arr.push(i < lines.length && lines[i].indent > indent ? block(lines[i].indent) : null);
+      } else if (isKey(content)) {
+        lines[i] = { indent: indent + 2, text: content };
+        arr.push(map(indent + 2));
+      } else { arr.push(scalar(content)); i++; }
+    }
+    return arr;
+  }
+  return lines.length ? block(lines[0].indent) : {};
+}
+/** { data, body } of a workflow file, or null when it has no frontmatter. */
+export function parseFrontmatter(text) {
+  const m = String(text).replace(/^\uFEFF/, '').replace(/\r/g, '').match(/^---\n([\s\S]*?)\n---\s*(?:\n|$)([\s\S]*)$/);
+  return m ? { data: parseYaml(m[1]) ?? {}, body: m[2] } : null;
+}
+
+const isMain = (() => {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
+if (isMain) {
   const file = process.argv[2];
   if (!file || !fs.existsSync(file)) {
     console.error(`${file ?? 'A logs file'} not found. Usage: node scripts/cost-report.mjs <logs.json> (from gh aw logs --json)`);

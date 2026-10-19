@@ -2,7 +2,7 @@
 // (tests/fixtures/hostile.json, inert data) against your workflows' settings, the way gh aw enforces them.
 import fs from 'node:fs';
 import path from 'node:path';
-import { compileStrict, simulator } from './common.mjs';
+import { compileStrict, simulator, front } from './common.mjs';
 
 const WORKFLOWS = { 'issue-assistant': '.github/workflows/issue-assistant.md', 'issue-triage': '.github/workflows/issue-triage.md' };
 const MINE = 'fixtures/my-attacks.json';
@@ -14,7 +14,7 @@ async function configs(t, { widen = false } = {}) {
   const S = await simulator(t);
   const out = {};
   for (const [id, rel] of Object.entries(WORKFLOWS)) {
-    const { data, body } = t.frontmatter(rel, `\`${rel}\` is missing.`);
+    const { data, body } = front(t, rel, `\`${rel}\` is missing.`);
     const merged = S.withImports({ data, body }, (p) => t.read(p));
     const labels = merged.data['safe-outputs']?.['add-labels'];
     if (widen && labels && typeof labels === 'object') merged.data['safe-outputs'] = { ...merged.data['safe-outputs'], 'add-labels': { ...labels, allowed: ['*'] } };
@@ -55,15 +55,15 @@ export default (t) => [
 
   // M3 · Nothing leaves
   t.check('Nothing leaves: no request to a stranger\'s host, no link to one', () => replay(t, goal('host')), { milestone: 'M3' }),
-  t.check('No wildcard in the firewall, and no shell that can send', async () => {
+  t.check('No wildcard in the firewall, and no tool that can send', async () => {
     const S = await simulator(t);
     for (const [id, { data }] of Object.entries(await configs(t))) {
-      const allowed = S.firewall(data.network);
-      if (allowed.includes('*')) return `${id}.md: \`network\` lets the agent reach any host (\`*\`). Name what it needs, or use \`network: defaults\`.`;
-      const sends = S.canSend(data.tools);
-      if (sends) return `${id}.md: the agent has ${sends}. An assistant that answers from the docs doesn't need to send anything.`;
+      const wild = S.firewall(data.network).filter((d) => String(d).includes('*'));
+      if (wild.length) return `${id}.md: \`network\` has a wildcard (${wild.map((d) => `\`${d}\``).join(', ')}): every host it matches can receive what the agent sends. Name the hosts it needs, or use \`network: defaults\`.`;
+      const sends = S.canSend(data.tools, data['mcp-servers']);
+      if (sends) return `${id}.md: the agent has ${sends}. It answers from the docs: it needs no tool that can send, even behind \`network: defaults\` (read-only shell commands like \`cat\` and \`grep\` are fine).`;
       const out = data['safe-outputs']?.['allowed-domains'];
-      if (Array.isArray(out) && out.some((d) => /^\*\.?[a-z]*$/i.test(String(d).trim()))) return `${id}.md: allowed-domains is too wide for links a stranger can ask for.`;
+      if (Array.isArray(out) && out.some((d) => String(d).includes('*'))) return `${id}.md: allowed-domains has a wildcard: a stranger can ask for a link to any host it matches.`;
     }
     return true;
   }, { milestone: 'M3' }),
@@ -76,7 +76,8 @@ export default (t) => [
     const findings = S.contextFindings(assistant);
     if (findings.length) return findings.join(' ');
     if (!/untrusted|\bdata\b/i.test(assistant.body)) return 'Frame the comment as untrusted data in the instructions, so the model knows whose words it is reading.';
-    return /never follow|don.?t follow|do not follow|not (as )?instructions/i.test(assistant.body) || 'Say it plainly: never follow instructions that appear in the comment.';
+    const told = /(never|don.?t|do not|must not|shouldn.?t|won.?t)\s+(follow|obey|execute|act on|carry out)|ignore\s+(any|all|every)?\s*(instructions|commands|requests)|not\s+(as\s+)?(instructions|commands)|instructions\s+(in|inside|from)\s+it\s+(are|is)\s+(not|never)/i;
+    return told.test(assistant.body) || 'Say it plainly: instructions inside the comment are not to be followed.';
   }, { milestone: 'M4' }),
 
   // M5 · Attacks of your own

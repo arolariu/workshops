@@ -1,7 +1,7 @@
 // Free checks for Lab 07 · hard++: a continuous-AI fleet (shared configuration, budgets, failure handling, costs, a runbook).
 import fs from 'node:fs';
 import path from 'node:path';
-import { readOnly, GLOBAL_SAFE_OUTPUT_KEYS, importsOf, refCostReport, compileAll, simulator, tableRows } from './common.mjs';
+import { readOnly, GLOBAL_SAFE_OUTPUT_KEYS, importsOf, refCostReport, compileStrict, simulator, tableRows, front, runOffline, withOffline } from './common.mjs';
 
 const SHARED = '.github/workflows/shared/fleet.md';
 const FLEET = ['issue-triage', 'pr-review', 'issue-assistant', 'weekly-report'];
@@ -13,15 +13,20 @@ const FLEET_DAILY = 1000;
 // group and job-discriminator. Budgets, max-turns and a concurrency group are allowed there, as fleet defaults.
 const REFUSED_IN_SHARED = ['timeout-minutes'];
 const SHARED_CONCURRENCY = ['group', 'job-discriminator'];
-const TRANSIENT = ['!inference_access_error', '!ai_credits_rate_limit_error', '!report_incomplete'];
+// Transient: the AI endpoint having a bad minute, not the workflow being broken. (report_incomplete is not: it can be a real tool or setup failure.)
+const TRANSIENT = ['!inference_access_error', '!ai_credits_rate_limit_error'];
 const FIXED_BUDGETS = { 'pr-review': { run: 100, daily: 300 }, 'weekly-report': { run: 150, daily: 200 }, 'issue-triage': { run: 50, daily: 200 }, 'issue-assistant': { run: 50, daily: 150 } };
 
-const fm = (t, rel) => t.frontmatter(rel, `\`${rel}\` is missing.`);
+const fm = (t, rel) => front(t, rel, `\`${rel}\` is missing.`);
 const fleet = (t) => FLEET.map((id) => ({ id, ...fm(t, wf(id)) }));
 const shared = (t) => (t.exists(SHARED) ? fm(t, SHARED).data : {});
 /** A setting as the workflow ends up with it: its own value wins, else the shared file's (gh aw's merge, v0.92.0). */
 const effective = (t, data, key) => data[key] ?? (importsOf(data).includes(SHARED) ? shared(t)[key] : undefined);
 const groupOf = (c) => (typeof c === 'string' ? c : c?.group);
+/** A concurrency group as it is at run time: `${{ github.workflow }}` differs per workflow, so it becomes the workflow's id. */
+const runtimeGroup = (group, id) => String(group ?? '').replace(/\$\{\{\s*github\.workflow\s*\}\}/g, id).trim();
+const PER_PR = /\$\{\{[^}]*(pull_request\.number|github\.event\.number|github\.head_ref|github\.ref\b|pull_request\.head\.ref)[^}]*\}\}/;
+const hasGithubTool = (d) => Boolean(d.tools && typeof d.tools === 'object' && 'github' in d.tools && d.tools.github !== false);
 const logsFile = (t) => path.join(t.exDir, 'tests', 'fixtures', 'fleet-logs.json');
 const logs = (t) => JSON.parse(fs.readFileSync(logsFile(t), 'utf8'));
 const pick = (w) => ({ id: w.id, runs: w.runs, failed: w.failed, aic: w.aic, avg: w.avg, max: w.max, peakDay: w.peakDay, nearBudget: w.nearBudget, overDaily: w.overDaily });
@@ -29,11 +34,12 @@ const pick = (w) => ({ id: w.id, runs: w.runs, failed: w.failed, aic: w.aic, avg
 function weeklyProblem(schedule) {
   const items = schedule == null ? [] : typeof schedule === 'string' ? [schedule] : (Array.isArray(schedule) ? schedule : [schedule]).map((s) => (typeof s === 'string' ? s : s?.cron));
   if (!items.length) return 'Add a weekly schedule, for example `schedule: weekly on monday`.';
+  if (items.length > 1) return `There are ${items.length} schedules: a weekly report runs once a week. Keep one.`;
   for (const item of items) {
     const v = String(item ?? '').trim();
     if (/^(weekly|bi-weekly|tri-weekly)\b/i.test(v) || /^every\s+(1\s*w|7\s*d|7 days|1 week)\b/i.test(v)) continue;
     const f = v.split(/\s+/);
-    if (f.length === 5 && /^\d+$/.test(f[0]) && /^\d+$/.test(f[1]) && f[2] === '*' && f[4] !== '*') continue;
+    if (f.length === 5 && /^\d+$/.test(f[0]) && /^\d+$/.test(f[1]) && f[2] === '*' && f[3] === '*' && /^([0-7]|sun|mon|tue|wed|thu|fri|sat)$/i.test(f[4])) continue;
     return `"${v}" isn't once a week. A weekly report should run weekly: \`schedule: weekly on monday\`.`;
   }
   return null;
@@ -46,7 +52,8 @@ export default (t) => [
     if (data.on !== undefined) return 'A shared file has no `on:`: with a trigger, gh aw would compile it as a workflow of its own.';
     if (!data.network) return '`shared/fleet.md` sets no `network` yet: put the fleet\'s firewall allow-list here, once.';
     const S = await simulator(t);
-    if (S.firewall(data.network).includes('*')) return 'The shared `network` lets every agent reach any host (`*`).';
+    const wild = S.firewall(data.network).filter((d) => String(d).includes('*'));
+    if (wild.length) return `The shared \`network\` has a wildcard (${wild.map((d) => `\`${d}\``).join(', ')}): every agent in the fleet could send to any host it matches.`;
     if (data['safe-outputs']?.mentions !== false) return 'Set `mentions: false` under the shared `safe-outputs`: no agent in the fleet pings anyone.';
     const refused = REFUSED_IN_SHARED.filter((k) => data[k] !== undefined);
     if (data.concurrency && typeof data.concurrency === 'object') refused.push(...Object.keys(data.concurrency).filter((k) => !SHARED_CONCURRENCY.includes(k)).map((k) => `concurrency.${k}`));
@@ -74,7 +81,7 @@ export default (t) => [
     if (!readOnly(p) || typeof p !== 'object') return 'Read-only permissions for the agent: `contents`, `issues` and `pull-requests`, all `read`.';
     const miss = ['contents', 'issues', 'pull-requests'].filter((k) => p[k] !== 'read');
     if (miss.length) return `It needs \`${miss.join('`, `')}: read\`.`;
-    const sets = d.tools?.github ? d.tools.github.toolsets ?? ['default'] : [];
+    const sets = hasGithubTool(d) ? d.tools.github?.toolsets ?? ['default'] : [];
     if (!sets.some((s) => ['default', 'all'].includes(s)) && !(sets.includes('issues') && sets.includes('pull_requests'))) return 'Give it the GitHub tool with the `issues` and `pull_requests` toolsets.';
     const so = d['safe-outputs'] ?? {};
     const extra = Object.keys(so).filter((k) => k !== 'create-issue' && !GLOBAL_SAFE_OUTPUT_KEYS.includes(k));
@@ -110,8 +117,10 @@ export default (t) => [
   t.check('Concurrency: a group per workflow, and a new push cancels an outdated review', () => {
     const groups = new Map();
     for (const { id, data: d } of fleet(t)) {
-      const group = groupOf(d.concurrency) ?? groupOf(effective(t, d, 'concurrency'));
-      if (!String(group ?? '').trim()) return `${id}.md needs a \`concurrency:\` group, so a burst of events queues instead of starting a crowd of agents.`;
+      const raw = groupOf(d.concurrency) ?? groupOf(effective(t, d, 'concurrency'));
+      const group = runtimeGroup(raw, id);
+      if (!group) return `${id}.md needs a \`concurrency:\` group, so a burst of events queues instead of starting a crowd of agents.`;
+      if (id === 'pr-review' && !PER_PR.test(group)) return `pr-review.md: its group "${raw}" is the same for every pull request, so a push to one PR would cancel the review of another. Add the PR to it, for example \`\${{ github.event.pull_request.number }}\`.`;
       if (groups.has(group)) return `${id}.md and ${groups.get(group)}.md share the concurrency group "${group}": one would hold up the other${id === 'pr-review' || groups.get(group) === 'pr-review' ? ', and a new push would cancel the other\'s run' : ''}.`;
       groups.set(group, id);
       const cancel = d.concurrency?.['cancel-in-progress'] === true;
@@ -143,7 +152,7 @@ export default (t) => [
   }, { milestone: 'M4' }),
 
   // M5 · The cost report
-  t.check('costReport() adds up the recorded runs', async () => {
+  t.check('costReport() adds up the recorded runs', () => withOffline(t, async () => {
     const { costReport } = await t.import(COST);
     const want = refCostReport(logs(t), FIXED_BUDGETS);
     let got;
@@ -161,9 +170,9 @@ export default (t) => [
     if (fails.join() !== want.failures.map((f) => f.run_id).join()) return t.fail('The failed runs (failure or timed_out, oldest first) don\'t match.', { expected: want.failures.map((f) => f.run_id), actual: fails });
     const empty = costReport({ runs: [] }, {});
     return (empty.runs === 0 && empty.aic === 0 && (empty.workflows ?? []).length === 0) || 'With no runs, the report should be all zeros and no workflows.';
-  }, { milestone: 'M5' }),
+  }), { milestone: 'M5' }),
   t.check('The CLI prints the report with your fleet\'s budgets', () => {
-    const r = t.node([COST, logsFile(t)]);
+    const r = runOffline(t, [COST, logsFile(t)]);
     if (r.code !== 0) return `\`node ${COST} <logs.json>\` exited with ${r.code}: ${r.all.trim().split('\n').slice(-2).join(' ')}`;
     const budgets = Object.fromEntries(fleet(t).map(({ id, data }) => [id, { run: Number(effective(t, data, 'max-ai-credits')) || null, daily: Number(effective(t, data, 'max-daily-ai-credits')) || null }]));
     const want = refCostReport(logs(t), budgets);
@@ -180,12 +189,12 @@ export default (t) => [
     if (!total || Number(total[1]) !== want.runs || Number(total[2]) !== want.failed || Number(total[3]) !== want.aic) return t.fail('The total line is missing or off.', { expected: `**Total:** ${want.runs} runs · ${want.failed} failed · ${want.aic} AI credits`, actual: total?.[0] ?? null });
     const lines = r.stdout.split('\n');
     for (const w of want.workflows) {
-      if (w.nearBudget && !lines.some((l) => l.includes('⚠️') && l.includes(w.id) && l.includes('80%'))) return `No warning line for ${w.id}: ${w.nearBudget} run(s) used 80% or more of the run budget.`;
-      if (w.overDaily && !lines.some((l) => l.includes('⚠️') && l.includes(w.id) && /daily/i.test(l))) return `No warning line for ${w.id}: its busiest day (${w.peakDay}) is over the daily budget (${w.budget.daily}).`;
+      if (w.nearBudget && !lines.some((l) => l.includes('⚠') && l.includes(w.id) && l.includes('80%'))) return `No warning line for ${w.id}: ${w.nearBudget} run(s) used 80% or more of the run budget.`;
+      if (w.overDaily && !lines.some((l) => l.includes('⚠') && l.includes(w.id) && /daily/i.test(l))) return `No warning line for ${w.id}: its busiest day (${w.peakDay}) is over the daily budget (${w.budget.daily}).`;
     }
     const missed = want.failures.filter((f) => !lines.some((l) => l.includes('❌') && l.includes(String(f.run_id))));
     if (missed.length) return `No ❌ line for the failed run(s): ${missed.map((f) => f.run_id).join(', ')}.`;
-    const none = t.node([COST, 'no-such-logs.json']);
+    const none = runOffline(t, [COST, 'no-such-logs.json']);
     return (none.code === 1 && /not found|no such|missing|doesn.t exist/i.test(none.all)) || 'With a file that doesn\'t exist, the CLI should say so and exit 1.';
   }, { milestone: 'M5' }),
 
@@ -207,13 +216,23 @@ export default (t) => [
     return true;
   }, { milestone: 'M6' }),
   t.check('RUNBOOK.md: what to do when a run fails, the budget runs out, or a hostile issue gets through', () => {
-    const s = t.need(RUNBOOK);
-    const heads = (s.match(/^#{2,3}\s+.+$/gm) ?? []).join('\n');
-    const sections = [[/fail/i, 'a failed run'], [/budget|credit/i, 'the budget alarm'], [/hostile|injection|attack/i, 'a hostile issue that got through']].filter(([re]) => !re.test(heads)).map(([, w]) => w);
-    if (sections.length) return `Add a section for: ${sections.join(', ')}.`;
-    const cmds = ['gh aw logs', 'gh aw disable', 'gh aw compile'].filter((c) => !s.includes(c));
-    return !cmds.length || `Say which command to run when: ${cmds.map((c) => `\`${c}\``).join(', ')} ${cmds.length > 1 ? "aren't" : "isn't"} in the runbook yet.`;
+    const s = t.need(RUNBOOK).replace(/<!--[\s\S]*?-->/g, '');
+    // Each section: its heading, real steps under it, and the command that section's reader needs first.
+    const sections = s.split(/^(?=#{2,3}\s)/m).map((part) => ({ head: part.match(/^#{2,3}\s+(.+)$/m)?.[1] ?? '', text: part.replace(/^#{2,3}\s+.+$/m, '').trim() }));
+    const NEED = [
+      [/fail/i, 'a failed run', /gh aw (logs|audit)\b/, '`gh aw logs` (or `gh aw audit`)'],
+      [/alarm|exceed|over (the )?budget|out of (budget|credits)|ran out|runs out|overspen/i, 'the budget alarm', /gh aw disable\b/, '`gh aw disable`, the kill switch'],
+      [/hostile|injection|attack/i, 'a hostile issue that got through', /gh aw disable\b[\s\S]*gh aw compile\b|gh aw compile\b[\s\S]*gh aw disable\b/, '`gh aw disable` to stop it and `gh aw compile` for the fix'],
+    ];
+    for (const [head, what, cmd, cmdText] of NEED) {
+      const sec = sections.find((x) => head.test(x.head));
+      if (!sec) return `Add a section for ${what} (a \`## …\` heading).`;
+      const prose = sec.text.split('\n').filter((l) => l.trim() && !/^\s*\|/.test(l));
+      if (prose.length < 2 || sec.text.length < 120) return `The section "${sec.head}" is too thin: write the steps someone on call follows (what to look at, how to stop the damage, how to fix it).`;
+      if (!cmd.test(sec.text)) return `The section "${sec.head}" should name the command to run: ${cmdText}.`;
+    }
+    return true;
   }, { milestone: 'M6' }),
 
-  t.check('gh aw compile --strict compiles the whole fleet', () => compileAll(t, FLEET), { needs: ['gh-aw'], optional: true, env: true, timeout: 200000 }),
+  t.check('gh aw compile --strict compiles the whole fleet', () => compileStrict(t, FLEET), { needs: ['gh-aw'], optional: true, env: true, timeout: 200000 }),
 ];

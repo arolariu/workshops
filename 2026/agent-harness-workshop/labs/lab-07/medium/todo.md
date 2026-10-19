@@ -12,7 +12,7 @@ team only recompiles when it has to.
 ## 📋 Requirements
 1. The instructions ask bug reporters for their operating system and Node.js version when they're missing.
 2. `good first issue` is an allowed label, and the workflow stays read-only with at most 1 label and 1 comment.
-3. New issues still trigger the workflow, and a schedule runs it at most once a day.
+3. New issues still trigger the workflow, and one schedule runs it at most once a day.
 4. A scheduled run can label the oldest issue without a label; comments stay on the issue that triggered the run.
 5. A daily budget (`max-daily-ai-credits`, 500 or less) caps what the workflow spends in 24 hours, and fits at
    least one run.
@@ -27,7 +27,7 @@ team only recompiles when it has to.
 - The agent is still read-only, with `add-labels.max: 1` and `add-comment.max: 1`
 
 ### M3 · A schedule and a budget
-- `on:` keeps `issues: [opened]` and gets a schedule that runs at most daily (`daily`, `weekly`, or a cron with
+- `on:` keeps `issues: [opened]` and gets one schedule that runs at most daily (`daily`, `weekly`, or a cron with
   a fixed minute and hour)
 - `add-labels` has `target: "*"`; `add-comment` keeps its default target
 - The body says what a scheduled run does: label the oldest issue without a label, no comment
@@ -106,7 +106,7 @@ activation job recomputes the hash; if you changed the frontmatter and didn't re
 </details>
 
 ## 🧠 Takeaway
-The frontmatter is compiled and checked by hash, the body is read fresh at run time: recompile for the first, never for the second.
+The frontmatter is compiled and checked by hash, the body is read fresh at run time: recompile for the first (and for a `${{ vars.* }}` in the body), never for plain instructions.
 
 ## ❓ Check yourself
 You add one line to the **body** of `issue-triage.md`: `Write in the tone ${{ vars.TRIAGE_TONE }}.` Do you need

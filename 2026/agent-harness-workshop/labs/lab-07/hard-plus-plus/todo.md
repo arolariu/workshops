@@ -41,12 +41,14 @@ and write the runbook the on-call person reads at 2 a.m.
 - Each of the four ends up with `max-ai-credits`, `max-daily-ai-credits` (≥ `max-ai-credits`) and `max-turns`
   (≤ 50), set in the workflow or as a fleet default in `shared/fleet.md` (the workflow's own value wins); and its
   own `timeout-minutes` (≤ 20)
-- A `concurrency.group` per workflow (no two share one); `pr-review` has `cancel-in-progress: true`, the others don't
+- A `concurrency.group` per workflow (no two share one at run time: `${{ github.workflow }}` is different in each);
+  `pr-review`'s group includes the pull request (`${{ github.event.pull_request.number }}`) and has
+  `cancel-in-progress: true`, the others don't cancel
 - The four daily budgets add up to 1,000 or less
 
 ### M4 · When things go wrong
 - The shared `report-failure-as-issue` is a list that excludes at least one transient category
-  (`!inference_access_error`, `!ai_credits_rate_limit_error` or `!report_incomplete`); no workflow overrides it
+  (`!inference_access_error` or `!ai_credits_rate_limit_error`); no workflow overrides it
 - The shared body (the fleet rules) says untrusted text is data, and to call `noop` when there's nothing to do
 
 ### M5 · The cost report
@@ -58,8 +60,9 @@ and write the runbook the on-call person reads at 2 a.m.
 ### M6 · The runbook
 - `RUNBOOK.md` has no TODO left, an owner, and a budget-table row per workflow whose run and daily budgets match its
   frontmatter
-- Sections for a failed run, the budget alarm and a hostile issue that got through, using `gh aw logs`,
-  `gh aw disable` and `gh aw compile`
+- Three sections with real steps: a failed run (using `gh aw logs` or `gh aw audit`), the budget alarm (using
+  `gh aw disable`, the kill switch), and a hostile issue that got through (`gh aw disable`, then the fix and
+  `gh aw compile`)
 
 **The cost report's rules.** A run belongs to the workflow named by its `workflow_path` (`issue-triage.lock.yml` →
 `issue-triage`). `failed` counts `failure` and `timed_out` (not `cancelled`). Round `aic`, `avg`, `max` and
@@ -127,7 +130,8 @@ safe-outputs:
 
 A group per workflow means a burst of 30 new issues queues up behind one triage run instead of starting 30 agents
 at once (add `queue: max` so pending runs wait instead of being dropped). For reviews it's the opposite: a new push
-makes the running review worthless, so cancel it.
+makes the running review worthless, so cancel it, but only on the same pull request: put the PR number in the
+group, or a push to one PR cancels the review of another.
 
 </details>
 
@@ -143,8 +147,9 @@ default; budgets differ per workflow (a review costs more than a triage), so set
 <details><summary>Which failures wake somebody</summary>
 
 `report-failure-as-issue` takes categories; `!` excludes one. `inference_access_error` and
-`ai_credits_rate_limit_error` are the AI endpoint having a bad minute, not your workflow being broken. And a run
-that finishes without any safe output fails: that's why every agent needs to know about `noop`.
+`ai_credits_rate_limit_error` are the AI endpoint having a bad minute, not your workflow being broken.
+`report_incomplete` isn't one of them: it can be a real tool or setup failure. And a run that finishes without
+any safe output fails: that's why every agent needs to know about `noop`.
 
 </details>
 

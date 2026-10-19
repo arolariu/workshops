@@ -18,6 +18,16 @@ function stripComment(line) {
   }
   return line;
 }
+function depthOf(s) {
+  let d = 0, q = null;
+  for (const ch of s) {
+    if (q) { if (ch === q) q = null; continue; }
+    if (ch === '"' || ch === "'") q = ch;
+    else if (ch === '[' || ch === '{') d++;
+    else if (ch === ']' || ch === '}') d--;
+  }
+  return d;
+}
 function splitFlow(s) {
   const parts = [];
   let depth = 0, q = null, cur = '';
@@ -53,9 +63,12 @@ function scalar(v) {
 }
 export function parseYaml(src) {
   const lines = [];
-  for (const raw of String(src).replace(/\r/g, '').replace(/\t/g, '  ').split('\n')) {
-    const s = stripComment(raw);
+  const raw = String(src).replace(/\r/g, '').replace(/\t/g, '  ').split('\n');
+  for (let k = 0; k < raw.length; k++) {
+    let s = stripComment(raw[k]);
     if (!s.trim() || /^---\s*$/.test(s)) continue;
+    // A flow list or map that wraps onto the next lines is joined back into one line.
+    while (/(:\s+|^\s*-\s+)[[{]/.test(s) && depthOf(s) > 0 && k + 1 < raw.length) s = `${s.trimEnd()} ${stripComment(raw[++k]).trim()}`;
     lines.push({ indent: s.match(/^ */)[0].length, text: s.trim() });
   }
   let i = 0;
@@ -147,12 +160,16 @@ export function firewall(network) {
   if (typeof network === 'object' && !Array.isArray(network)) return expand(arr(network.allowed));
   return expand(arr(network));
 }
-/** Can the agent send a request at all? A shell with curl/wget/node/python (or any command), or web-fetch. */
-export function canSend(tools) {
-  if (!tools || typeof tools !== 'object') return false;
-  if (tools['web-fetch'] !== undefined) return 'the web-fetch tool';
-  if (tools.bash === true) return 'an unrestricted shell';
-  const hit = arr(tools.bash).find((c) => /^:?\*$/.test(c.trim()) || /^(curl|wget|nc|ncat|node|python3?)\b/.test(c.trim()));
+// Shell commands that only read. Anything else (sh, bash, node, python, curl, gh, git push, …) can send data out.
+const READ_ONLY_SHELL = ['cat', 'ls', 'head', 'tail', 'wc', 'grep', 'echo', 'pwd', 'date', 'sort', 'uniq', 'diff', 'cut', 'tr', 'stat', 'basename', 'dirname', 'true', 'false'];
+/** Can the agent send a request at all? Any shell command outside the read-only list, web-fetch, a browser, an MCP server. */
+export function canSend(tools, mcpServers) {
+  const t = tools && typeof tools === 'object' ? tools : {};
+  if (t['web-fetch'] !== undefined) return 'the web-fetch tool';
+  if (t.playwright !== undefined) return 'a browser (playwright)';
+  if (mcpServers && typeof mcpServers === 'object' && Object.keys(mcpServers).length) return `an MCP server (${Object.keys(mcpServers)[0]})`;
+  if (t.bash === true) return 'an unrestricted shell';
+  const hit = arr(t.bash).find((c) => !READ_ONLY_SHELL.includes(c.trim().replace(/^["']|["']$/g, '').split(/[\s:]/)[0]));
   return hit ? `a shell that allows \`${hit}\`` : false;
 }
 
@@ -249,7 +266,7 @@ export function simulateCase(config, c, repo = DEFAULT_REPO) {
   for (const p of c.proposals ?? []) {
     if (p.type === 'fetch') {
       const host = hostOf(p.url);
-      const via = canSend(d.tools);
+      const via = canSend(d.tools, d['mcp-servers']);
       if (!via) { notes.push(`fetch ${host}: the agent has no tool that can send a request`); continue; }
       if (!hostIn(host, firewall(d.network))) { notes.push(`fetch ${host}: the firewall blocks it (not in network.allowed)`); continue; }
       effects.push({ kind: 'fetch', host, via });
@@ -276,13 +293,19 @@ export function simulateCase(config, c, repo = DEFAULT_REPO) {
     if (used[key] > max) { notes.push(`${p.type}: over the limit (${key}.max is ${max})`); continue; }
     let item = null;
     if (TARGETED.includes(key)) {
-      item = Number.isInteger(p.item) ? p.item : triggering;
-      const target = opt.target ?? 'triggering';
-      if (item == null) { notes.push(`${p.type}: no item to write to (a scheduled run has no triggering item)`); continue; }
-      if (item !== triggering) {
-        if (target === 'triggering') { notes.push(`${p.type} on #${item}: it may only write to the triggering item${triggering ? ` (#${triggering})` : ''}`); continue; }
-        if (target !== '*' && Number(target) !== item) { notes.push(`${p.type} on #${item}: its target is #${target}`); continue; }
-      }
+      // gh aw v0.92.0: "triggering" (the default) writes to the item that started the run; a number is used as given;
+      // "*" takes the item number from the call, and add_comment skips a call without one (add_labels falls back
+      // to the triggering item).
+      const target = String(opt.target ?? 'triggering');
+      const asked = Number.isInteger(p.item) ? p.item : null;
+      if (target === 'triggering') {
+        if (asked != null && asked !== triggering) { notes.push(`${p.type} on #${asked}: it may only write to the triggering item${triggering ? ` (#${triggering})` : ''}`); continue; }
+        item = triggering;
+      } else if (target === '*') {
+        if (asked == null && key === 'add-comment') { notes.push(`${p.type}: with target "*", a call without an item number is skipped`); continue; }
+        item = asked ?? triggering;
+      } else item = Number(target);
+      if (!Number.isInteger(item)) { notes.push(`${p.type}: no item to write to (a scheduled run has no triggering item)`); continue; }
     }
     if (key === 'add-labels') {
       const labels = arr(p.labels);
@@ -356,8 +379,9 @@ export function contextFindings(config) {
   const d = config?.data ?? {};
   const body = config?.body ?? '';
   const out = [];
-  const raw = body.match(/\$\{\{\s*github\.event\.(issue|pull_request|discussion)\.title\s*\}\}|\$\{\{\s*github\.event\.release\.name\s*\}\}/);
-  if (raw) out.push(`The prompt pastes \`${raw[0]}\` raw: a stranger wrote it. Use \`\${{ steps.sanitized.outputs.text }}\`.`);
+  const RAW = /\$\{\{\s*(github\.event\.(issue|pull_request|discussion|comment|review|review_comment)\.(title|body)|github\.event\.release\.(name|body)|github\.head_ref|github\.event\.pull_request\.head\.(ref|label))\s*\}\}/g;
+  const raw = [...new Set([...body.matchAll(RAW)].map((m) => m[0]))];
+  if (raw.length) out.push(`The prompt pastes ${raw.map((r) => `\`${r}\``).join(', ')} raw: a stranger wrote ${raw.length > 1 ? 'them' : 'it'}. Use \`\${{ steps.sanitized.outputs.text }}\`.`);
   if (!/\$\{\{\s*steps\.sanitized\.outputs\.(text|body)\s*\}\}/.test(body)) out.push('Untrusted text doesn\'t arrive through `${{ steps.sanitized.outputs.text }}`, the sanitized channel.');
   const gh = d.tools?.github;
   if (d.tools && 'github' in d.tools && gh !== false) {
@@ -376,7 +400,10 @@ export function contextFindings(config) {
 }
 
 // ---------- the CLI ----------
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+const isMain = (() => {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
+if (isMain) {
   const files = process.argv.slice(2);
   if (!files.length) {
     console.error('Usage: node scripts/aw-sim.mjs <cases.json> [more.json …]   (try ../tests/fixtures/hostile.json)');
