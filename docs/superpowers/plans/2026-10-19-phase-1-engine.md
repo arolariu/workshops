@@ -851,3 +851,33 @@ test('NO_COLOR and --no-anim draw plain frames that fit 80 columns', () => { /* 
 - [ ] **Step 4:** TUI smoke at 80×24 and 120×40, with `--no-anim` and `NO_COLOR=1` (the Task 9 tests), plus one real start: `node labs/start.mjs --no-intro --no-anim` in a terminal, navigate home → lab → exercise → `i` → `b` → `q`.
 - [ ] **Step 5:** Commit any fixes, then report to the coordinator: what was built, the verification output, the deviations above (plus any found while implementing), and open issues. Wait for the go-ahead before Phase 2.
 
+
+---
+
+## Notes from the implementation (added while executing)
+
+- **Base:** PR #1 moved from `e1928e6` to `6dae8a5` before work started; this branch is rebased onto `6dae8a5`.
+- **Conflicts (Task 4):** a solution file that the new upstream version already contains byte for byte is *absorbed*,
+  not reported as a conflict. A file already reported as edited or deleted is not reported again as a conflict.
+- **PR #1 lock bug (found by Task 5's extra test load):** on Windows, creating `.progress.json.lock` while another
+  process deletes it fails with `EPERM`; `locked()` then wrote without the lock and the concurrency test lost
+  updates. Fixed in its own commit (retry up to ~40 times on `EPERM`/`EACCES`/`EBUSY`), so it can be ported to PR #1.
+- **Next up (Task 8):** one PR #1 TUI test assumed "first unfinished exercise"; it now follows the spec rule (back to
+  your last level first). The test keeps its intent: a stale pass counts as unfinished.
+- **`local` (after the agent sweep):** `FINDINGS.md` and `team-notes.md` are Lab 01 easy's inputs. They no longer
+  travel past it (`course.json`), as before the chain.
+- **Agent checks after the re-seed (Task 11):** run on copies of `sol/` in `labs/.runs/sol-sweep/`, with every
+  `--max-ai-credits` above 30 lowered to 30 in the copy (lab-03/hard's fixer and lab-05/hard's leash use 50). Two
+  checks fail, and fail the same way on the pre-re-seed `sol/`, so they are not caused by the chain: lab-01/hard (the
+  "without instructions" run still reads `AGENTS.md` as a file and prints the canary) and lab-05/medium case 1 (the
+  agent obeys `AGENTS.md` and never tries `npm install`, so the guard has nothing to deny). Both levels are rewritten
+  in Phase 4.
+- **Tests (Tasks 7, 9):** the tests described by comments in this plan were written out in full.
+- **PR #1 lock bug, part 2 (found while verifying):** under load the concurrency test still lost updates. Tracing
+  every lock acquire/release showed a second cause: a waiting writer saw a just-released lock (Windows keeps it visible
+  for a moment) whose owner had exited, deleted it, and so deleted the next writer's brand-new lock. A lock with a gone
+  owner is now broken only after 1 s. Stress test (4 runs × 4 writers × 25 writes): PR #1's original lost updates in
+  18 of 40 runs, part 1 alone in 10 of 40, both parts in 0 of 60.
+- **Agent re-sweep after the `local` change:** 11 of 12 changed levels pass. lab-05/easy failed this time and passed in
+  the first sweep: the agent chose a command spelling outside `--allow-tool=shell(rm)`, so Copilot refused it before
+  the hook ran. Run-to-run variance in a pre-existing check (Windows); noted for Lab 05's Phase 4 rewrite.
