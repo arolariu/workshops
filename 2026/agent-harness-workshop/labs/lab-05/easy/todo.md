@@ -5,8 +5,8 @@
 ## 🎯 Mission
 One day an agent *will* try `rm -rf` on the wrong folder. Make sure that in this project it physically can't.
 The hook is already wired up in `.github/hooks/guardrails.json`; it runs
-`.github/hooks/scripts/guard.mjs` before every tool call. Teach `decide()` to block recursive force-deletes,
-**every spelling of them**, while letting normal work through.
+`.github/hooks/scripts/guard.mjs` before every tool call. Fill in `isRecursiveForceDelete()` and `decide()` so it
+blocks recursive force-deletes, **every spelling of them**, while letting normal work through.
 
 ## 📂 Work here
 ```bash
@@ -28,10 +28,11 @@ is `"powershell"`. Return a string to block, `null` to allow.
 
 </details>
 
-<details><summary>Regex or words?</summary>
+<details><summary>The helpers do the splitting</summary>
 
-A single regex gets messy fast. Try: split the command on `&&`, `||`, `;`, `|`; split each part into words;
-skip `sudo`; if the first word is `rm`, collect its flags and check for "recursive" **and** "force".
+`segments("cd build && rm -rf x")` gives `["cd build", "rm -rf x"]`, and `words("sudo rm -r -f x")` gives
+`["rm", "-r", "-f", "x"]` (it drops `sudo`). So `isRecursiveForceDelete` only looks at one command's flags:
+are "recursive" **and** "force" both there, in short (`-rf`, `-r -f`) or long (`--recursive --force`) form?
 
 </details>
 

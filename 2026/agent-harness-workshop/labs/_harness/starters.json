@@ -1,6 +1,6 @@
 {
   "format": 2,
-  "revision": "f5f496a1795065a1fba2f09203d7747f7f4db37b",
+  "revision": "f1bcd088c733499ffcd8760195d0f43b3bfacc3a",
   "note": "Every seed file of every exercise's src/ as a git blob ID (line endings normalised), and the chain: where each level starts from and which files are its own starter files. Regenerate with: node labs/start.mjs sync-seeds",
   "exercises": {
     "lab-00/easy": {
@@ -235,7 +235,7 @@
     "lab-05/easy": {
       ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
       ".github/hooks/guardrails.json": "7957f56d18cc57c81d8fb4b174aa942e047b3739",
-      ".github/hooks/scripts/guard.mjs": "2d36cfbcef9f4fe9f5331522c184a4b85e8c19fd",
+      ".github/hooks/scripts/guard.mjs": "0abab8aecb1b43632bbc052b6ba2bab510ae99b3",
       ".github/skills/new-module/SKILL.md": "f72e8bf23e1adb17fd86f45d24a4b8d8ed10ca58",
       ".github/skills/new-module/templates/module.template.js": "817611e44740e7e8af3382c9111d77762e0226c5",
       ".github/skills/new-module/templates/module.test.template.js": "63b430c2ef6014ab7425b33f162a83e55c6944a8",
@@ -761,7 +761,7 @@
       "from": "lab-04/easy",
       "starter": {
         ".github/hooks/guardrails.json": "7957f56d18cc57c81d8fb4b174aa942e047b3739",
-        ".github/hooks/scripts/guard.mjs": "2d36cfbcef9f4fe9f5331522c184a4b85e8c19fd",
+        ".github/hooks/scripts/guard.mjs": "0abab8aecb1b43632bbc052b6ba2bab510ae99b3",
         "AGENTS.md": "e37b145e87eb8428419d1019d8701619e7055f30"
       },
       "inherited": {

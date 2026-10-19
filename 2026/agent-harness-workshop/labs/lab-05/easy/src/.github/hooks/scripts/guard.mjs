@@ -7,6 +7,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const SHELL_TOOLS = new Set(['bash', 'powershell', 'shell']);
+
+// Split "cd build && rm -rf x; ls" into separate commands, and drop "sudo" / "VAR=value" prefixes.
+const segments = (command) => String(command ?? '').split(/&&|\|\||[;|\n]/).map((s) => s.trim()).filter(Boolean);
+const words = (segment) => {
+  const list = segment.split(/\s+/);
+  while (list[0] === 'sudo' || /^\w+=\S*$/.test(list[0] ?? '')) list.shift();
+  return list;
+};
+
+function isRecursiveForceDelete(segment) {
+  const [cmd, ...rest] = words(segment);
+  // TODO: return true when cmd is rm and its flags say "recursive" AND "force", in any spelling
+  //       (-rf, -fr, -r -f, -Rf, --recursive --force), or when cmd is PowerShell's Remove-Item with -Recurse.
+  return false;
+}
+
 /**
  * Decide about one tool call.
  * @param {string} toolName - e.g. "bash" or "powershell" (shell), "view", "edit", "create"
@@ -14,7 +31,8 @@ import { fileURLToPath } from 'node:url';
  * @returns {string | null} a reason to block the call, or null to allow it
  */
 export function decide(toolName, args) {
-  // TODO: block recursive force-deletes (rm -rf and all its spellings, and PowerShell's Remove-Item -Recurse).
+  // TODO: for a shell tool (SHELL_TOOLS), block the call when any segment of args.command is a recursive
+  //       force-delete. Return a reason the model can understand; return null to allow the call.
   return null;
 }
 
