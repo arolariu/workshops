@@ -612,3 +612,36 @@ test('inherited checks show under the results, advisory: the level still passes 
   assert.equal(progressStore(labsDir).get('lab-05/easy').checks, 'pass', 'an advisory warning never turns a pass into a fail');
   t.quit();
 });
+test('the agent screen shows what happened in each case, and says when there was no JSON trace', async () => {
+  const timeline = '⛔ powershell rm -rf x (denied by a hook) · 💬 answer · Σ ≈1.2k in / 0.0k out tokens';
+  const t = await app({
+    open: 'lab-00/easy',
+    size: { columns: 120, rows: 40 },
+    deps: {
+      loadAgentChecks: async () => [{ name: 'traced', prompt: 'hi', expect: () => true }, { name: 'plain', prompt: 'hi', expect: () => true }],
+      runAgentChecks: async () => ({ runId: 'r', state: 'pass', allPass: true, results: [
+        { name: 'traced', status: 'pass', traced: true, timeline, output: 'Blocked by the guard.' },
+        { name: 'plain', status: 'pass', traced: false, output: 'A plain answer.' },
+      ] }),
+    },
+  });
+  press(t.input, 'a');
+  await waitFor(() => t.state.agent?.phase === 'confirm');
+  press(t.input, 'y');
+  await waitFor(() => t.state.agent.phase === 'done');
+  const shown = text(t.output);
+  assert.match(shown, /🧭 What happened: ⛔ powershell rm -rf x \(denied by a hook\)/);
+  assert.match(shown, /Copilot said \(no JSON trace, so this is the raw output\):/);
+  t.quit();
+});
+
+test('history details show each case timeline', async () => {
+  const startedAt = new Date().toISOString();
+  const suite = { runId: 'r1', dir: 'x', startedAt, state: 'fail', budget: { cases: [{ configuredCap: 30 }] }, cases: [{ name: 'guard', status: 'fail', message: 'nope', launched: true, startedAt, timeline: '🔧 view a.js ✓ · 💬 answer' }] };
+  const t = await app({ open: 'lab-00/easy', size: { columns: 120, rows: 40 }, deps: { listRuns: () => [suite] } });
+  press(t.input, 'H');
+  await waitFor(() => t.state.screen === 'history');
+  press(t.input, '\r', 'return');
+  assert.match(text(t.output), /🧭 🔧 view a\.js ✓ · 💬 answer/);
+  t.quit();
+});

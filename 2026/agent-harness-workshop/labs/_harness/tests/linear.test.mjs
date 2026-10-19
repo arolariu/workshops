@@ -201,3 +201,19 @@ test('xray works line by line too', async () => {
   assert.match(text, /X-ray of the reference solution/);
   assert.doesNotMatch(text, /\x1b/);
 });
+test('linear agent and history print each case timeline', async () => {
+  const timeline = '⛔ powershell rm -rf x (denied by a hook) · 💬 answer';
+  const deps = {
+    loadAgentChecks: async () => [{ name: 'guard', prompt: 'hi', expect: () => true }, { name: 'plain', prompt: 'hi', expect: () => true }],
+    runAgentChecks: async ({ onEvent }) => {
+      onEvent({ type: 'result', idx: 0, name: 'guard', status: 'pass', traced: true, timeline });
+      onEvent({ type: 'result', idx: 1, name: 'plain', status: 'pass', traced: false, output: 'A plain answer.' });
+      return { state: 'pass', allPass: true, results: [], runId: 'r1', dir: null };
+    },
+    listRuns: () => [{ runId: 'r1', startedAt: new Date().toISOString(), state: 'pass', cases: [{ name: 'guard', status: 'pass', timeline }] }],
+  };
+  const { text } = await session(['open lab-00 easy', 'agent', 'yes', 'history', 'quit'], { deps });
+  assert.match(text, /What happened: ⛔ powershell rm -rf x \(denied by a hook\)/);
+  assert.match(text, /No JSON trace, so there is no timeline/);
+  assert.match(text, /What happened in "guard": ⛔ powershell/);
+});

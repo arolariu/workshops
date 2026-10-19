@@ -291,7 +291,11 @@ export function runLinear({
       exDir: ex.dir, target: ex.src, labsDir, labId: lab.id, level: ex.level, specs, signal: controller.signal,
       onEvent: (e) => {
         if (e.type === 'start') say(`  Started: ${e.name}`);
-        if (e.type === 'result') say(`  ${e.status}: ${e.name}${e.message ? `. ${e.message}` : ''}`);
+        if (e.type === 'result') {
+          say(`  ${e.status}: ${e.name}${e.message ? `. ${e.message}` : ''}`);
+          if (e.timeline) say(`    What happened: ${e.timeline}`);
+          else if (e.traced === false && e.output) say('    No JSON trace, so there is no timeline; the raw output is in the run folder.');
+        }
       },
     });
     active = null;
@@ -376,7 +380,10 @@ export function runLinear({
         say(meterLine(creditSummary(deps.listRuns(labsDir), { now: new Date(deps.now()) })));
         say('Run folders stay on this computer and can contain generated or sensitive output.');
         if (!runs.length) say('No agent runs yet.');
-        runs.forEach((r) => say(`  ${r.startedAt ?? ''} ${r.state} ${r.runId}: ${(r.cases ?? []).map((c) => `${c.name} ${c.status}`).join('; ')}`));
+        runs.forEach((r) => {
+          say(`  ${r.startedAt ?? ''} ${r.state} ${r.runId}: ${(r.cases ?? []).map((c) => `${c.name} ${c.status}`).join('; ')}`);
+          (r.cases ?? []).filter((c) => c.timeline).forEach((c) => say(`    What happened in "${c.name}": ${c.timeline}`));
+        });
         return;
       }
       case 'compare': case 'diff': compare(args[0]); return;

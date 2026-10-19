@@ -166,3 +166,57 @@ test('history marks the cases that started the agent, for the credit meter', asy
   const blocked = await runAgentChecks({ ...base, target: path.join(base.target, 'missing') });
   assert.equal(listRuns(base.labsDir).find((r) => r.runId === blocked.runId).cases[0].launched, undefined, 'never started: not counted');
 });
+test('Copilot runs with JSON events by default; trace: false or an explicit --output-format turn that off', () => {
+  const base = { name: 'x', prompt: 'hi', expect: () => true };
+  const fmt = (args) => args.filter((a, i) => a === '--output-format' || args[i - 1] === '--output-format');
+  assert.deepEqual(fmt(copilotArgs(base)), ['--output-format', 'json']);
+  assert.deepEqual(fmt(copilotArgs({ ...base, trace: false })), []);
+  assert.deepEqual(fmt(copilotArgs({ ...base, extraArgs: ['--output-format', 'text'] })), ['--output-format', 'text']);
+});
+
+/** A stand-in for the Copilot CLI: prints JSON events when the prompt says TRACE, else plain text. */
+function fakeCopilot(root) {
+  const script = path.join(root, 'fake-copilot.mjs');
+  fs.writeFileSync(script, `const args = process.argv.slice(2);
+const prompt = args[args.indexOf('-p') + 1] ?? '';
+const ev = (type, data) => JSON.stringify({ type, data });
+if (!prompt.includes('TRACE')) { console.log('A plain answer.'); process.exit(0); }
+console.log([
+  ev('assistant.message', { content: 'Looking at it.', toolRequests: [{ toolCallId: 't1', name: 'powershell', arguments: { command: 'rm -rf x' } }] }),
+  ev('tool.execution_start', { toolCallId: 't1', toolName: 'powershell', arguments: { command: 'rm -rf x' } }),
+  ev('tool.execution_complete', { toolCallId: 't1', success: false, error: { code: 'denied', message: 'Denied by preToolUse hook: no recursive deletes' } }),
+  ev('assistant.message', { content: 'Blocked by the guard.' }),
+  ev('session.usage_checkpoint', { accountingSnapshot: { modelMetrics: { m: { usage: { inputTokens: 1200, outputTokens: 40, cacheReadTokens: 0 } } } } }),
+  JSON.stringify({ type: 'result', exitCode: 0, usage: { premiumRequests: 1 } }),
+].join('\\n'));
+`);
+  if (process.platform === 'win32') {
+    const cmd = path.join(root, 'fake-copilot.cmd');
+    fs.writeFileSync(cmd, `@"${process.execPath}" "%~dp0fake-copilot.mjs" %*\r\n`);
+    return cmd;
+  }
+  const sh = path.join(root, 'fake-copilot');
+  fs.writeFileSync(sh, `#!/bin/sh\nexec "${process.execPath}" "$(dirname "$0")/fake-copilot.mjs" "$@"\n`, { mode: 0o755 });
+  return sh;
+}
+
+test('a traced run: expect gets the answer text, the case keeps a timeline, and trace.json is saved', async () => {
+  const { base, labsDir } = fixture(`export default [{ name: 'traced', prompt: 'TRACE it', expect: (t, { output, answer }) => (output === 'Looking at it.\\n\\nBlocked by the guard.' && answer === 'Blocked by the guard.') || 'got: ' + JSON.stringify({ output, answer }) }];`);
+  const result = await runAgentChecks({ ...base, copilotBin: fakeCopilot(path.dirname(labsDir)) });
+  assert.equal(result.state, 'pass', JSON.stringify(result.results[0]));
+  const c = result.results[0];
+  assert.match(c.timeline, /⛔ powershell rm -rf x \(denied by a hook\) · 💬 answer · Σ ≈1\.2k in \/ 0\.0k out tokens/);
+  assert.equal(c.traced, true);
+  const saved = JSON.parse(fs.readFileSync(path.join(result.dir, 'case-1', 'trace.json'), 'utf8'));
+  assert.equal(saved.timeline[0].by, 'hook');
+  assert.equal(saved.usage.inputTokens, 1200);
+  assert.equal(listRuns(labsDir).find((r) => r.runId === result.runId).cases[0].timeline, c.timeline, 'history keeps the timeline');
+});
+
+test('without JSON in the output, expect gets the raw text and no timeline is invented', async () => {
+  const { base, labsDir } = fixture(`export default [{ name: 'plain', prompt: 'just answer', expect: (t, { output, answer }) => (output === 'A plain answer.' && answer === output) || 'got: ' + JSON.stringify({ output, answer }) }];`);
+  const result = await runAgentChecks({ ...base, copilotBin: fakeCopilot(path.dirname(labsDir)) });
+  assert.equal(result.state, 'pass', JSON.stringify(result.results[0]));
+  assert.equal(result.results[0].traced, false);
+  assert.equal(result.results[0].timeline ?? null, null);
+});

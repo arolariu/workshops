@@ -886,8 +886,9 @@ export async function startTui({
           L.push(`   ${statusIcon(r.status === 'pass' ? 'pass' : r.status === 'fail' ? 'fail' : r.status)} ${r.status === 'pass' ? green(s.name) : white(s.name)}`);
           if (r.status !== 'pass' && r.message) wrap(inline(r.message), W() - 10).forEach((l, j) => L.push(`       ${j === 0 ? dim('↳ ') : '  '}${yellow(l)}`));
           if (r.note) L.push(...para(dim(`ℹ️  ${r.note}`), '       ', '       '));
+          if (r.timeline) L.push(...para(`🧭 ${white('What happened:')} ${dim(r.timeline)}`, '       ', '          '));
           if (r.output) {
-            L.push(`       ${dim('Copilot said:')}`);
+            L.push(`       ${dim(r.traced === false && !s.command ? 'Copilot said (no JSON trace, so this is the raw output):' : 'Copilot said:')}`);
             r.output.split('\n').filter((l) => l.trim()).slice(-8).forEach((l) => wrap(l, W() - 12).forEach((w) => L.push(`         ${dim(w)}`)));
           }
         } else if (A.phase === 'running' && A.current === i) {
@@ -936,6 +937,7 @@ export async function startTui({
         (r.cases ?? []).forEach((c) => {
           L.push(...para(`${statusIcon(c.status === 'not-run' ? 'not-run' : c.status)} ${white(c.name)} ${dim(c.status)}`, '       ', '         '));
           if (c.message) L.push(...para(yellow(c.message), '         ', '         '));
+          if (c.timeline) L.push(...para(dim(`🧭 ${c.timeline}`), '         ', '            '));
           if (c.command) L.push(...para(cyan(c.command), '         ', '         '));
         });
       }

@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 import { makeKit, copilotBin as defaultCopilot, TRUST_HINT, isTrusted } from './kit.mjs';
 import { runProcess, resolveCommand } from './process.mjs';
 import { recoveryFor } from './doctor.mjs';
+import { parseTrace, timelineText } from './trace.mjs';
 
 export async function loadAgentChecks(exDir) {
   const file = path.join(exDir, 'tests', 'agent.mjs');
@@ -24,9 +25,12 @@ export function copilotArgs(specIn, kit) {
   if (spec.agent) args.push('--agent', spec.agent);
   for (const dir of spec.pluginDirs ?? []) args.push('--plugin-dir', dir);
   args.push('-p', spec.prompt, '-s', '--no-ask-user', `--max-ai-credits=${spec.credits ?? 30}`);
+  // JSON events give the agent screen a timeline; trace.mjs turns them back into the text `-s` prints.
+  const extra = spec.extraArgs ?? [];
+  if (spec.trace !== false && !extra.some((a) => /^--output-format(=|$)/.test(String(a)))) args.push('--output-format', 'json');
   for (const a of spec.allow ?? []) args.push(`--allow-tool=${a}`);
   for (const d of spec.deny ?? []) args.push(`--deny-tool=${d}`);
-  args.push(...(spec.extraArgs ?? []));
+  args.push(...extra);
   return args;
 }
 
@@ -246,20 +250,34 @@ async function runSuite({ exDir, target, labsDir, labId, level, signal, onEvent 
       fs.writeFileSync(path.join(caseDir, 'stderr.txt'), res.stderr);
     } catch { /* keep going: the output is also in the result */ }
     c.exitCode = res.code;
-    const output = res.stdout.trim();
+    // A Copilot run's stdout is JSON events (see copilotArgs): keep the timeline, and give `expect` the text `-s` would
+    // print. expect(kit, { output: every message, answer: the last one, stderr, code }).
+    let output = res.stdout.trim();
+    let answer = output;
+    if (!spec.command) {
+      const trace = parseTrace(res.stdout, { cwd: work });
+      c.traced = trace.ok;
+      if (trace.ok) {
+        output = trace.output;
+        answer = trace.answer;
+        c.timeline = timelineText(trace);
+        c.usage = trace.usage;
+        try { writeJson(path.join(caseDir, 'trace.json'), { timeline: trace.timeline, usage: trace.usage }); } catch { /* the result still has it */ }
+      }
+    }
     if (res.cancelled || signal?.aborted) { cancelled = true; done('cancelled', 'Cancelled while the agent was running.', { output }); break; }
     if (res.missing) { done('blocked', `Could not start \`${shown}\`. ${shown === 'copilot' ? recoveryFor('copilot') : ''}`.trim(), { output }); continue; }
     if (res.error) { done('fail', `Could not run the agent: ${res.error}`, { output }); continue; }
     if (res.timedOut) { done('fail', 'The agent run took too long and was stopped.', { output }); continue; }
     if (res.code !== 0 && !spec.allowNonZero) {
-      const why = `${res.stderr}\n${res.stdout}`.trim().split('\n').slice(-4).join(' ').slice(0, 400);
+      const why = `${res.stderr}\n${output}`.trim().split('\n').slice(-4).join(' ').slice(0, 400);
       done('fail', `The run ended with exit code ${res.code}. ${why}${/auth|login|token/i.test(why) ? ' (Are you logged in? Run `copilot` and use /login.)' : ''}`, { output });
       continue;
     }
     onEvent({ type: 'verdict', idx, name: spec.name });
     let verdict;
     try {
-      verdict = await raceAbort(Promise.resolve().then(() => spec.expect(kit, { output, stderr: res.stderr, code: res.code })), signal);
+      verdict = await raceAbort(Promise.resolve().then(() => spec.expect(kit, { output, answer, stderr: res.stderr, code: res.code })), signal);
     } catch (e) {
       done('fail', `The verdict crashed: ${e?.message ?? e}`, { output });
       continue;
