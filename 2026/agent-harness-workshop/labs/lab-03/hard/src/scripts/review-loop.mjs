@@ -98,10 +98,6 @@ export function writeReport(dir, report) {
 
 /** One real Copilot call: returns what it printed, throws when it fails. */
 export function copilotRun(args) {
-  if (process.env.HARNESS_NO_COPILOT) {
-    globalThis.__harnessCopilotCalls = (globalThis.__harnessCopilotCalls ?? 0) + 1;
-    throw new Error('copilotRun() refused: the free checks never call Copilot. Use the run() you are given.');
-  }
   let r = spawnSync('copilot', args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
   if (r.error?.code === 'ENOENT' && process.platform === 'win32') {
     const q = (a) => (/^[\w\-./:=@,]+$/.test(a) ? a : `"${a.replace(/"/g, '""')}"`);

@@ -5,7 +5,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { GOAL, artifact, fakeTeam, flag, norm } from './helpers.mjs';
-import { offline } from '../../../_harness/fixtures/lab-03/offline.mjs';
 
 const BROKEN = JSON.parse(fs.readFileSync(new URL('./fixtures/broken-artifacts.json', import.meta.url), 'utf8')).artifacts;
 const TEAM = 'scripts/team.mjs';
@@ -33,12 +32,12 @@ async function workspace(t, { budget } = {}) {
   team.startRun({ runDir, goal: GOAL, pipeline });
   const file = (f) => path.join(runDir, f);
   const json = (f) => JSON.parse(fs.readFileSync(file(f), 'utf8'));
-  return { t, work, team, pipeline, runDir, file, json };
+  return { work, team, pipeline, runDir, file, json };
 }
 /** What a person would do: approve plan.json as it is now (the format of approval.json). */
 const writeApproval = (w) => fs.writeFileSync(w.file('approval.json'), JSON.stringify({ by: 'Ana', at: '2026-10-20T10:00:00.000Z', plan: sha(w.file('plan.json')) }));
-/** advance(), with the real Copilot out of reach: a free check must never start a paid call. */
-const advance = (w, fake) => offline(w.t, () => w.team.advance(w.runDir, { pipeline: w.pipeline, run: fake.run, cwd: w.work }));
+/** advance() with the fake team (the kit refuses a real Copilot session in free checks). */
+const advance = (w, fake) => w.team.advance(w.runDir, { pipeline: w.pipeline, run: fake.run, cwd: w.work });
 /** The whole recorded run: plan, the gate, a person approves, implement, test, review. */
 async function fullRun(t, options = {}) {
   const w = await workspace(t, options);

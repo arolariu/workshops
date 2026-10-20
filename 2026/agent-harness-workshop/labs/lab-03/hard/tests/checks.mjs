@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { norm, flag, cap, REVIEWS, fakeCopilot, greenTests } from './helpers.mjs';
 import { capsOf } from '../../../_harness/fixtures/lab-03/aliases.mjs';
-import { offline, offlineEnv } from '../../../_harness/fixtures/lab-03/offline.mjs';
 
 const FIXER = '.github/agents/fixer.agent.md';
 const REVIEWER = '.github/agents/reviewer.agent.md';
@@ -14,8 +13,8 @@ const load = (t) => t.import('scripts/review-loop.mjs');
 const writes = (a) => norm(a).some((x) => /^--allow-tool=(write|shell)\b/.test(x)) || a.some((x) => /^--(allow-all|yolo|allow-all-tools)/.test(x));
 
 /**
- * Run the learner's loop with a fake Copilot, inside a temp folder (so a relative dir lands there), with the real
- * Copilot out of reach. Returns { report, fake, dir } (dir: where the loop wrote, absolute).
+ * Run the learner's loop with a fake Copilot, inside a temp folder (so a relative dir lands there). The kit refuses a
+ * real Copilot session in free checks. Returns { report, fake, dir } (dir: where the loop wrote, absolute).
  */
 async function loop(t, answers, options = {}) {
   const { reviewLoop } = await load(t);
@@ -23,15 +22,13 @@ async function loop(t, answers, options = {}) {
   const fake = fakeCopilot(answers.map((a) => REVIEWS[a]), { failOn: options.failOn });
   const { failOn, ...rest } = options;
   const here = process.cwd();
-  return offline(t, async () => {
-    process.chdir(work);
-    try {
-      const report = await reviewLoop({ file: 'deadlines.js', maxRounds: 3, creditsPerRound: 80, dir: LOOP_DIR, run: fake.run, runTests: greenTests, ...rest });
-      return { report, fake, dir: path.join(work, ...LOOP_DIR.split('/')) };
-    } finally {
-      process.chdir(here);
-    }
-  });
+  process.chdir(work);
+  try {
+    const report = await reviewLoop({ file: 'deadlines.js', maxRounds: 3, creditsPerRound: 80, dir: LOOP_DIR, run: fake.run, runTests: greenTests, ...rest });
+    return { report, fake, dir: path.join(work, ...LOOP_DIR.split('/')) };
+  } finally {
+    process.chdir(here);
+  }
 }
 const said = (fake) => fake.agents().join(' → ') || 'no calls';
 const stopIs = (report, want) => (report?.stop === want ? true : `It stopped with ${JSON.stringify(report?.stop)}, expected "${want}".`);
@@ -230,7 +227,7 @@ export default (t) => [
     return /^Stopped: budget\b/m.test(renderReport(poor.report)) || 'A loop that never started still gets a report: "Stopped: budget. …".';
   }, { milestone: 'M4' }),
   t.check('The dry run shows both agents and their caps', () => {
-    const r = t.node(['scripts/review-loop.mjs', 'deadlines.js', '--dry-run'], { env: offlineEnv(t.tmp()) });
+    const r = t.node(['scripts/review-loop.mjs', 'deadlines.js', '--dry-run']);
     const lines = r.stdout.split('\n');
     const rev = lines.find((l) => /--agent reviewer/.test(l));
     const fix = lines.find((l) => /--agent fixer/.test(l));

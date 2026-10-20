@@ -3,7 +3,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { offlineEnv } from '../../../_harness/fixtures/lab-03/offline.mjs';
 
 const AUDIT = 'scripts/audit-agents.mjs';
 const ROLES = '.github/policies/roles.json';
@@ -168,10 +167,9 @@ export default (t) => [
 
   // M5 · Fix the five agents
   t.check('The CLI: exit 1 with findings on the fixture set, 0 on your agents', () => {
-    const env = offlineEnv(t.tmp());
-    const bad = t.node([AUDIT, '--agents', FIX(t, 'agents'), '--roles', FIX(t, 'roles.json')], { env });
+    const bad = t.node([AUDIT, '--agents', FIX(t, 'agents'), '--roles', FIX(t, 'roles.json')]);
     if (bad.code !== 1 || !/fx-alias/.test(bad.stdout)) return `On tests/fixtures/agents/ it should list the findings and exit 1; it exited ${bad.code}.`;
-    const good = t.node([AUDIT], { env });
+    const good = t.node([AUDIT]);
     return good.code === 0 || `On .github/agents/ it still finds something (exit ${good.code}):\n${good.stdout.split('\n').filter((l) => /❌/.test(l)).slice(0, 4).join('\n')}`;
   }, { milestone: 'M5' }),
   t.check('Your audit and the reference audit find nothing in .github/agents/', async () => {

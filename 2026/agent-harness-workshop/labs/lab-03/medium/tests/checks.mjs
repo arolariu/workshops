@@ -5,7 +5,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { applyFixes, FIX_NAMES, LOCATION } from '../../../_harness/fixtures/lab-03/deadlines-fixes.mjs';
 import { ALIASES, capsOf, toolEntries } from '../../../_harness/fixtures/lab-03/aliases.mjs';
-import { offline } from '../../../_harness/fixtures/lab-03/offline.mjs';
 
 const AGENT = '.github/agents/test-writer.agent.md';
 const FINDING = { done: 'the done items (deadlines.js:23)', utc: 'the UTC date (deadlines.js:7)', invalid: 'the invalid dates (deadlines.js:12)' };
@@ -27,7 +26,7 @@ async function variants(t) {
     for (const [name, source] of Object.entries(sources)) {
       const copy = t.copy(t.tmp());
       fs.writeFileSync(path.join(copy, 'deadlines.js'), source);
-      out[name] = await offline(t, () => t.unitTests({ cwd: copy }));
+      out[name] = t.unitTests({ cwd: copy });
     }
     runs = out;
     return out;

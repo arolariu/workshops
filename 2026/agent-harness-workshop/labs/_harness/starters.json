@@ -1,6 +1,6 @@
 {
   "format": 2,
-  "revision": "7c7b2572d7db2a02e8eae85db8325b4d2886ca29",
+  "revision": "2e600ca8aab951f1f9631cf13935c2e1b70a8169",
   "note": "Every seed file of every exercise's src/ as a git blob ID (line endings normalised), and the chain: where each level starts from and which files are its own starter files. Regenerate with: node labs/start.mjs sync-seeds",
   "exercises": {
     "lab-00/easy": {
@@ -377,7 +377,7 @@
       "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
       "index.js": "c921c72563c35a7f4ab3f2a5fffd2625a11f4036",
       "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
-      "scripts/review-loop.mjs": "367b01021f8c629863f57bc904958af99e63fdcf"
+      "scripts/review-loop.mjs": "5183685e54b9e5af67b53cfb8ea3da397a15dd2a"
     },
     "lab-03/hard-plus": {
       ".github/agents/coverage.agent.md": "e310595dd99c7242d72a0310c969ec3a1e9cadf8",
@@ -405,7 +405,7 @@
       "index.js": "c921c72563c35a7f4ab3f2a5fffd2625a11f4036",
       "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
       "scripts/audit-agents.mjs": "871538da6b72ab826087c2e896e9ccd2166ff655",
-      "scripts/review-loop.mjs": "48fd0eff5a9a18f8eb049d6c2cec3aa6c0e6ded6"
+      "scripts/review-loop.mjs": "2b4e2360ff50b1190c003af4144590d46a91d196"
     },
     "lab-03/hard-plus-plus": {
       ".github/agents/coverage.agent.md": "7b7c36eeff6b6ff31faad877ffc5bd3972e33be7",
@@ -436,8 +436,8 @@
       "index.js": "c921c72563c35a7f4ab3f2a5fffd2625a11f4036",
       "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
       "scripts/audit-agents.mjs": "6ed2c72f0a1ecadefca0d7ca6bcae1050cf04cf5",
-      "scripts/review-loop.mjs": "48fd0eff5a9a18f8eb049d6c2cec3aa6c0e6ded6",
-      "scripts/team.mjs": "7150b15a67e6eef8a218d73df1e46cc28bad9bbe",
+      "scripts/review-loop.mjs": "2b4e2360ff50b1190c003af4144590d46a91d196",
+      "scripts/team.mjs": "179fe90c1b2fee57fa17036bbb63b237dada282e",
       "scripts/team/contracts/plan.schema.json": "d7261da14829f5383dae8257199b6359645ab7ac",
       "scripts/team/contracts/test-report.schema.json": "4288a9a5115b569a5a2c802b95b8f78c2cec858f",
       "scripts/team/contracts/verdict.schema.json": "4562abdfe0609c56212c134772bd54cb11df1460",
@@ -1494,7 +1494,7 @@
       "from": "lab-03/medium",
       "starter": {
         ".github/agents/fixer.agent.md": "4fc3b9b839f5fc6605ead629b0d3b2816938f50d",
-        "scripts/review-loop.mjs": "367b01021f8c629863f57bc904958af99e63fdcf"
+        "scripts/review-loop.mjs": "5183685e54b9e5af67b53cfb8ea3da397a15dd2a"
       },
       "inherited": {
         ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
@@ -1546,7 +1546,7 @@
         "grades.test.js": "1b6f3676566f4eb214dbc8fcea127dd895f4dd54",
         "index.js": "c921c72563c35a7f4ab3f2a5fffd2625a11f4036",
         "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
-        "scripts/review-loop.mjs": "48fd0eff5a9a18f8eb049d6c2cec3aa6c0e6ded6"
+        "scripts/review-loop.mjs": "2b4e2360ff50b1190c003af4144590d46a91d196"
       }
     },
     "lab-03/hard-plus-plus": {
@@ -1555,7 +1555,7 @@
         ".github/agents/implementer.agent.md": "8654a9f89cb6065604fce8a45a615d455d0dd415",
         ".github/agents/planner.agent.md": "448bbe0cfeffe0f5408fae7256f8a655e45dfce9",
         ".github/agents/tester.agent.md": "696ca5acb9f6c58174d8a80273a7b510da687504",
-        "scripts/team.mjs": "7150b15a67e6eef8a218d73df1e46cc28bad9bbe",
+        "scripts/team.mjs": "179fe90c1b2fee57fa17036bbb63b237dada282e",
         "scripts/team/contracts/plan.schema.json": "d7261da14829f5383dae8257199b6359645ab7ac",
         "scripts/team/contracts/test-report.schema.json": "4288a9a5115b569a5a2c802b95b8f78c2cec858f",
         "scripts/team/contracts/verdict.schema.json": "4562abdfe0609c56212c134772bd54cb11df1460",
@@ -1587,7 +1587,7 @@
         "index.js": "c921c72563c35a7f4ab3f2a5fffd2625a11f4036",
         "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
         "scripts/audit-agents.mjs": "6ed2c72f0a1ecadefca0d7ca6bcae1050cf04cf5",
-        "scripts/review-loop.mjs": "48fd0eff5a9a18f8eb049d6c2cec3aa6c0e6ded6"
+        "scripts/review-loop.mjs": "2b4e2360ff50b1190c003af4144590d46a91d196"
       }
     },
     "lab-04/easy": {
