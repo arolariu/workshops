@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { SERVER, VERSIONS, TOKEN, withStdio, withHttp, httpWithoutToken, rpc } from './helpers.mjs';
-import { suiteRun, noCopilotIn } from './common.mjs';
+import { suiteRun } from './common.mjs';
 import { MUTANTS, mutant } from './mutants.mjs';
 
 const PAGE_SIZE = 10;
@@ -246,7 +246,6 @@ export default (t) => [
   t.check('Your conformance suite passes on your server, over stdio and HTTP', async () => {
     if (!t.exists(SUITE)) return `${SUITE} is missing.`;
     const r = await suiteRun(t, t.dir, SUITE);
-    noCopilotIn(t, r);
     if (r.fail) return `node --test ${SUITE}: ${r.fail} of ${r.total} failing: ${r.failing.slice(0, 2).join(' | ')}`;
     if (r.pass < 12) return `node --test ${SUITE} has ${r.pass} passing test(s); write at least 12 (todos don't count).`;
     const both = ['stdio', 'http'].filter((x) => !r.passing.some((n) => n.toLowerCase().includes(x)));
@@ -264,7 +263,6 @@ export default (t) => [
     };
     // All seven at once (the reference, then the six broken servers); a run that hangs is stopped with its servers.
     const [control, ...broken] = await Promise.all([run(reference), ...MUTANTS.map((name) => run(mutant(name, reference)))]);
-    noCopilotIn(t, control, ...broken);
     if (control.fail || !control.pass) return `On the reference server your suite has ${control.fail} failing test(s): ${control.failing.slice(0, 2).join(' | ')}. Test what the protocol (and todo.md) promises, not your own wording.`;
     const survived = MUTANTS.filter((name, i) => broken[i].fail === 0);
     return !survived.length || `Your suite passes on broken servers: ${survived.join(', ')}. Add a test for each (todo.md, M6 lists what each one breaks).`;

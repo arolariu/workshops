@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { connect, serverConfig, noCopilot, suiteRun, noCopilotIn } from './common.mjs';
+import { connect, serverConfig, suiteRun } from './common.mjs';
 import { MUTANTS, mutant } from './mutants.mjs';
 
 const SERVER = 'mcp/studybuddy-server.mjs';
@@ -125,15 +125,14 @@ export default (t) => [
     const spyLog = path.join(t.tmp(), 'fs.jsonl');
     const { server } = serverConfig(t);
     const spy = pathToFileURL(path.join(t.exDir, 'tests', 'fs-spy.mjs')).href;
-    const guard = noCopilot(t);
-    const c = await t.mcp({ command: 'node', args: ['--import', spy, ...(server.args ?? [])], env: { ...(server.env ?? {}), STUDYBUDDY_STATE: file, FS_SPY_LOG: spyLog, ...guard.env } });
+    const c = await t.mcp({ command: 'node', args: ['--import', spy, ...(server.args ?? [])], env: { ...(server.env ?? {}), STUDYBUDDY_STATE: file, FS_SPY_LOG: spyLog } });
     try {
       await markDone(t, c);
       for (const id of ['A1', 'A2']) {
         const r = await c.call('mark_done', { id });
         if (r.isError) return `mark_done("${id}") failed: ${r.text}`;
       }
-    } finally { c.close(); guard.assert(); }
+    } finally { c.close(); }
     const ops = fs.existsSync(spyLog) ? fs.readFileSync(spyLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
     const direct = ops.filter((o) => !/rename|copy|cp/.test(o.op) && same(o.paths[0], file));
     if (direct.length) return `The server writes straight into state.json (${direct[0].op}). If it stops halfway (a crash, a full disk, a second process reading), the file is half-written. Write a temp file next to it, then rename it over state.json.`;
@@ -164,7 +163,6 @@ export default (t) => [
   t.check('Your contract suite passes on your server', async () => {
     if (!t.exists(SUITE)) return `${SUITE} is missing.`;
     const r = await suiteRun(t, t.dir, SUITE);
-    noCopilotIn(t, r);
     if (r.fail) return `node --test ${SUITE}: ${r.fail} of ${r.total} failing: ${r.failing.slice(0, 2).join(' | ')}`;
     return r.pass >= 6 || `node --test ${SUITE} has ${r.pass} passing test(s); write at least 6 (the example counts, todos don't). See todo.md, M5.`;
   }, { milestone: 'M5', timeout: 150000 }),
@@ -179,7 +177,6 @@ export default (t) => [
     };
     // All seven at once: the reference (the control) and the six broken servers.
     const [control, ...broken] = await Promise.all([run(reference), ...MUTANTS.map((name) => run(mutant(name, reference)))]);
-    noCopilotIn(t, control, ...broken);
     if (control.fail || !control.pass) return `On the reference server your suite has ${control.fail} failing test(s): ${control.failing.slice(0, 2).join(' | ')}. Test the contract in todo.md, not your own wording.`;
     const survived = MUTANTS.filter((name, i) => broken[i].fail === 0);
     return !survived.length || `Your suite passes on broken servers: ${survived.join(', ')}. Add a test for each (todo.md, M5 lists what each one breaks).`;

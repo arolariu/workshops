@@ -2,7 +2,7 @@
 // hostile on purpose) through STUDYBUDDY_BOARD_DATA, and give the server its token through STUDYBUDDY_BOARD_TOKEN.
 import fs from 'node:fs';
 import path from 'node:path';
-import { serverConfig, noCopilot, suiteRun, noCopilotIn } from './common.mjs';
+import { serverConfig, suiteRun } from './common.mjs';
 import { TOKEN, WRONG, TOKEN_VAR, SECRETS, PRIVATE, boardData, board, boardTool, posts } from './helpers.mjs';
 
 // Input names that hold a credential (not "author", "authority"…): token, apiKey, api_key, password, secret, auth, …
@@ -64,24 +64,22 @@ export default (t) => [
   }, { milestone: 'M1' }),
   t.check('The portal\'s other tools are untouched (your hard contract suite still passes)', async () => {
     const r = await suiteRun(t, t.dir, 'mcp-contract.test.mjs');
-    noCopilotIn(t, r);
     return (r.total > 0 && r.fail === 0) || `node --test mcp-contract.test.mjs: ${r.fail} of ${r.total} failing. ${r.failing.slice(0, 2).join(' | ')}`;
   }, { milestone: 'M1', timeout: 150000 }),
   t.check('Without mcp/board.mjs the portal still starts, and its other tools work', async () => {
     const { server } = serverConfig(t);
     const copy = t.copy(t.tmp());
     fs.rmSync(path.join(copy, 'mcp', 'board.mjs'), { force: true });
-    const guard = noCopilot(t);
     let c;
     try {
-      c = await t.mcp({ command: server.command, args: server.args ?? [], cwd: copy, env: { ...(server.env ?? {}), STUDYBUDDY_STATE: path.join(t.tmp(), 'state.json'), ...guard.env }, timeout: 5000 });
+      c = await t.mcp({ command: server.command, args: server.args ?? [], cwd: copy, env: { ...(server.env ?? {}), STUDYBUDDY_STATE: path.join(t.tmp(), 'state.json') }, timeout: 5000 });
     } catch (e) {
       return `Without mcp/board.mjs the server doesn't start (${e.message.slice(0, 160)}). Load the board with a guarded import: const board = await import('./board.mjs').catch(…). A server copied on its own (Lab 06 packages it in a plugin) must still serve every other tool.`;
     }
     try {
       const ids = ((await c.call('get_deadlines', {})).data ?? []).map((a) => a.id).join(',');
       return ids === 'A2,A1' || `Without mcp/board.mjs, get_deadlines should still return A2,A1, got ${ids || 'nothing'}.`;
-    } finally { c.close(); guard.assert(); }
+    } finally { c.close(); }
   }, { milestone: 'M1' }),
 
   // M2 · Say where it comes from

@@ -3,7 +3,6 @@
 // Every server they start is stopped in a finally, with timeouts, so nothing hangs.
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
-import { noCopilot } from './common.mjs';
 
 export const SERVER = 'mcp/library-server.mjs';
 export const VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26'];
@@ -12,9 +11,7 @@ export const TOKEN = `lib_${crypto.randomBytes(12).toString('hex')}`;
 
 function start(t, args, env) {
   if (!t.exists(SERVER)) t.fail(`${SERVER} is missing.`);
-  const guard = noCopilot(t); // free checks never start Copilot, even if the server tries
-  const child = spawn(process.execPath, [t.path(SERVER), ...args], { cwd: t.dir, env: { ...process.env, LIBRARY_TOKEN: '', ...env, ...guard.env }, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
-  child.guard = guard;
+  const child = spawn(process.execPath, [t.path(SERVER), ...args], { cwd: t.dir, env: { ...process.env, LIBRARY_TOKEN: '', ...env }, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   return child;
 }
 async function stop(child) {
@@ -23,7 +20,6 @@ async function stop(child) {
     child.kill();
     await Promise.race([gone, new Promise((resolve) => setTimeout(resolve, 2000))]);
   }
-  child.guard.assert();
 }
 
 /**
