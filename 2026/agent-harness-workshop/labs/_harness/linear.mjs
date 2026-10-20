@@ -1,5 +1,6 @@
 // The linear mode (--linear): the lab companion one line at a time, for screen readers and simple terminals.
 // No alternate screen, raw input, cursor movement, colors or animation. It uses the same helpers as the app.
+import fs from 'node:fs';
 import readline from 'node:readline';
 import path from 'node:path';
 import { loadCatalog, findExercise, levelChoices, normalizeLabId } from './catalog.mjs';
@@ -9,7 +10,7 @@ import { runAgentChecks as realRunAgentChecks, loadAgentChecks as realLoadAgentC
 import { inspectEnvironment as realInspect, reportLines } from './doctor.mjs';
 import { ensureStarter, listRecovery, restoreStarter, restoreSnapshot, createCheckpoint, resetToCommit, compareTrees, changesDiff as realChangesDiff } from './workspace.mjs';
 import { PATHS, pathById, pathTime, progressView, describeSelection, nextExercise, choosePath, learningReport, writeReport } from './learning.mjs';
-import { statusWord, stripAnsi, inline, isAscii, asciiFold } from './ui.mjs';
+import { statusWord, stripAnsi, inline, isAscii, asciiFold, renderMarkdown } from './ui.mjs';
 import { runInteractive as realRunInteractive } from './system.mjs';
 import { copilotBin } from './kit.mjs';
 import { courseOrder, predecessorOf, loadManifest } from './chain.mjs';
@@ -44,6 +45,7 @@ const HELP = `Commands (type one and press Enter):
   changes           your changes since your latest commit, file by file (needs git)
   xray [sol]        X-ray your harness (or the reference): what it adds to every turn, and its maturity level
   replay [harnessed|FILE]  an agent run turn by turn, without (or with) a harness; no AI, no credits
+  guide [LAB]       the lab guide (this exercise's lab, or LAB): concepts, under the hood, examples, links
   present [LAB]     the facilitator's slides: each lab guide's key sections, the closing demo, the homework map
   glossary [WORD]   the words this workshop uses, in one line each
   recovery          the starter, your checkpoints and backups
@@ -410,6 +412,13 @@ export function runLinear({
         say(`The agent loop, ${rec.title}: ${rec.turns.length} turns. Each turn: the model reads its context, writes a tool call, the harness decides, the result joins the history.`);
         rec.turns.forEach((_, i) => replayLines(rec, i, { W: 100, fmt: { ...PLAIN, green: (s) => s, bold: (s) => s, cyan: (s) => s } }).forEach((l) => say(l)));
         if (rec.scripted) say(`Now compare it with the other run: replay ${otherReplay(rec.id)}`);
+        return;
+      }
+      case 'guide': {
+        const id = args[0] ? normalizeLabId(args[0]) : current?.lab.id;
+        const lab = catalog.find((l) => l.id === id);
+        if (!lab) { say(args[0] ? `"${args[0]}" is not a lab. Try: guide lab-01.` : 'No exercise is open. Type "guide lab-01", or open an exercise first.'); return; }
+        renderMarkdown(fs.readFileSync(lab.readmePath, 'utf8'), 100).forEach((l) => say(l));
         return;
       }
       case 'present': {

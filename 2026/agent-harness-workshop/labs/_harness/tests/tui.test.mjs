@@ -476,6 +476,96 @@ test('NO_COLOR and --no-anim: plain frames that fit 80 columns', () => {
     /X-RAY · Lab 00/, /MATURITY · L0/, /THE AGENT LOOP · No harness/, /TURN 2 OF 6/, /THE AGENT LOOP · With a harness/]) assert.match(all, want);
 });
 
+// Every screen of the key table, driven in a child process (NO_COLOR is read when ui.mjs loads), at 80×24: no colour
+// codes, no line cut off at the edge, and a "more below" whenever a screen scrolls. With ascii (--plain), only ASCII.
+function visitEveryScreen({ plain = false } = {}) {
+  const { labsDir } = fixtureWorkshop();
+  fs.writeFileSync(path.join(labsDir, 'lab-00', 'easy', 'tests', 'agent.mjs'), "export default [{ name: 'asks Copilot', prompt: 'hi', expect: () => true }];\n");
+  fs.writeFileSync(path.join(labsDir, 'lab-00', 'easy', 'todo.md'), QUIZ_TODO);
+  const script = `
+    import { PassThrough } from 'node:stream';
+    const { startTui } = await import(process.env.TUI_URL);
+    const { loadCatalog } = await import(process.env.CATALOG_URL);
+    const { slidesFor } = await import(process.env.PRESENT_URL);
+    const { stripAnsi, width } = await import(process.env.UI_URL);
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const report = { states: [], frames: [], cut: [], colour: false };
+    async function run(opts, steps) {
+      const input = new PassThrough(); input.isTTY = true; input.setRawMode = () => input;
+      const output = new PassThrough(); Object.assign(output, { columns: 80, rows: 24, isTTY: true });
+      const writes = []; output.write = (s) => { writes.push(String(s)); return true; };
+      const app = await startTui({ labsDir: process.env.LABS, input, output, anim: false, intro: false, ascii: ${plain}, onExit: () => {}, ...opts,
+        deps: {
+          inspectEnvironment: async () => ({ ready: true, coreReady: true, items: [{ id: 'copilot', label: 'GitHub Copilot CLI', status: 'ready', required: true, category: 'workshop' }] }),
+          loadAgentChecks: async () => { await wait(150); return [{ name: 'asks Copilot', prompt: 'hi', expect: () => true }]; },
+          runAgentChecks: async () => { await wait(300); return { runId: 'run-1', state: 'pass', allPass: true, results: [{ name: 'asks Copilot', status: 'pass', message: '' }] }; },
+          listRuns: () => [],
+          copyToClipboard: async () => 'system', openFolder: async () => 'your file manager',
+        } });
+      const until = async (pred, ms = 8000) => { const end = Date.now() + ms; while (!pred() && Date.now() < end) await wait(20); };
+      const look = () => {
+        const state = app.keyState();
+        const { lines, footer } = app.screenLines();
+        const frame = stripAnsi(writes.filter((w) => w.startsWith('\\x1b[H')).at(-1) ?? '');
+        report.states.push(state);
+        report.frames.push({ state, frame });
+        const wide = lines.map(stripAnsi).filter((l) => width(l) > 79);
+        if (wide.length) report.cut.push(state + ': ' + wide[0]);
+        if (lines.length > 24 - footer.length && !/more below|↓|v$/m.test(frame)) report.cut.push(state + ': scrolls without saying so');
+      };
+      const key = async (s, name = s) => { input.emit('keypress', s, { name }); await wait(40); };
+      await wait(60);
+      for (const step of steps) { await step({ key, look, until, app }); }
+      report.colour ||= writes.some((w) => /\\x1b\\[(38|48);5;/.test(w));
+      app.quit();
+    }
+    const back = async ({ key, app }, to) => { for (let i = 0; i < 4 && app.state.screen !== to; i++) await key('', 'escape'); };
+    await run({}, [
+      async ({ look }) => look(),
+      async (c) => { await c.key('/'); c.look(); await back(c, 'home'); },
+      async (c) => { await c.key('d'); c.look(); await back(c, 'home'); },
+      async (c) => { await c.key('e'); c.look(); await back(c, 'home'); },
+      async (c) => { await c.key('u'); await wait(300); c.look(); await back(c, 'home'); },
+      async (c) => { await c.key('?'); c.look(); await back(c, 'home'); },
+      async (c) => { await c.key('\\r', 'return'); c.look(); await c.key('g'); c.look(); await back(c, 'lab'); await c.key('\\r', 'return'); c.look(); },
+      async (c) => { await c.key('m'); c.look(); await back(c, 'exercise'); },
+      async (c) => { await c.key('t'); c.look(); await c.until(() => !c.app.state.run?.running); c.look(); await c.key('\\r', 'return'); c.look(); await c.key('b'); await c.key('o'); c.look(); await back(c, 'exercise'); },
+      async (c) => { await c.key('a'); c.look(); await c.until(() => c.app.state.agent?.phase === 'confirm'); c.look(); await c.key('y'); c.look(); await c.until(() => c.app.state.agent?.phase === 'done'); c.look(); await c.key('H'); c.look(); await back(c, 'exercise'); },
+      async (c) => { await c.key('s'); c.look(); await c.key('y'); c.look(); await back(c, 'exercise'); },
+      async (c) => { await c.key('i'); c.look(); await back(c, 'exercise'); },
+      async (c) => { await c.key('v'); await wait(200); c.look(); await back(c, 'exercise'); },
+      async (c) => { (await import('node:fs')).writeFileSync(process.env.LABS + '/lab-00/easy/src/done.txt', 'done\\n'); await c.key('t'); await wait(100); await c.until(() => !c.app.state.run?.running); await back(c, 'exercise'); await c.key('l'); c.look(); await back(c, 'exercise'); },
+      async (c) => { await c.key('u'); await c.until(() => c.app.state.xray?.report || c.app.state.xray?.error, 8000); await wait(100); c.look(); await back(c, 'exercise'); },
+      async (c) => { await c.key('x'); c.look(); await c.key('\\r', 'return'); c.look(); await c.key('y'); await c.until(() => c.app.state.recovery?.result); c.look(); await back(c, 'exercise'); },
+    ]);
+    await run({ present: slidesFor(loadCatalog(process.env.LABS)) }, [async ({ look }) => look()]);
+    process.stdout.write(JSON.stringify(report));
+    process.exit(0);
+  `;
+  const url = (f) => pathToFileURL(path.join(import.meta.dirname, '..', ...f.split('/'))).href;
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', timeout: 120000, env: { ...process.env, NO_COLOR: '1', LABS: labsDir, TUI_URL: url('tui.mjs'), CATALOG_URL: url('catalog.mjs'), PRESENT_URL: url('screens/present.mjs'), UI_URL: url('ui.mjs') } });
+  assert.equal(r.status, 0, r.stderr);
+  return JSON.parse(r.stdout.slice(r.stdout.indexOf('{')));
+}
+
+test('accessibility: every screen in the key table, with NO_COLOR, fits 80x24 without losing anything', () => {
+  const out = visitEveryScreen();
+  const missing = Object.keys(KEYMAP).filter((s) => !out.states.includes(s));
+  assert.deepEqual(missing, [], `screens the walk did not reach (it saw: ${[...new Set(out.states)].join(', ')})`);
+  assert.equal(out.colour, false, 'NO_COLOR means no colour codes, on every screen');
+  for (const { state, frame } of out.frames) {
+    const rows = frame.split('\r\n');
+    assert.ok(rows.length <= 24, `${state}: ${rows.length} rows`);
+    for (const line of rows) assert.ok(width(line) <= 80, `${state}: ${line}`);
+  }
+  assert.deepEqual(out.cut, [], 'lines cut at the edge, or a screen that scrolls without saying so');
+});
+
+test('--plain: every screen in the key table prints only ASCII and box-drawing, at 80 columns', () => {
+  const out = visitEveryScreen({ plain: true });
+  for (const { state, frame } of out.frames) assert.match(frame, /^[\x00-\x7f\u2500-\u257f]*$/, `${state}: ${[...new Set([...frame].filter((c) => !/[\x00-\x7f\u2500-\u257f]/.test(c)))].join(' ')}`);
+});
+
 test('every key in the table reaches a handler, and the more menu lists exactly its keys', async () => {
   const t = await app({ open: 'lab-00/easy' });
   assert.deepEqual(t.unhandled(), [], 'bindings without a handler');

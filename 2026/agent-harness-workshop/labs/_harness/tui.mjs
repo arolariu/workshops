@@ -2039,5 +2039,5 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
     .then(() => deps.inspectEnvironment({ rootDir }))
     .then((report) => { S.env = report; }, () => { S.env = { ready: false, coreReady: true, items: [] }; })
     .then(() => { if (!quitting) render(); });
-  return { state: S, closed, render, quit, unhandled };
+  return { state: S, closed, render, quit, unhandled, keyState, screenLines: () => SCREENS[S.screen]() };
 }

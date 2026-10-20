@@ -4,6 +4,7 @@ import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { test } from 'node:test';
 import { runLinear } from '../linear.mjs';
+import { KEYMAP } from '../keys.mjs';
 import { loadCatalog, exerciseByKey } from '../catalog.mjs';
 import { loadCourse } from '../course.mjs';
 import { computeChain, writeChain } from '../chain.mjs';
@@ -241,4 +242,58 @@ test('present works in linear mode too: the slides as text', async () => {
   assert.match(text, /Anatomy of a skill/);
   assert.match(text, /"lab-42" is not a lab/);
   assert.doesNotMatch(text, /\x1b\[/);
+});
+
+// Linear mode (screen readers, simple terminals) can do everything the app can: every action of the key table maps to
+// a linear command, or says why it doesn't apply to a line-by-line session.
+const NA = (why) => ({ na: why });
+const LINEAR_FOR = {
+  'home.prev': 'list', 'home.nextItem': 'list', 'home.jump': 'open', 'home.open': 'open', 'home.next': 'next', 'home.search': 'list',
+  'home.path': 'path', 'home.doctor': 'doctor', 'home.export': 'export', 'home.replay': 'replay', 'home.page': NA('no screen to page'),
+  'lab.prev': 'list', 'lab.nextItem': 'list', 'lab.tier': 'open', 'lab.open': 'open', 'lab.guide': 'guide', 'lab.search': 'list', 'lab.back': NA('no screens'), 'lab.page': NA('no screen to page'),
+  'browse.prev': 'list', 'browse.nextItem': 'list', 'browse.open': 'open', 'browse.search': 'list', 'browse.level': 'list', 'browse.status': 'list', 'browse.time': 'list',
+  'browse.path': 'path', 'browse.bookmarked': 'list', 'browse.next': 'next', 'browse.back': NA('no screens'), 'browse.page': NA('no screen to page'),
+  'scroll.scroll': NA('every line is printed'), 'scroll.back': NA('no screens'),
+  'doctor.scroll': NA('every line is printed'), 'doctor.again': 'doctor', 'doctor.back': NA('no screens'),
+  'export.markdown': 'export', 'export.json': 'export', 'export.back': NA('no screens'),
+  'exercise.scroll': NA('every line is printed'), 'exercise.checks': 'checks', 'exercise.copilot': 'copilot', 'exercise.hint': 'hint', 'exercise.agent': 'agent',
+  'exercise.bring': 'bring', 'exercise.changes': 'changes', 'exercise.learn': 'quiz', 'exercise.xray': 'xray', 'exercise.more': NA('every item is its own command'),
+  'exercise.watch': NA('a line-by-line session runs the checks when you type checks; watching a folder would interleave output with typing'),
+  'exercise.guide': 'guide', 'exercise.solution': 'compare', 'exercise.recovery': 'recovery', 'exercise.bookmark': 'bookmark', 'exercise.history': 'history',
+  'exercise.open': 'show', 'exercise.copy': 'show', 'exercise.doctor': 'doctor', 'exercise.export': 'export', 'exercise.next': 'next', 'exercise.tier': 'open',
+  'exercise.search': 'list', 'exercise.back': NA('no screens'),
+  'menu.prev': NA('no menu'), 'menu.nextItem': NA('no menu'), 'menu.doIt': NA('no menu'), 'menu.item': NA('every item is its own command'), 'menu.back': NA('no screens'),
+  'checks.prev': 'details', 'checks.nextItem': 'details', 'checks.page': NA('no screen to page'), 'checks.details': 'details', 'checks.again': 'checks', 'checks.output': 'output',
+  'checks.watch': NA('see exercise.watch'), 'checks.copilot': 'copilot', 'checks.agent': 'agent', 'checks.next': 'next', 'checks.doctor': 'doctor', 'checks.back': NA('no screens'), 'checks.answer': 'answer',
+  'checksRunning.cancel': NA('Ctrl+C cancels a run'),
+  'checkDetail.scroll': NA('every line is printed'), 'checkDetail.nextCheck': 'details', 'checkDetail.prevCheck': 'details', 'checkDetail.hint': 'hint', 'checkDetail.output': 'output',
+  'checkDetail.copilot': 'copilot', 'checkDetail.doctor': 'doctor', 'checkDetail.back': NA('no screens'),
+  'agent.scroll': NA('every line is printed'), 'agent.again': 'agent', 'agent.history': 'history', 'agent.back': NA('no screens'),
+  'agentConfirm.yes': 'agent', 'agentConfirm.no': 'agent', 'agentLoading.no': 'agent', 'agentRunning.cancel': NA('Ctrl+C cancels a run'),
+  'history.prev': 'history', 'history.nextItem': 'history', 'history.page': NA('no screen to page'), 'history.toggle': 'history', 'history.back': NA('no screens'),
+  'confirmSolution.show': 'compare', 'confirmSolution.hint': 'hint', 'confirmSolution.back': NA('no screens'),
+  'bring.scroll': NA('every line is printed'), 'bring.yes': 'bring', 'bring.back': 'bring',
+  'solution.nextFile': 'compare', 'solution.prevFile': 'compare', 'solution.toggle': 'compare', 'solution.scroll': NA('every line is printed'), 'solution.back': NA('no screens'),
+  'changes.nextFile': 'changes', 'changes.prevFile': 'changes', 'changes.scroll': NA('every line is printed'), 'changes.back': NA('no screens'),
+  'learn.answer': 'answer', 'learn.scroll': NA('every line is printed'), 'learn.back': NA('no screens'),
+  'xray.scroll': NA('every line is printed'), 'xray.side': 'xray', 'xray.again': 'xray', 'xray.back': NA('no screens'),
+  'replay.nextTurn': 'replay', 'replay.prevTurn': 'replay', 'replay.switch': 'replay', 'replay.scroll': NA('every line is printed'), 'replay.back': NA('no screens'),
+  'present.nextSlide': 'present', 'present.prevSlide': 'present', 'present.first': 'present', 'present.last': 'present', 'present.back': NA('no screens'),
+  'recovery.prev': 'recovery', 'recovery.nextItem': 'recovery', 'recovery.page': NA('no screen to page'), 'recovery.restore': 'restore', 'recovery.save': 'checkpoint', 'recovery.back': NA('no screens'),
+  'recoveryConfirm.yes': 'restore', 'recoveryConfirm.keep': 'restore', 'recoveryResult.back': NA('no screens'),
+};
+
+test('linear mode covers every action of the app: each key-table action has a linear command (or a reason it does not apply)', async () => {
+  const actions = Object.entries(KEYMAP).flatMap(([state, list]) => list.map((b) => `${state}.${b.id}`));
+  assert.deepEqual(actions.filter((a) => !(a in LINEAR_FOR)), [], 'actions with no linear command and no reason');
+  const { text } = await session(['help', 'quit']);
+  const commands = [...new Set(Object.values(LINEAR_FOR).filter((v) => typeof v === 'string'))];
+  for (const c of commands) assert.match(text, new RegExp(`^  ${c}\\b`, 'm'), `linear help lists "${c}"`);
+});
+
+test('guide prints a lab guide in linear mode', async () => {
+  const { text } = await session(['open lab-01 easy', 'guide', 'guide lab-02', 'guide lab-42', 'quit']);
+  assert.match(text, /Instructions in one minute/);
+  assert.match(text, /Skills in one minute/);
+  assert.match(text, /"lab-42" is not a lab/);
 });
