@@ -13,7 +13,7 @@ import { loadCourse } from '../course.mjs';
 import { computeChain, writeChain } from '../chain.mjs';
 import { KEYMAP } from '../keys.mjs';
 import { loadReplay } from '../replay.mjs';
-import { fixtureWorkshop, waitFor, chainCourse } from './helpers.mjs';
+import { fixtureWorkshop, waitFor, chainCourse, writeTree, tmpdir } from './helpers.mjs';
 
 function terminal({ columns = 80, rows = 24 } = {}) {
   const input = new PassThrough();
@@ -321,6 +321,39 @@ test('home: two counts, 👥/🏠 over the tiers, readable at 80 and 120 columns
     assert.match(s, /🏠/);
     assert.match(s, /07 {2}🚀 {2}Agentic workflows/, 'lab names are not cut off');
     assert.match(s, /q quit/, 'the footer keeps its last key');
+    assert.ok(widest(t.output) <= columns, `${columns} columns`);
+    t.quit();
+  }
+});
+
+// The real course's todo.md and readme files, with stub checks: the home screen as learners see it, and no write to
+// the real labs folder's progress.
+test('home: the real course, with Lab 08 as a homework row and all 45 levels counted', async () => {
+  const real = path.resolve(import.meta.dirname, '..', '..');
+  const course = loadCatalog(real);
+  const labsDir = path.join(tmpdir('real course '), 'labs');
+  const files = { '_harness/course.json': fs.readFileSync(path.join(real, '_harness', 'course.json'), 'utf8') };
+  for (const lab of course) {
+    files[`${lab.id}/readme.md`] = fs.readFileSync(path.join(real, lab.id, 'readme.md'), 'utf8');
+    for (const ex of lab.levels) {
+      files[`${ex.key}/todo.md`] = fs.readFileSync(path.join(ex.dir, 'todo.md'), 'utf8');
+      files[`${ex.key}/src/README.md`] = 'x\n';
+      files[`${ex.key}/sol/README.md`] = 'x\n';
+      files[`${ex.key}/tests/checks.mjs`] = "export default (t) => [t.check('x', () => true)];\n";
+    }
+  }
+  writeTree(labsDir, files);
+  const levels = course.flatMap((l) => l.levels);
+  assert.equal(levels.length, 45, 'Labs 00-07 and the capstone, five tiers each');
+  const capstone = course.find((l) => l.capstone);
+  assert.equal(capstone?.id, 'lab-08');
+  assert.ok(capstone.levels.every((ex) => ex.mode === 'homework'), 'every capstone tier is homework, easy included');
+  for (const columns of [80, 120]) {
+    const t = await app({ labsDir, size: { columns, rows: 60 } });
+    const s = text(t.output);
+    assert.match(s, /Workshop 0\/8\b/, `${columns} columns: the live track is the eight easy levels of Labs 00-07`);
+    assert.match(s, /Homework 0\/37\b/, `${columns} columns`);
+    assert.match(s, /08 {2}🏛️ {2}Capstone/, `${columns} columns: Lab 08 has its row`);
     assert.ok(widest(t.output) <= columns, `${columns} columns`);
     t.quit();
   }

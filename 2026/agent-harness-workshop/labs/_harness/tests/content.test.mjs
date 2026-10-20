@@ -108,9 +108,9 @@ test('every reference solution passes the scorecard rules of the layers earlier 
   }
 });
 
-// Labs whose homework ladder is complete (Phase 4). Their levels above easy follow the ticket format of spec §5.3.
+// Labs whose homework ladder is complete (Phase 4; the capstone in Phase 5). Their levels above easy follow the ticket format of spec §5.3.
 // CONTENT_TEST_LABS=lab-01,lab-02 checks other labs while their ladders are being written.
-const GROWN = new Set(process.env.CONTENT_TEST_LABS ? process.env.CONTENT_TEST_LABS.split(',').map((s) => s.trim()) : ['lab-00', 'lab-01', 'lab-02', 'lab-03', 'lab-04', 'lab-05', 'lab-06', 'lab-07']);
+const GROWN = new Set(process.env.CONTENT_TEST_LABS ? process.env.CONTENT_TEST_LABS.split(',').map((s) => s.trim()) : ['lab-00', 'lab-01', 'lab-02', 'lab-03', 'lab-04', 'lab-05', 'lab-06', 'lab-07', 'lab-08']);
 // The capstone's tiers have their own times. "about 1 h" leaves a quarter either way.
 const tierRange = (d, capstone = false) => {
   const time = capstone ? d.capstoneTime : d.time;
