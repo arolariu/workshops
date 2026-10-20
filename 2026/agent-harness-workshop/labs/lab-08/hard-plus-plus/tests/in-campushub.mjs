@@ -7,7 +7,8 @@ import path from 'node:path';
 
 const [prompt, ...extra] = process.argv.slice(2);
 const cwd = path.join(process.cwd(), 'campushub');
-const args = ['-p', prompt, '-s', '--no-ask-user', '--max-ai-credits=30', '--output-format', 'json', ...extra];
+// `--trust-folder` trusts campushub/ for this one session, so its hooks and MCP server load without saved trust.
+const args = ['-p', prompt, '-s', '--no-ask-user', '--trust-folder', '--max-ai-credits=30', '--output-format', 'json', ...extra];
 const bin = process.env.HARNESS_COPILOT || 'copilot';
 let r = spawnSync(bin, args, { cwd, stdio: 'inherit' });
 if (r.error?.code === 'ENOENT' && process.platform === 'win32') {
