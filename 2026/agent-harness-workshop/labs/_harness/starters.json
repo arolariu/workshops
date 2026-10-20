@@ -1,6 +1,6 @@
 {
   "format": 2,
-  "revision": "53655af6cdb6e7be76e89d968a120bff56aa3940",
+  "revision": "50f70cec51ae04fbe1daa73066d8d208ee4b83ac",
   "note": "Every seed file of every exercise's src/ as a git blob ID (line endings normalised), and the chain: where each level starts from and which files are its own starter files. Regenerate with: node labs/start.mjs sync-seeds",
   "exercises": {
     "lab-00/easy": {
@@ -525,7 +525,7 @@
       "index.js": "c921c72563c35a7f4ab3f2a5fffd2625a11f4036",
       "mcp-contract.test.mjs": "3abe35c5ad66e1f1490696a648dbb8c21d9f192a",
       "mcp/board-data.json": "60a94de7fba5ddb1c12e09f99c40eb5c2dde8a24",
-      "mcp/board.mjs": "61a3269b4545350b59dc79eb61b41e089158eff5",
+      "mcp/board.mjs": "8a8af2f759db86cb8c4246fc9c5537e086eeeda3",
       "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
       "mcp/studybuddy-server.mjs": "8dc93753744976d260dee8ebd040051cfb364ee9",
       "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
@@ -550,7 +550,7 @@
       "mcp-conformance.test.mjs": "b309d9a0f9ba3a4d5ab373dde64886d453fac692",
       "mcp-contract.test.mjs": "3abe35c5ad66e1f1490696a648dbb8c21d9f192a",
       "mcp/board-data.json": "60a94de7fba5ddb1c12e09f99c40eb5c2dde8a24",
-      "mcp/board.mjs": "850c59141293bc708bd7a696de7093d978eb3337",
+      "mcp/board.mjs": "089c2d1944fbc077695465f6b8d7e10204c36411",
       "mcp/library-data.json": "f4a5e488e246d7128a282b7ab723725c9d559499",
       "mcp/library-server.mjs": "408fd42de9e9978156e5b7c41f6c4745a7d0229c",
       "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
@@ -1109,7 +1109,7 @@
       "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
       "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
       "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
-      "scripts/attack.mjs": "83124e3eb76ca7c7d7b14e25c84e3fbe24adf773"
+      "scripts/attack.mjs": "565a5fea07c8bbffb49a8a077c7c0ce1b5701834"
     },
     "lab-08/hard": {
       ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
@@ -1174,7 +1174,7 @@
       "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
       "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
       "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
-      "scripts/attack.mjs": "908c77815daf5cca39cc8348b7312b14cd5d188a",
+      "scripts/attack.mjs": "7a42e64658929cbf43d755c77652a1d9b7505d0d",
       "scripts/eval.mjs": "bec0e561ac1c79ea61735a566bed58bc8eeae839",
       "scripts/eval/score.mjs": "d4cb9b6479703d86d21ccc4d538b2d0042e9808c",
       "scripts/eval/stats.mjs": "f5e723fe8ef1e29ac1a61bec6e78c52c6317f045"
@@ -1249,7 +1249,7 @@
       "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
       "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
       "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
-      "scripts/attack.mjs": "908c77815daf5cca39cc8348b7312b14cd5d188a",
+      "scripts/attack.mjs": "7a42e64658929cbf43d755c77652a1d9b7505d0d",
       "scripts/eval.mjs": "bec0e561ac1c79ea61735a566bed58bc8eeae839",
       "scripts/eval/score.mjs": "f6302eb34c7c453b42bb4255598f545849b91857",
       "scripts/eval/stats.mjs": "c63fe95e68ef7b52a336a30757f9721048f07113",
@@ -1378,7 +1378,7 @@
       "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
       "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
       "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
-      "scripts/attack.mjs": "908c77815daf5cca39cc8348b7312b14cd5d188a",
+      "scripts/attack.mjs": "7a42e64658929cbf43d755c77652a1d9b7505d0d",
       "scripts/eval.mjs": "bec0e561ac1c79ea61735a566bed58bc8eeae839",
       "scripts/eval/score.mjs": "f6302eb34c7c453b42bb4255598f545849b91857",
       "scripts/eval/stats.mjs": "c63fe95e68ef7b52a336a30757f9721048f07113",
@@ -2009,7 +2009,7 @@
       "from": "lab-04/hard",
       "starter": {
         "mcp/board-data.json": "60a94de7fba5ddb1c12e09f99c40eb5c2dde8a24",
-        "mcp/board.mjs": "61a3269b4545350b59dc79eb61b41e089158eff5"
+        "mcp/board.mjs": "8a8af2f759db86cb8c4246fc9c5537e086eeeda3"
       },
       "inherited": {
         ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
@@ -2060,7 +2060,7 @@
         "index.js": "c921c72563c35a7f4ab3f2a5fffd2625a11f4036",
         "mcp-contract.test.mjs": "3abe35c5ad66e1f1490696a648dbb8c21d9f192a",
         "mcp/board-data.json": "60a94de7fba5ddb1c12e09f99c40eb5c2dde8a24",
-        "mcp/board.mjs": "850c59141293bc708bd7a696de7093d978eb3337",
+        "mcp/board.mjs": "089c2d1944fbc077695465f6b8d7e10204c36411",
         "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
         "mcp/studybuddy-server.mjs": "d05ec628c375ed0075c40aca5fc07f92ec352dee",
         "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142"
@@ -2672,7 +2672,7 @@
       "starter": {
         "attacks.local.json": "f02bbbd4d90961497de14d8a32e5b663d2c410dc",
         "attacks/pack.json": "89270755c20c8d9489e1d0c6ed7f005cbbaa4d3e",
-        "scripts/attack.mjs": "83124e3eb76ca7c7d7b14e25c84e3fbe24adf773"
+        "scripts/attack.mjs": "565a5fea07c8bbffb49a8a077c7c0ce1b5701834"
       },
       "inherited": {
         ".github/agents/reviewer.agent.md": "0ee37c1b4ef3b72f0fd386c20c7c8cf4a5e05159",
@@ -2774,7 +2774,7 @@
         "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
         "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
         "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
-        "scripts/attack.mjs": "908c77815daf5cca39cc8348b7312b14cd5d188a"
+        "scripts/attack.mjs": "7a42e64658929cbf43d755c77652a1d9b7505d0d"
       }
     },
     "lab-08/hard-plus": {
@@ -2854,7 +2854,7 @@
         "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
         "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
         "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
-        "scripts/attack.mjs": "908c77815daf5cca39cc8348b7312b14cd5d188a",
+        "scripts/attack.mjs": "7a42e64658929cbf43d755c77652a1d9b7505d0d",
         "scripts/eval.mjs": "bec0e561ac1c79ea61735a566bed58bc8eeae839",
         "scripts/eval/score.mjs": "f6302eb34c7c453b42bb4255598f545849b91857",
         "scripts/eval/stats.mjs": "c63fe95e68ef7b52a336a30757f9721048f07113"
@@ -2987,7 +2987,7 @@
         "mcp/portal-data.json": "0d2c2845b4df89c3ead59afe18f8a09b15febeeb",
         "mcp/studybuddy-server.mjs": "71c7fb56bc7a7a83a65270c3b58cf68d62b1f563",
         "package.json": "84c85efda42bd4de36ab959f3d69a794cc972142",
-        "scripts/attack.mjs": "908c77815daf5cca39cc8348b7312b14cd5d188a",
+        "scripts/attack.mjs": "7a42e64658929cbf43d755c77652a1d9b7505d0d",
         "scripts/eval.mjs": "bec0e561ac1c79ea61735a566bed58bc8eeae839",
         "scripts/eval/score.mjs": "f6302eb34c7c453b42bb4255598f545849b91857",
         "scripts/eval/stats.mjs": "c63fe95e68ef7b52a336a30757f9721048f07113",

@@ -103,8 +103,12 @@ export function hubReplayer(t) {
   return { copy, hooks, decide: one, variants };
 }
 
+/** Packs say {{FAKE_KEY}} where an attack needs a secret; scripts/attack.mjs fills it in the same way. */
+const FAKE_KEY = `${'Fk7'.repeat(4)}${'xQ2'.repeat(4)}`;
+
 /** Replay a pack ({ attacks, allowed }) through decide(): { misses: [{ id, family, tool }], falsePositives: [{ id, tool, reason }] }. */
 export function replayPack(pack, { decide, variants }) {
+  pack = JSON.parse(JSON.stringify(pack).replaceAll('{{FAKE_KEY}}', FAKE_KEY));
   const misses = [];
   const falsePositives = [];
   for (const a of pack.attacks ?? []) {

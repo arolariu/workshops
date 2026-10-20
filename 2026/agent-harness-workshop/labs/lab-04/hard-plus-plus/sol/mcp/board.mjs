@@ -113,7 +113,7 @@ export const boardTool = {
 // ---------- the portal's board API: a stand-in for a remote service (don't change it) ----------
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // The portal keeps a hash of the one token it accepts, never the token itself.
-const ACCEPTED_TOKEN_SHA256 = '9f43ea81b6573e187197d66d4b4152fc6bf834c6574570fa9670b789b10fe0e9';
+const ACCEPTED_TOKEN_SHA256 = 'b7d6c9a0931e7de149f64f5d3832e9ed0129f78ea26644e889a7662dd7a5f942';
 const sha256 = (text) => crypto.createHash('sha256').update(String(text)).digest('hex');
 
 /**

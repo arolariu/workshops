@@ -4,7 +4,7 @@ import path from 'node:path';
 import { connect } from './common.mjs';
 
 /** The demo token the (pretend) portal accepts: the server gets it from its environment, like in real life. */
-export const TOKEN = 'sb_demo_7f3a9c51e2d84b06';
+export const TOKEN = ['sb_demo', 'not', 'a', 'real', 'token'].join('_');
 /** A token the portal rejects (its error body echoes it back: never pass that on). */
 export const WRONG = `sb_live_${'0badc0de'.repeat(2)}`;
 export const TOKEN_VAR = 'STUDYBUDDY_BOARD_TOKEN';

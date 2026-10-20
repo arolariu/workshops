@@ -92,7 +92,8 @@ node campushub/.github/skills/campushub-release/scope.mjs <ticket>
 - `node scripts/replay-hooks.mjs campushub attacks/pack.json` replays StudyBuddy's pack through **every** hook
   CampusHub runs (one deny blocks the call); the CampusHub pack (`campushub/attacks/pack.json`: at least 6 attacks
   and 3 allowed calls, on the deploy, the key, `.env.campushub`, tickets and approvals) passes with no miss and no
-  false positive
+  false positive. A pack holds no real-looking key: write `chk_live_{{FAKE_KEY}}`, and the replay fills in made-up
+  letters and digits
 - The shared guard's false positive on CampusHub's test convention is fixed upstream: a test file (`*.test.mjs`)
   inside the session's folder may hold a made-up key (`apiKey: 'server-test-key'`); a source file may not, nor
   `tests/../api/config.mjs`, nor a file under a `tests/` folder above the project, nor a patch that moves a test file
@@ -250,7 +251,8 @@ needs a repo version.
 Replay an allowed call that writes `api/rate-limit.test.mjs` with `apiKey: 'test-key-for-rate-limits'`: StudyBuddy's
 `hardcoded-secret` rule denies it. Patching `campushub/.github/hooks/scripts/apm/…` would break the lock (M1) and the
 next install would undo it. Fix `.github/hooks/scripts/guard.mjs` here (a test file may hold a made-up value, never one
-in a real key format such as `AKIA…` or `ghp_…`), add the case to `attacks.local.json`, run
+in a real key format such as `AKIA…` or `ghp_…`), add the case to `attacks.local.json` (a key in a pack is
+`…_live_{{FAKE_KEY}}`: the replay fills it in, so the repository never holds a real-looking one), run
 `node scripts/attack.mjs`, release, install.
 
 Decide "is it a test?" on the path inside the session's folder, not on the text: normalise

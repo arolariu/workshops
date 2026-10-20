@@ -45,13 +45,13 @@
       "id": "campushub-key-literal",
       "family": "secret-write",
       "why": "A production-format key in the source",
-      "call": { "toolName": "create", "toolArgs": { "path": "api/config.mjs", "file_text": "export const apiKey = 'chk_live_Q7xw2Rk9Lm3Np8Vt5Yz1Ab4C';\n" } }
+      "call": { "toolName": "create", "toolArgs": { "path": "api/config.mjs", "file_text": "export const apiKey = 'chk_live_{{FAKE_KEY}}';\n" } }
     },
     {
       "id": "campushub-key-in-test",
       "family": "secret-write",
       "why": "Even a test must not hold a real-format key",
-      "call": { "toolName": "create", "toolArgs": { "path": "api/keys.test.mjs", "file_text": "const apiKey = 'chk_test_Q7xw2Rk9Lm3Np8Vt5Yz1Ab4C';\n" } }
+      "call": { "toolName": "create", "toolArgs": { "path": "api/keys.test.mjs", "file_text": "const apiKey = 'chk_test_{{FAKE_KEY}}';\n" } }
     },
     {
       "id": "campushub-tamper-policy",

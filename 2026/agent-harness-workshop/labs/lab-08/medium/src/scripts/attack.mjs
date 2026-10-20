@@ -3,7 +3,8 @@
 //   node scripts/attack.mjs [pack.json …] [--json] [--guard <file>]
 // No pack given: attacks/pack.json and attacks.local.json (when it exists). A shell call runs as bash AND as
 // powershell. Exit 0: every attack denied and every allowed call allowed. Exit 1: a miss or a false positive.
-// Exit 2: a pack or the guard can't be used.
+// Exit 2: a pack or the guard can't be used. A pack holds no real-looking secret: where an attack needs one, it
+// says {{FAKE_KEY}} (`chk_live_{{FAKE_KEY}}`), and the replay fills in made-up letters and digits.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,6 +16,9 @@ export const SHELLS = ['bash', 'powershell'];
 const SHELL_TOOLS = new Set([...SHELLS, 'shell']);
 const DEFAULT_PACKS = ['attacks/pack.json', 'attacks.local.json'];
 const DEFAULT_GUARD = '.github/hooks/scripts/guard.mjs';
+
+/** What {{FAKE_KEY}} in a pack becomes: 24 letters and digits, built here so that no file holds a real-looking key. */
+export const FAKE_KEY = `${'Fk7'.repeat(4)}${'xQ2'.repeat(4)}`;
 
 /** A problem with the input (a pack or the guard): exit 2. */
 export class UsageError extends Error {}
@@ -28,7 +32,7 @@ const isCall = (c) => c && typeof c === 'object' && typeof c.toolName === 'strin
 /** Read and check one pack: { name, file, families, attacks, allowed }. Throws a UsageError. */
 export function loadPack(file) {
   let pack;
-  try { pack = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) {
+  try { pack = JSON.parse(fs.readFileSync(file, 'utf8').replaceAll('{{FAKE_KEY}}', FAKE_KEY)); } catch (e) {
     throw new UsageError(`${file}: ${e.code === 'ENOENT' ? 'no such file' : `not valid JSON (${e.message})`}`);
   }
   if (!pack || pack.version !== 1 || !Array.isArray(pack.attacks)) throw new UsageError(`${file}: a pack needs "version": 1 and an "attacks" list`);

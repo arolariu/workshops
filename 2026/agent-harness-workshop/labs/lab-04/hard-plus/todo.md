@@ -73,8 +73,8 @@ at the bottom, `portalBoardApi()`: a stand-in for the portal's real API. Call it
 `mcp/board-data.json`; the checks serve their own hostile board from `tests/fixtures/` instead. To try it in Copilot,
 set the demo token in **your** environment before you start `copilot`:
 ```bash
-export STUDYBUDDY_BOARD_TOKEN=sb_demo_7f3a9c51e2d84b06       # bash
-$env:STUDYBUDDY_BOARD_TOKEN = 'sb_demo_7f3a9c51e2d84b06'     # PowerShell
+export STUDYBUDDY_BOARD_TOKEN=sb_demo_not_a_real_token       # bash
+$env:STUDYBUDDY_BOARD_TOKEN = 'sb_demo_not_a_real_token'     # PowerShell
 ```
 
 ## 💡 Hints
