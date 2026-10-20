@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { offlineEnv } from '../../../_harness/fixtures/lab-03/offline.mjs';
 
 const AUDIT = 'scripts/audit-agents.mjs';
 const ROLES = '.github/policies/roles.json';
@@ -41,7 +42,9 @@ const TOOL_LISTS = [
   [['studybuddy/get_deadlines'], 'mcp:read', 'one read-only MCP tool'],
   [['studybuddy/mark_done'], 'mcp:write', 'one MCP tool that changes things'],
   [['other-server/*'], 'mcp:write', 'a server the policy doesn\'t know: it can\'t tell, so it fails closed'],
-  [['read', 'serach', 'studybuddy/nope'], 'read', 'names Copilot ignores'],
+  [['studybuddy/delete_course'], 'mcp:write', 'a tool the catalog doesn\'t list for a known server: it fails closed too'],
+  [['apply_patch', 'rg', 'read_powershell', 'web_search', 'read_agent', 'sql'], 'search edit execute web agent todo', 'the CLI\'s own tool names'],
+  [['read', 'serach', 'exec'], 'read', 'names Copilot ignores'],
 ];
 const ORDER = ['read', 'search', 'edit', 'execute', 'web', 'agent', 'todo', 'mcp:read', 'mcp:write'];
 
@@ -72,8 +75,8 @@ export default (t) => [
       const got = c.all ? 'all' : ORDER.filter((x) => (c.caps ?? []).includes(x)).join(' ');
       if (got !== want) return `capabilities(${JSON.stringify(tools)}) (${what}) should give ${want || 'nothing'}, got ${got || 'nothing'}.`;
     }
-    const typo = capabilities(['read', 'serach', 'studybuddy/nope'], POLICY(t));
-    return sameSet(typo.unknown ?? [], ['serach', 'studybuddy/nope'], 'unknown should list the names Copilot ignores');
+    const typo = capabilities(['read', 'serach', 'exec'], POLICY(t));
+    return sameSet(typo.unknown ?? [], ['serach', 'exec'], 'unknown should list the names Copilot ignores');
   }, { milestone: 'M1' }),
   t.check('capabilities() says which entry gave each capability', async () => {
     const { capabilities } = await load(t);
@@ -165,9 +168,10 @@ export default (t) => [
 
   // M5 · Fix the five agents
   t.check('The CLI: exit 1 with findings on the fixture set, 0 on your agents', () => {
-    const bad = t.node([AUDIT, '--agents', FIX(t, 'agents'), '--roles', FIX(t, 'roles.json')]);
+    const env = offlineEnv(t.tmp());
+    const bad = t.node([AUDIT, '--agents', FIX(t, 'agents'), '--roles', FIX(t, 'roles.json')], { env });
     if (bad.code !== 1 || !/fx-alias/.test(bad.stdout)) return `On tests/fixtures/agents/ it should list the findings and exit 1; it exited ${bad.code}.`;
-    const good = t.node([AUDIT]);
+    const good = t.node([AUDIT], { env });
     return good.code === 0 || `On .github/agents/ it still finds something (exit ${good.code}):\n${good.stdout.split('\n').filter((l) => /❌/.test(l)).slice(0, 4).join('\n')}`;
   }, { milestone: 'M5' }),
   t.check('Your audit and the reference audit find nothing in .github/agents/', async () => {
@@ -186,11 +190,13 @@ export default (t) => [
     const can = (id) => ref.capabilities(agent(id).tools, policy);
     const tools = (id) => (Array.isArray(agent(id).tools) ? agent(id).tools : String(agent(id).tools ?? '').split(',')).map((x) => x.trim());
     if (!can('docs-writer').caps.includes('edit')) return 'docs-writer has to edit the docs: keep `edit`.';
-    if (!can('release').caps.includes('execute') || !agent('release').explicit) return 'release has to run `npm test` and `git log` (execute), and only when someone picks it (disable-model-invocation: true).';
+    if (!can('release').caps.includes('execute')) return 'release has to run `npm test` and `git log`: it needs execute.';
     if (!can('coverage').caps.includes('execute')) return 'coverage has to run the tests: it needs execute (is "exec" a tool name?).';
     if (!tools('portal').some((x) => /^studybuddy\/get_/.test(x)) || can('portal').caps.includes('mcp:write')) return 'portal needs the studybuddy read tools (studybuddy/get_…), and not mark_done.';
     const triage = can('triage');
-    return (triage.caps.includes('read') && triage.caps.includes('search') && !triage.caps.includes('agent')) || 'triage reads and searches, and hands nothing on: read, search, no agent.';
+    if (!(triage.caps.includes('read') && triage.caps.includes('search') && !triage.caps.includes('agent'))) return 'triage reads and searches, and hands nothing on: read, search, no agent.';
+    const open = FIVE.filter((id) => !agent(id).explicit);
+    return !open.length || `Only a person or a script starts these (the policy says "invocation": "explicit"): add disable-model-invocation: true to ${open.join(', ')}.`;
   }, { milestone: 'M5' }),
   t.check("roles.json still says what the security team wrote", () => {
     const now = t.json(ROLES);

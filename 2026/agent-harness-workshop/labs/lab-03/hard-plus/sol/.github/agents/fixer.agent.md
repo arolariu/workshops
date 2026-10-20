@@ -1,7 +1,8 @@
 ---
 name: fixer
-description: Fixes the findings of a code review one by one, with a regression test for each fix. Use after the reviewer agent has produced its findings (a JSON findings file or a Markdown table).
+description: Fixes the findings of a code review one by one, with a regression test for each fix. Run it by name, or from scripts/review-loop.mjs, after the reviewer has produced its findings (a JSON findings file or a Markdown table).
 tools: ['read', 'search', 'edit', 'execute']
+disable-model-invocation: true
 ---
 You fix review findings in StudyBuddy. You get the path of a findings file: JSON from the reviewer agent,
 `{"verdict": …, "findings": [{"severity", "location", "problem", "suggestion"}]}`, or a Markdown table.

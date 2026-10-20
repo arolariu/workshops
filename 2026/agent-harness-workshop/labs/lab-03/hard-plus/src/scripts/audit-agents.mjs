@@ -8,16 +8,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// The tool aliases of the custom agents configuration reference (case-insensitive), plus the CLI's own tool names.
+// The tool aliases of the custom agents configuration reference (case-insensitive), plus the CLI's own tool names
+// (the ones a session lists: view, rg, apply_patch, read_powershell, web_search, read_agent, sql, …).
 // https://docs.github.com/en/copilot/reference/custom-agents-configuration#tool-aliases
 export const ALIASES = {
-  read: ['read', 'notebookread', 'view'],
-  search: ['search', 'grep', 'glob'],
-  edit: ['edit', 'multiedit', 'write', 'notebookedit', 'create'],
-  execute: ['execute', 'shell', 'bash', 'powershell'],
-  agent: ['agent', 'custom-agent', 'task'],
-  web: ['web', 'websearch', 'webfetch', 'web_fetch'],
-  todo: ['todo', 'todowrite'],
+  read: ['read', 'notebookread', 'view', 'skill', 'fetch_copilot_cli_documentation'],
+  search: ['search', 'grep', 'glob', 'rg'],
+  edit: ['edit', 'multiedit', 'write', 'notebookedit', 'create', 'apply_patch', 'str_replace', 'str_replace_editor'],
+  execute: ['execute', 'shell', 'bash', 'powershell', 'read_bash', 'write_bash', 'stop_bash', 'list_bash', 'read_powershell', 'write_powershell', 'stop_powershell', 'list_powershell'],
+  agent: ['agent', 'custom-agent', 'task', 'read_agent', 'write_agent', 'list_agents'],
+  web: ['web', 'websearch', 'webfetch', 'web_fetch', 'web_search'],
+  todo: ['todo', 'todowrite', 'sql'],
 };
 // What a role may do, in roles.json: the seven built-in kinds, and MCP tools that only read or that change things.
 export const CAPABILITIES = ['read', 'search', 'edit', 'execute', 'web', 'agent', 'todo', 'mcp:read', 'mcp:write'];
@@ -27,7 +28,8 @@ export const CAPABILITIES = ['read', 'search', 'edit', 'execute', 'web', 'agent'
 /**
  * The capabilities a tools list grants. No list (null) or "*" anywhere = everything; [] = nothing. Aliases count in any
  * case; "server/tool" and "server/*" come from policy.mcp (a server it doesn't know counts as mcp:write: it can't
- * tell). Names Copilot doesn't know are ignored, by Copilot too: they end up in `unknown`.
+ * tell), and so does a tool the catalog doesn't list for a known server. Names Copilot doesn't know are ignored, by
+ * Copilot too: they end up in `unknown`.
  * @returns {{ all: boolean, caps: string[], from: Record<string, string[]>, unknown: string[] }}
  */
 export function capabilities(tools, policy = {}) {
@@ -151,7 +153,10 @@ export function loadPolicy(file) {
   try { return JSON.parse(text); } catch (e) { throw new Error(`The role policy ${file} is not valid JSON: ${e.message}`); }
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths: a symlinked temp folder, a junction or a short 8.3 path still counts as "run directly".
+const isMain = (() => {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) {
   const argv = process.argv.slice(2);
   const opt = (name, fallback) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : fallback);

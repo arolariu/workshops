@@ -3,28 +3,35 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { norm, flag, cap, REVIEWS, fakeCopilot, greenTests } from './helpers.mjs';
+import { capsOf } from '../../../_harness/fixtures/lab-03/aliases.mjs';
+import { offline, offlineEnv } from '../../../_harness/fixtures/lab-03/offline.mjs';
 
 const FIXER = '.github/agents/fixer.agent.md';
 const REVIEWER = '.github/agents/reviewer.agent.md';
-const toolList = (data) => (Array.isArray(data.tools) ? data.tools : String(data.tools ?? '').split(',')).map((x) => String(x).trim().toLowerCase()).filter(Boolean);
-const READ_ONLY = ['read', 'search', 'view', 'grep', 'glob'];
+const LOOP_DIR = '.agent-logs/review-loop';
 const load = (t) => t.import('scripts/review-loop.mjs');
-const writes = (a) => norm(a).some((x) => /^--allow-tool=(write|shell)(\(\))?$/.test(x)) || a.some((x) => /^--(allow-all|yolo|allow-all-tools)/.test(x));
+// Any write or shell permission (shell(x) too), or allow-all.
+const writes = (a) => norm(a).some((x) => /^--allow-tool=(write|shell)\b/.test(x)) || a.some((x) => /^--(allow-all|yolo|allow-all-tools)/.test(x));
 
-/** Run the learner's loop with a fake Copilot in a temp folder; returns { report, fake, dir }. */
+/**
+ * Run the learner's loop with a fake Copilot, inside a temp folder (so a relative dir lands there), with the real
+ * Copilot out of reach. Returns { report, fake, dir } (dir: where the loop wrote, absolute).
+ */
 async function loop(t, answers, options = {}) {
   const { reviewLoop } = await load(t);
   const work = t.tmp();
-  const dir = path.join(work, '.agent-logs', 'review-loop');
   const fake = fakeCopilot(answers.map((a) => REVIEWS[a]), { failOn: options.failOn });
+  const { failOn, ...rest } = options;
   const here = process.cwd();
-  process.chdir(work);
-  try {
-    const report = await reviewLoop({ file: 'deadlines.js', maxRounds: 3, creditsPerRound: 80, dir, run: fake.run, runTests: greenTests, ...options, failOn: undefined });
-    return { report, fake, dir };
-  } finally {
-    process.chdir(here);
-  }
+  return offline(t, async () => {
+    process.chdir(work);
+    try {
+      const report = await reviewLoop({ file: 'deadlines.js', maxRounds: 3, creditsPerRound: 80, dir: LOOP_DIR, run: fake.run, runTests: greenTests, ...rest });
+      return { report, fake, dir: path.join(work, ...LOOP_DIR.split('/')) };
+    } finally {
+      process.chdir(here);
+    }
+  });
 }
 const said = (fake) => fake.agents().join(' → ') || 'no calls';
 const stopIs = (report, want) => (report?.stop === want ? true : `It stopped with ${JSON.stringify(report?.stop)}, expected "${want}".`);
@@ -53,8 +60,9 @@ export default (t) => [
   }, { milestone: 'M1' }),
   t.check('The reviewer can answer in JSON, and stays read-only', () => {
     const { data, body } = t.frontmatter(REVIEWER);
-    const extra = toolList(data).filter((x) => !READ_ONLY.includes(x));
-    if (extra.length || !toolList(data).length) return `The reviewer must stay read-only (read, search): ${extra.join(', ') || 'no tools list'}.`;
+    const c = capsOf(data.tools);
+    const extra = c.all ? ['every tool'] : [...c.caps].filter((x) => !['read', 'search'].includes(x));
+    if (extra.length || !c.caps.size) return `The reviewer must stay read-only (read, search): ${extra.join(', ') || 'no tools'}.`;
     const missing = ['json', 'verdict', 'findings', 'severity', 'location'].filter((w) => !new RegExp(w, 'i').test(body));
     return !missing.length || `Its instructions should give the JSON format (a script reads it): missing ${missing.join(', ')}.`;
   }, { milestone: 'M1' }),
@@ -70,8 +78,9 @@ export default (t) => [
     const { data } = t.frontmatter(FIXER, `Create \`${FIXER}\`.`);
     const description = String(data.description ?? '');
     if (description.length < 20 || /\bTODO\b/.test(description)) return 'Write a description: what it does and when to use it.';
-    const tools = toolList(data);
-    const missing = [['read', ['read', 'view']], ['edit', ['edit']], ['execute', ['execute', 'shell', 'bash', 'powershell']]].filter(([, alts]) => !alts.some((a) => tools.includes(a))).map(([k]) => k);
+    if (data.tools == null) return 'Add a `tools:` list: without one, the agent gets every tool.';
+    const c = capsOf(data.tools);
+    const missing = ['read', 'edit', 'execute'].filter((x) => !c.all && !c.caps.has(x));
     return !missing.length || `Add these tools: ${missing.join(', ')}.`;
   }, { milestone: 'M2' }),
   t.check('The fixer works from the findings file, tests every fix, never pushes', () => {
@@ -90,7 +99,7 @@ export default (t) => [
     const a = reviewerArgs('deadlines.js', { credits: 40 });
     if (!a?.length) return 'reviewerArgs() returns nothing yet.';
     if (flag(a, '--agent') !== 'reviewer') return 'Run the reviewer agent (--agent reviewer).';
-    if (writes(a) || norm(a).some((x) => /^--allow-tool=.*write/.test(x))) return 'The reviewer must not get write or shell permission.';
+    if (writes(a)) return 'The reviewer must not get write or shell permission.';
     if (!a.includes('-s')) return 'Add -s: the loop parses the answer, not the stats.';
     if (cap(a) !== 40) return `reviewerArgs(file, { credits: 40 }) should cap the call at 40 (--max-ai-credits=40), got ${flag(a, '--max-ai-credits')}.`;
     return cap(reviewerArgs('deadlines.js')) >= 30 || 'Without options, cap it at 30 (the smallest cap Copilot accepts).';
@@ -158,26 +167,33 @@ export default (t) => [
     }
     return true;
   }, { milestone: 'M3' }),
-  t.check('It stops when nothing improves, and at the maximum', async () => {
+  t.check('It stops when the score stops going down (not the count), and at the maximum', async () => {
     const stuck = await loop(t, ['issues3', 'issues3again']);
     if (stuck.report?.stop !== 'no-progress') return `Two reviews with the same score (6, then 6) should stop with "no-progress", got ${JSON.stringify(stuck.report?.stop)} (calls: ${said(stuck.fake)}).`;
     if (said(stuck.fake) !== 'reviewer → fixer → reviewer') return `When nothing improved, don't ask the fixer again: got ${said(stuck.fake)}.`;
-    const max = await loop(t, ['issues3', 'issues2'], { maxRounds: 2 });
-    if (said(max.fake) !== 'reviewer → fixer → reviewer → fixer') return `With maxRounds: 2 and progress (6, then 3) expected reviewer → fixer → reviewer → fixer, got ${said(max.fake)}.`;
-    return stopIs(max.report, 'max-rounds');
+    const fewer = await loop(t, ['issues3low', 'issues1high']);
+    if (fewer.report?.stop !== 'no-progress') return `Three lows (score 3), then one high (score 3): fewer findings, but nothing got better. Expected "no-progress", got ${JSON.stringify(fewer.report?.stop)} (calls: ${said(fewer.fake)}). Compare scores, not counts.`;
+    const better = await loop(t, ['issues3', 'issues3low'], { maxRounds: 2 });
+    if (said(better.fake) !== 'reviewer → fixer → reviewer → fixer') return `Three findings (score 6), then three lows (score 3): the same count, but better. With maxRounds: 2 expected reviewer → fixer → reviewer → fixer, got ${said(better.fake)}.`;
+    return stopIs(better.report, 'max-rounds');
   }, { milestone: 'M3' }),
   t.check('It never hands an unreadable review to the fixer', async () => {
     const { report, fake } = await loop(t, ['table']);
     if (fake.calls.some((c) => c.agent === 'fixer')) return 'The review had no JSON, and the fixer was called anyway.';
     return stopIs(report, 'unreadable');
   }, { milestone: 'M3' }),
-  t.check('It refuses a budget below two calls, and stops on a failed call', async () => {
+  t.check('It refuses a budget below two calls, and stops on a failed call (with a report)', async () => {
     const poor = await loop(t, ['issues3'], { creditsPerRound: 50 });
     if (poor.fake.calls.length) return `With creditsPerRound: 50 no call can be paid for (2 × 30), but it made ${poor.fake.calls.length}.`;
     if (poor.report?.stop !== 'budget') return `With creditsPerRound: 50 expected the stop "budget", got ${JSON.stringify(poor.report?.stop)}.`;
     const failed = await loop(t, ['issues3', 'clean'], { failOn: 'fixer' });
     if (failed.fake.calls.length !== 2) return `After the fixer's call failed, the loop went on: ${said(failed.fake)}.`;
-    return stopIs(failed.report, 'error');
+    const stop = stopIs(failed.report, 'error');
+    if (stop !== true) return stop;
+    const file = path.join(failed.dir, 'report.json');
+    if (!fs.existsSync(file)) return 'A loop that stopped on an error still writes report.json: call finish() at every exit.';
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return (saved.stop === 'error' && saved.rounds?.length === 1 && Boolean(saved.rounds[0].findingsFile)) || `report.json after the failed fix should say stop "error", with round 1 and its findings file: got ${JSON.stringify({ stop: saved.stop, rounds: saved.rounds?.length })}.`;
   }, { milestone: 'M3' }),
 
   // M4 · The run report
@@ -214,7 +230,7 @@ export default (t) => [
     return /^Stopped: budget\b/m.test(renderReport(poor.report)) || 'A loop that never started still gets a report: "Stopped: budget. …".';
   }, { milestone: 'M4' }),
   t.check('The dry run shows both agents and their caps', () => {
-    const r = t.node(['scripts/review-loop.mjs', 'deadlines.js', '--dry-run']);
+    const r = t.node(['scripts/review-loop.mjs', 'deadlines.js', '--dry-run'], { env: offlineEnv(t.tmp()) });
     const lines = r.stdout.split('\n');
     const rev = lines.find((l) => /--agent reviewer/.test(l));
     const fix = lines.find((l) => /--agent fixer/.test(l));

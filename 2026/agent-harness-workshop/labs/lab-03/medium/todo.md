@@ -36,9 +36,10 @@ evidence, not from opinions.
 - `deadlines.js` and the existing tests are unchanged
 
 ### M3 · Bug reports that point at the proof
-- `BUGS.md` has one `## ` report per finding, each with the finding's location from `REVIEW.md` (`deadlines.js:23`,
-  `deadlines.js:7`, `deadlines.js:12`), the steps, **Expected** and **Actual**
-- Each report names its red test exactly, and every red test is in a report
+- `BUGS.md` has one `## ` report per finding, each naming only its own finding's location from `REVIEW.md`
+  (`deadlines.js:23`, `deadlines.js:7` or `deadlines.js:12`), with the steps, **Expected** and **Actual**
+- Each report names, exactly, a red test that proves its finding (one that turns green when only that bug is fixed),
+  and every red test is in a report
 
 ## 📂 Work here
 ```bash
@@ -113,14 +114,17 @@ What actually stops it from editing `deadlines.js`?
 <details><summary>Answer</summary>
 
 **2.** The tool list decides *which tools* reach the model, not which files they may touch. For a hard boundary on
-paths you need permissions (`--deny-tool='write(deadlines.js)'`) or a hook (Lab 05), and a check on the outcome:
-`deadlines.js` is unchanged.
+paths you need permissions (`--deny-tool='write(deadlines.js)'` stops the file tools, but not a shell command that
+writes the file) or a hook that sees every call (Lab 05), and a check on the outcome: `deadlines.js` is unchanged.
 
 </details>
 
 ## 🚀 Going further
-- Make the boundary hard: `copilot --agent test-writer --deny-tool='write(deadlines.js)'`, then ask it to fix a bug.
+- Make the boundary harder: `copilot --agent test-writer --deny-tool='write(deadlines.js)'`, then ask it to fix a
+  bug. `write(…)` covers the file tools only: `echo … > deadlines.js` is a shell command, so deny that too, or use a
+  hook (Lab 05).
 - Hand `BUGS.md` to the default agent: *"Fix the bugs in BUGS.md and make the tests green."* Then read the diff: did
   it change only `deadlines.js`, or did it "fix" a test too?
 - Add `include-custom-instructions: true`: run as a subagent, a custom agent doesn't read `AGENTS.md` unless it asks to.
-- Add `disable-model-invocation: true` if this agent should only run when you pick it by name.
+- The reference adds `disable-model-invocation: true`: an agent that can edit and run starts only when someone picks
+  it (`--agent`, `/agent`), never because the main agent thought it fit. Lab 03 hard+ turns that into a policy.

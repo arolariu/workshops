@@ -14,10 +14,14 @@ export default [
       if (!r1.findingsFile || !t.exists(r1.findingsFile)) return 'The findings file the fixer was given is missing.';
       if (t.unchanged('deadlines.js')) return 'deadlines.js was not changed: did the fixer run?';
       const before = t.unitTests({ cwd: t.solDir }).failing; // the red tests the test-writer left behind
-      const now = t.unitTests().failing;
-      const broken = now.filter((n) => !before.includes(n));
+      const now = t.unitTests();
+      const broken = now.failing.filter((n) => !before.includes(n));
       if (broken.length) return `The fix broke tests that were green: ${broken.slice(0, 2).join(' | ')}`;
-      return now.length < before.length || `None of the red tests turned green: ${now.slice(0, 2).join(' | ')}`;
+      // A red test that disappeared, or was renamed, is not a red test that turned green.
+      const turned = before.filter((n) => !now.failing.includes(n));
+      const gone = turned.filter((n) => !now.passing.includes(n));
+      if (gone.length) return `These red tests are gone instead of green (deleted or renamed?): ${gone.slice(0, 2).join(' | ')}`;
+      return turned.length > 0 || `None of the red tests turned green: ${now.failing.slice(0, 2).join(' | ')}`;
     },
   },
 ];

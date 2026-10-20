@@ -31,17 +31,22 @@ export const flag = (args, name) => {
 
 /**
  * A fake Copilot for the team, working in `work`: each agent replays its recorded answer (or one from `answers`); the
- * implementer also makes the recorded edit (the review's three fixes in deadlines.js) and any `extraEdits`.
+ * implementer also makes the recorded edit (the review's three fixes in deadlines.js) and any `extraEdits`, and the
+ * tester makes any `testerEdits` (paths relative to `work`).
  */
-export function fakeTeam(work, reference, { answers = {}, extraEdits = {} } = {}) {
+export function fakeTeam(work, reference, { answers = {}, extraEdits = {}, testerEdits = {} } = {}) {
   const calls = [];
+  const write = (edits) => {
+    for (const [file, text] of Object.entries(edits)) fs.writeFileSync(path.join(work, file), typeof text === 'function' ? text(fs.readFileSync(path.join(work, file), 'utf8')) : text);
+  };
   const run = (args) => {
     const agent = flag(args, '--agent');
     calls.push({ agent, args: [...args] });
     if (agent === 'implementer') {
       fs.writeFileSync(path.join(work, 'deadlines.js'), applyFixes(reference));
-      for (const [file, text] of Object.entries(extraEdits)) fs.writeFileSync(path.join(work, file), text);
+      write(extraEdits);
     }
+    if (agent === 'tester') write(testerEdits);
     const answer = answers[agent] ?? ANSWERS[agent];
     if (answer === undefined) throw new Error(`the fake team has no agent called ${agent}`);
     return answer;

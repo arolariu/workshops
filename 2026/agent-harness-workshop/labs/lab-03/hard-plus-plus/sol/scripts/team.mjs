@@ -93,8 +93,8 @@ export async function advance(runDir, { pipeline, run = copilotRun, cwd = proces
     Object.assign(st, { status: 'running', credits: stage.credits });
     state.spent += stage.credits;
     save();
-    const baseline = stage.id === 'implement' ? takeBaseline(runDir, cwd) : null;
-    const before = baseline ? snapshot(cwd) : null;
+    const baseline = ['implement', 'test'].includes(stage.id) ? takeBaseline(runDir, cwd) : null;
+    const folder = snapshot(runDir);
     let answer;
     try {
       answer = await run(stageArgs(stage, runDir, state.goal), { stage: stage.id, cwd });
@@ -103,14 +103,20 @@ export async function advance(runDir, { pipeline, run = copilotRun, cwd = proces
       save();
       return { status: 'stopped', stage: stage.id, reason: `error: ${e.message}` };
     }
-    const result = baseline ? patchOf(cwd, baseline, before) : artifactOf(stage, answer);
+    // No agent may touch the run folder (plan.json, approval.json, …) during its call, whatever tool it used.
+    const meddled = changedFiles(folder, snapshot(runDir));
+    const result = meddled.length ? { problems: [`The ${stage.agent} agent changed the run folder: ${meddled.join(', ')}.`] }
+      : stage.id === 'implement' ? implementResult(runDir, cwd, state, baseline)
+        : stage.id === 'test' ? testResult(stage, answer, cwd, state, baseline)
+          : artifactOf(stage, answer);
     if (result.problems.length) {
       st.status = 'failed';
       save();
       return { status: 'stopped', stage: stage.id, reason: `contract: ${result.problems.join(' ')}` };
     }
     fs.writeFileSync(output, result.text);
-    Object.assign(st, { status: 'done', output: stage.writes, sha256: sha256File(output), inputs });
+    for (const [f, text] of Object.entries(result.extra ?? {})) fs.writeFileSync(path.join(runDir, f), text);
+    Object.assign(st, { status: 'done', output: stage.writes, sha256: sha256File(output), inputs, ...result.record });
     save();
   }
   return { status: 'done', stage: null };
@@ -124,26 +130,44 @@ function artifactOf(stage, answer) {
   return { problems, text: `${JSON.stringify(json.value, null, 2)}\n` };
 }
 
-/** Before the first implement: the plan's files as they were (baseline.json), so every patch starts from there. */
+/** Before the first implement: every work file as it was (baseline.json). Every later comparison starts from here. */
 function takeBaseline(runDir, cwd) {
   const file = path.join(runDir, 'baseline.json');
   if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
-  const plan = JSON.parse(fs.readFileSync(path.join(runDir, 'plan.json'), 'utf8'));
-  const baseline = { files: plan.files, content: {} };
-  for (const f of plan.files) baseline.content[f] = fs.existsSync(path.join(cwd, f)) ? fs.readFileSync(path.join(cwd, f), 'utf8') : '';
+  const hashes = snapshot(cwd);
+  const content = Object.fromEntries(Object.keys(hashes).map((f) => [f, fs.readFileSync(path.join(cwd, f), 'utf8')]));
+  const baseline = { hashes, content };
   fs.writeFileSync(file, `${JSON.stringify(baseline, null, 2)}\n`);
   return baseline;
 }
 
-/** The implementer's work as a patch of the plan's files; a change to any other file during the call breaks the contract. */
-function patchOf(cwd, baseline, before) {
+const TEST_FILE = /\.test\.[cm]?js$/;
+const readFile = (cwd, f) => (fs.existsSync(path.join(cwd, f)) ? fs.readFileSync(path.join(cwd, f), 'utf8') : '');
+const diffOf = (cwd, baseline, files) => files.map((f) => unifiedDiff(f, baseline.content[f] ?? '', readFile(cwd, f))).join('');
+
+/**
+ * The implementer's work, against the baseline and the plan as it is now: every file that differs from the baseline
+ * must be in the plan, or be a test the tester left as it is. The patch covers the plan's files.
+ */
+function implementResult(runDir, cwd, state, baseline) {
+  const plan = JSON.parse(fs.readFileSync(path.join(runDir, 'plan.json'), 'utf8'));
   const now = snapshot(cwd);
-  const touched = [...new Set([...Object.keys(now), ...Object.keys(before)])].filter((f) => now[f] !== before[f]);
-  const outside = touched.filter((f) => !baseline.files.includes(f));
-  if (outside.length) return { problems: [`The implementer changed files outside the plan: ${outside.join(', ')}.`] };
-  const read = (f) => (fs.existsSync(path.join(cwd, f)) ? fs.readFileSync(path.join(cwd, f), 'utf8') : '');
-  const text = baseline.files.map((f) => unifiedDiff(f, baseline.content[f], read(f))).join('');
-  return text ? { problems: [], text } : { problems: ['The implementer changed nothing.'] };
+  const tested = state.stages.test?.tests ?? {};
+  const outside = changedFiles(baseline.hashes, now).filter((f) => !plan.files.includes(f) && !(f in tested && tested[f] === (now[f] ?? null)));
+  if (outside.length) return { problems: [`Files outside the plan differ from the run's baseline: ${outside.join(', ')}. Undo them, or approve a plan that lists them, then resume.`] };
+  const text = diffOf(cwd, baseline, plan.files);
+  return text ? { problems: [], text, record: { tree: now } } : { problems: ['The implementer changed nothing.'] };
+}
+
+/** The tester's answer, and its changes: test files only (compared with what implement left). They go to tests.patch. */
+function testResult(stage, answer, cwd, state, baseline) {
+  const artifact = artifactOf(stage, answer);
+  if (artifact.problems.length) return artifact;
+  const now = snapshot(cwd);
+  const library = changedFiles(state.stages.implement?.tree ?? baseline.hashes, now).filter((f) => !TEST_FILE.test(f));
+  if (library.length) return { problems: [`The tester changed files that aren't tests: ${library.join(', ')}.`] };
+  const tests = changedFiles(baseline.hashes, now).filter((f) => TEST_FILE.test(f));
+  return { ...artifact, extra: { 'tests.patch': diffOf(cwd, baseline, tests) }, record: { tests: Object.fromEntries(tests.map((f) => [f, now[f] ?? null])) } };
 }
 
 // ---------- M4 · The approval gate ----------
@@ -236,6 +260,11 @@ export function snapshot(dir) {
   return Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)));
 }
 
+/** The files whose hash differs between two snapshots (added, changed or removed), sorted. */
+export function changedFiles(a, b) {
+  return [...new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])].filter((f) => (a ?? {})[f] !== (b ?? {})[f]).sort();
+}
+
 /** A unified diff of one file (3 lines of context), from `before` to `after`. '' when they are the same. */
 export function unifiedDiff(file, before, after) {
   const a = String(before ?? '').replace(/\r\n/g, '\n').split('\n');
@@ -279,6 +308,10 @@ export const writeState = (runDir, state) => fs.writeFileSync(path.join(runDir, 
 
 /** One real Copilot call: returns what it printed, throws when it fails. */
 export function copilotRun(args, { cwd = process.cwd() } = {}) {
+  if (process.env.HARNESS_NO_COPILOT) {
+    globalThis.__harnessCopilotCalls = (globalThis.__harnessCopilotCalls ?? 0) + 1;
+    throw new Error('copilotRun() refused: the free checks never call Copilot. Use the run() you are given.');
+  }
   let r = spawnSync('copilot', args, { cwd, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
   if (r.error?.code === 'ENOENT' && process.platform === 'win32') {
     const q = (a) => (/^[\w\-./:=@,]+$/.test(a) ? a : `"${a.replace(/"/g, '""')}"`);
@@ -289,7 +322,10 @@ export function copilotRun(args, { cwd = process.cwd() } = {}) {
   return r.stdout;
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths: a symlinked temp folder, a junction or a short 8.3 path still counts as "run directly".
+const isMain = (() => {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) {
   const [cmd, arg] = process.argv.slice(2);
   const argv = process.argv.slice(2);

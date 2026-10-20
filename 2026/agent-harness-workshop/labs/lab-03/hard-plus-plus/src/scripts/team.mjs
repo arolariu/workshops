@@ -63,10 +63,12 @@ export async function advance(runDir, { pipeline, run = copilotRun, cwd = proces
   //     { status: 'awaiting-approval', stage: stage.id, reason }
   //   - TODO(M5): skip a stage that is done, whose output exists, and whose inputs still have the hashes it saw
   //   - a stage whose credits would push state.spent past state.budget: "stopped", return a "budget: …" reason
-  //   - "running", credits, spent, save; for implement: takeBaseline() and a snapshot(cwd) first
+  //   - "running", credits, spent, save; takeBaseline() before implement and test; snapshot(runDir) before the call
   //   - answer = await run(stageArgs(stage, runDir, state.goal), { stage: stage.id, cwd }); a throw stops ("error: …")
-  //   - the artifact: patchOf() for implement, artifactOf() for the others; problems stop the run ("contract: …")
-  //   - write it to stage.writes, then { status: 'done', output, sha256, inputs } and save
+  //   - the run folder must be the same after the call (changedFiles()); then the result: implementResult(),
+  //     testResult() or artifactOf(); any problem stops the run ("contract: …")
+  //   - write result.text to stage.writes and each of result.extra, then { status: 'done', output, sha256, inputs,
+  //     ...result.record } and save
   return { status: 'stopped', stage: null, reason: 'TODO(M3): advance() is not written yet.' };
 }
 
@@ -78,23 +80,38 @@ function artifactOf(stage, answer) {
   return { problems, text: `${JSON.stringify(json.value, null, 2)}\n` };
 }
 
-/** Before the first implement: the plan's files as they were (baseline.json), so every patch starts from there. */
+/** Before the first implement: every work file as it was (baseline.json). Every later comparison starts from here. */
 function takeBaseline(runDir, cwd) {
   const file = path.join(runDir, 'baseline.json');
   if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
-  const plan = JSON.parse(fs.readFileSync(path.join(runDir, 'plan.json'), 'utf8'));
-  const baseline = { files: plan.files, content: {} };
-  for (const f of plan.files) baseline.content[f] = fs.existsSync(path.join(cwd, f)) ? fs.readFileSync(path.join(cwd, f), 'utf8') : '';
+  const hashes = snapshot(cwd);
+  const content = Object.fromEntries(Object.keys(hashes).map((f) => [f, fs.readFileSync(path.join(cwd, f), 'utf8')]));
+  const baseline = { hashes, content };
   fs.writeFileSync(file, `${JSON.stringify(baseline, null, 2)}\n`);
   return baseline;
 }
 
-/** The implementer's work as a patch of the plan's files; a change to any other file during the call breaks the contract. */
-function patchOf(cwd, baseline, before) {
-  // TODO(M3): compare snapshot(cwd) with `before`: a changed file that isn't in baseline.files is a problem (name it).
-  // The patch: unifiedDiff(file, baseline.content[file], the file now) for each of baseline.files, joined; an empty
-  // patch is a problem too ("the implementer changed nothing").
-  return { problems: ['TODO(M3): patchOf() is not written yet.'] };
+const TEST_FILE = /\.test\.[cm]?js$/;
+const readFile = (cwd, f) => (fs.existsSync(path.join(cwd, f)) ? fs.readFileSync(path.join(cwd, f), 'utf8') : '');
+const diffOf = (cwd, baseline, files) => files.map((f) => unifiedDiff(f, baseline.content[f] ?? '', readFile(cwd, f))).join('');
+
+/**
+ * The implementer's work, against the baseline and the plan as it is now: every file that differs from the baseline
+ * must be in the plan, or be a test the tester left as it is. The patch covers the plan's files.
+ */
+function implementResult(runDir, cwd, state, baseline) {
+  // TODO(M3): read plan.json as it is now and snapshot(cwd). A file that differs from baseline.hashes is a problem
+  // (name it) unless the plan lists it, or it is a test the tester left as it is (state.stages.test.tests). The
+  // patch: diffOf(cwd, baseline, plan.files); an empty one is a problem too. Return { problems, text, record: { tree } }.
+  return { problems: ['TODO(M3): implementResult() is not written yet.'] };
+}
+
+/** The tester's answer, and its changes: test files only (compared with what implement left). They go to tests.patch. */
+function testResult(stage, answer, cwd, state, baseline) {
+  // TODO(M3): artifactOf() the answer; then every file that differs from what implement left
+  // (state.stages.implement.tree) must be a test file (TEST_FILE). Return the artifact with
+  // extra: { 'tests.patch': diffOf() of the test files that differ from the baseline } and record: { tests: { file: hash } }.
+  return { problems: ['TODO(M3): testResult() is not written yet.'] };
 }
 
 // ---------- M4 · The approval gate ----------
@@ -174,6 +191,11 @@ export function snapshot(dir) {
   return Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)));
 }
 
+/** The files whose hash differs between two snapshots (added, changed or removed), sorted. */
+export function changedFiles(a, b) {
+  return [...new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])].filter((f) => (a ?? {})[f] !== (b ?? {})[f]).sort();
+}
+
 /** A unified diff of one file (3 lines of context), from `before` to `after`. '' when they are the same. */
 export function unifiedDiff(file, before, after) {
   const a = String(before ?? '').replace(/\r\n/g, '\n').split('\n');
@@ -217,6 +239,10 @@ export const writeState = (runDir, state) => fs.writeFileSync(path.join(runDir, 
 
 /** One real Copilot call: returns what it printed, throws when it fails. */
 export function copilotRun(args, { cwd = process.cwd() } = {}) {
+  if (process.env.HARNESS_NO_COPILOT) {
+    globalThis.__harnessCopilotCalls = (globalThis.__harnessCopilotCalls ?? 0) + 1;
+    throw new Error('copilotRun() refused: the free checks never call Copilot. Use the run() you are given.');
+  }
   let r = spawnSync('copilot', args, { cwd, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
   if (r.error?.code === 'ENOENT' && process.platform === 'win32') {
     const q = (a) => (/^[\w\-./:=@,]+$/.test(a) ? a : `"${a.replace(/"/g, '""')}"`);
@@ -227,7 +253,10 @@ export function copilotRun(args, { cwd = process.cwd() } = {}) {
   return r.stdout;
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths: a symlinked temp folder, a junction or a short 8.3 path still counts as "run directly".
+const isMain = (() => {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) {
   const [cmd, arg] = process.argv.slice(2);
   const argv = process.argv.slice(2);

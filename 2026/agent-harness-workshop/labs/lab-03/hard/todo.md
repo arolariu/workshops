@@ -51,8 +51,8 @@ CLEAN means no findings · score = high 3, medium 2, low 1
 - `reviewLoop({ file, maxRounds, creditsPerRound, dir, run, runTests })` calls Copilot only through `run(args)` (the
   checks pass a fake that replays recorded answers) and the tests only through `runTests()`
 - Each round: review → stop if the answer is `unreadable`, the code is `clean`, or there's `no-progress` (the score
-  isn't lower than the round before) → write `<dir>/round-<n>.findings.json` → fix → tests. After `maxRounds`:
-  `max-rounds`
+  isn't lower than the round before: the score, not the number of findings) → write `<dir>/round-<n>.findings.json`
+  → fix → tests. After `maxRounds`: `max-rounds`
 - A round that can't be paid for stops with `budget` before any call; a call that throws stops with `error`
 
 ### M4 · The run report
@@ -100,7 +100,8 @@ you checked.
 The agent's `tools` decide what the model can do at all; the permission flags decide what runs without asking. In
 `-p` mode nobody can answer a question, so anything not allowed is refused. The reviewer needs no permissions
 (`--deny-tool=write` makes that explicit); the fixer needs `--allow-tool=write` and `--allow-tool=shell(npm:*)`,
-and `--deny-tool=shell(git push)` wins over every allow.
+and `--deny-tool=shell(git push)` wins over every allow. The reference fixer also has
+`disable-model-invocation: true`: an agent that edits and runs starts only when you (or the loop) pick it.
 
 </details>
 

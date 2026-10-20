@@ -16,8 +16,9 @@ every stage within its credit cap, and resumes a stopped run without paying twic
    permissions and a credit cap per stage; the new agents only get what their job needs, never delegate, and only run
    from the script.
 3. `advance()` runs the stages in order and writes each artifact into the run folder; it stops at the gate until a
-   person approves, before a stage the budget can't pay for, and when an artifact breaks its contract or the
-   implementer leaves the plan.
+   person approves, before a stage the budget can't pay for, when an artifact breaks its contract, when the work
+   leaves the plan (the implementer changes a file the plan doesn't list, the tester changes anything but tests), and
+   when an agent touches the run folder. The reviewer sees the tester's changes too.
 4. `approve()` records who approved which plan (its sha256); a changed plan needs a new approval.
 5. A run resumes where it stopped: a stage runs again only if it never finished, its output is gone, or its inputs
    changed.
@@ -29,9 +30,10 @@ state.json        { goal, budget, spent, stages: { <id>: { status,
                     credits } } }
 plan.json         the planner's JSON             (contract: plan)
 approval.json     { by, at, plan: sha256 of plan.json }
-baseline.json     the plan's files before the first implement
+baseline.json     every work file before the first implement
 changes.patch     unifiedDiff() of each plan file, baseline → now
 test-report.json  the tester's JSON              (contract: test-report)
+tests.patch       the test files the tester changed, baseline → now
 verdict.json      the reviewer's JSON            (contract: verdict)
 ```
 
@@ -49,13 +51,14 @@ verdict.json      the reviewer's JSON            (contract: verdict)
 - `pipeline.json`: stages `plan → approve → implement → test → review`; `approve` is `"human": true`, with no agent;
   every other stage has its own agent, a `credits` cap (30+), `reads`, `writes` (`plan.json`, `changes.patch`,
   `test-report.json`, `verdict.json`), a `contract` where it has one, `allow` and `deny`, and a `prompt` (`{goal}` and
-  `{run}` get filled in); `budget` pays for one pass
+  `{run}` get filled in); the review stage also reads `tests.patch`; `budget` pays for one pass
 - `planner`, `implementer` and `tester` (the reviewer is yours, from the easy level): planner and reviewer only read
   and search; the implementer can edit and run, the tester can run; nobody has `agent`; the three new agents have
   `disable-model-invocation: true`. `roles.json` gives them roles, and the hard+ audit finds nothing
 - `stageArgs(stage, runDir, goal)`: `--agent`, a prompt that names the stage's inputs in the run folder, `-s`,
   `--no-ask-user` and the stage's cap; plan and review get no write or shell permission; implement and test get
-  `write` and `shell(npm:*)` but never `node`, and `git push` is denied
+  `write` and `shell(npm test)`, nothing wider (`npm:*` also allows `npm exec` and `npm run`), and deny
+  `write(approval.json)`, `write(plan.json)`, `write(package.json)` and `shell(git push)`
 
 ### M3 · Run the stages
 - `advance(runDir, { pipeline, run, cwd })` calls Copilot only through `run(args)`, with `stageArgs()`: first the
@@ -65,8 +68,11 @@ verdict.json      the reviewer's JSON            (contract: verdict)
 - With the recorded answers, the artifacts equal the recording, and `state.json` records each stage's `status`,
   `output`, `sha256`, `inputs` and `credits`, and the `spent` total
 - A stage whose cap would push `spent` past `budget` doesn't start (`stopped`, reason `budget: …`). An artifact that
-  breaks its contract stops the run (`contract: …`) and isn't saved; so does an implementer that changes a file the
-  plan doesn't list (the reason names it)
+  breaks its contract stops the run (`contract: …`) and isn't saved
+- The work stays in its lane, compared with `baseline.json` (every work file before the first implement) and the plan
+  as it is now: a file that differs from the baseline must be in the plan's `files`, or be a test the tester left;
+  the tester may change test files (`*.test.js`) only, and those changes go to `tests.patch`, which the reviewer
+  reads; and no agent may change anything in the run folder during its call. Each stops the run, naming the file
 
 ### M4 · The approval gate
 - Without `approval.json`, `advance()` waits and calls nobody
@@ -81,6 +87,8 @@ verdict.json      the reviewer's JSON            (contract: verdict)
   `verdict.json` re-runs only the reviewer; an approved change to `plan.json` re-runs implement, test and review; an
   implement that gives the same patch doesn't ask the tester again
 - A stage left `running` (a crash) or `failed` runs again, and `spent` keeps counting across resumes
+- Resuming can't get a change outside the plan through: it still differs from the baseline. A newly approved plan
+  that lists the file lets it in, and one that drops it shuts it out again
 
 ## 📂 Work here
 ```bash
@@ -121,10 +129,12 @@ one. Add the three roles to `roles.json`, and run `node scripts/audit-agents.mjs
 
 </details>
 
-<details><summary>Why no node for the agents</summary>
+<details><summary>Why only npm test</summary>
 
-`node scripts/team.mjs approve run-1 --by Ana` is one shell command away. `shell(npm:*)` lets them run the tests;
-without `shell(node:*)` (and with it denied), no agent can approve its own plan.
+`node scripts/team.mjs approve run-1 --by Ana` is one shell command away, and so is `npm exec`. `shell(npm test)`
+runs the tests and nothing else; denying writes to `approval.json`, `plan.json` and `package.json` (the test script)
+keeps the file tools off the gate. That raises the bar; it isn't a wall: an agent that can write a test and run
+`npm test` can run any code, which is why `advance()` also stops a run whose folder changed during an agent's call.
 
 </details>
 
@@ -145,9 +155,18 @@ Save `state.json` before each call: a run that crashes mid-stage leaves `running
 
 <details><summary>The patch belongs to the script</summary>
 
-Before the first implement, keep the plan's files as they are (`baseline.json`), and take a `snapshot(cwd)` before
-every implement call. After the call, a file whose hash changed but isn't in the plan's `files` breaks the contract.
-The patch is `unifiedDiff(file, baseline, now)` for each file of the plan, in order, joined.
+Before the first implement, `takeBaseline()` keeps every work file as it is (`baseline.json`: hashes and text).
+Compare with the baseline, not with the moment before the call: otherwise a change outside the plan stops the run
+once, and the next resume walks past it. Read the plan's `files` from `plan.json` as it is now (a newly approved plan
+may add or drop a file). The patch is `diffOf(cwd, baseline, plan.files)`.
+
+</details>
+
+<details><summary>Lanes, file by file</summary>
+
+`changedFiles(a, b)` lists what differs between two snapshots. Implement: `changedFiles(baseline.hashes, now)` minus
+the plan's files, minus tests the tester left as they were. Test: `changedFiles(implement's tree, now)` must all be
+`*.test.js`. Every stage: `changedFiles(snapshot(runDir) before, after)` must be empty.
 
 </details>
 
@@ -182,7 +201,9 @@ the reviewer won't catch?
 <details><summary>Answer</summary>
 
 **4.** Separation of duties only holds when the permissions match the roles: one shell command turns the tester into
-the approver. Give `npm`, deny `node`, and keep the gate out of the agents' reach.
+the approver. Allowing only `npm test`, denying writes to the gate's files and watching the run folder makes that
+much harder, but a gate kept in files the agents' tools can reach is a speed bump, not a lock: in CI the approval
+lives where no agent can write (Lab 07).
 
 </details>
 
@@ -191,4 +212,5 @@ the approver. Give `npm`, deny `node`, and keep the gate out of the agents' reac
   `resume`. Compare what it cost with the review loop.
 - Let a `request-changes` verdict send the run back to implement with the findings, at most twice.
 - Don't take the tester's word for it: run `node --test` yourself after the test stage and compare with its report.
-- Move the gate into CI: a GitHub environment with required reviewers (Lab 07).
+- Move the gate into CI: a GitHub environment with required reviewers (Lab 07), where no agent can write the approval.
+- Run the agents in `/sandbox` with the run folder outside the paths they may write.

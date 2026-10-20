@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { GOAL, artifact, fakeTeam, flag, norm } from './helpers.mjs';
+import { offline } from '../../../_harness/fixtures/lab-03/offline.mjs';
 
 const BROKEN = JSON.parse(fs.readFileSync(new URL('./fixtures/broken-artifacts.json', import.meta.url), 'utf8')).artifacts;
 const TEAM = 'scripts/team.mjs';
@@ -13,6 +14,7 @@ const ORDER = ['plan', 'approve', 'implement', 'test', 'review'];
 const WRITES = { plan: 'plan.json', implement: 'changes.patch', test: 'test-report.json', review: 'verdict.json' };
 const CONTRACT = { plan: 'plan', test: 'test-report', review: 'verdict' };
 const NEW_AGENTS = ['planner', 'implementer', 'tester'];
+const GUARDED = ['write(approval.json)', 'write(plan.json)', 'write(package.json)', 'shell(git push)'];
 const RUN = '.agent-logs/team/run-1';
 const sha = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -31,11 +33,12 @@ async function workspace(t, { budget } = {}) {
   team.startRun({ runDir, goal: GOAL, pipeline });
   const file = (f) => path.join(runDir, f);
   const json = (f) => JSON.parse(fs.readFileSync(file(f), 'utf8'));
-  return { work, team, pipeline, runDir, file, json };
+  return { t, work, team, pipeline, runDir, file, json };
 }
 /** What a person would do: approve plan.json as it is now (the format of approval.json). */
 const writeApproval = (w) => fs.writeFileSync(w.file('approval.json'), JSON.stringify({ by: 'Ana', at: '2026-10-20T10:00:00.000Z', plan: sha(w.file('plan.json')) }));
-const advance = (w, fake) => w.team.advance(w.runDir, { pipeline: w.pipeline, run: fake.run, cwd: w.work });
+/** advance(), with the real Copilot out of reach: a free check must never start a paid call. */
+const advance = (w, fake) => offline(w.t, () => w.team.advance(w.runDir, { pipeline: w.pipeline, run: fake.run, cwd: w.work }));
 /** The whole recorded run: plan, the gate, a person approves, implement, test, review. */
 async function fullRun(t, options = {}) {
   const w = await workspace(t, options);
@@ -86,6 +89,7 @@ export default (t) => [
     }
     const names = agents.map((s) => s.agent);
     if (new Set(names).size !== names.length) return `Every stage needs its own agent (separation of duties), got ${names.join(', ')}.`;
+    if (!(stageOf(p, 'review').reads ?? []).includes('tests.patch')) return 'The reviewer should see what the tester changed too: add "tests.patch" to the review stage\'s reads (and its prompt).';
     const total = agents.reduce((n, s) => n + s.credits, 0);
     return (Number.isInteger(p.budget) && p.budget >= total) || `The run's "budget" (${p.budget}) should cover one pass of every stage (${total}).`;
   }, { milestone: 'M2' }),
@@ -132,8 +136,11 @@ export default (t) => [
       if (n.some((x) => /^--allow-tool=shell\(node/.test(x))) return `stageArgs(${s.id}) allows node: an agent could run node scripts/team.mjs approve itself.`;
       if (['plan', 'review'].includes(s.id) && n.some((x) => /^--allow-tool=(write|shell)/.test(x))) return `The ${s.id} stage gets no write or shell permission.`;
       if (['implement', 'test'].includes(s.id)) {
-        if (!n.includes('--allow-tool=write') || !n.some((x) => /^--allow-tool=shell\(npm/.test(x))) return `The ${s.id} stage needs --allow-tool=write and --allow-tool=shell(npm:*).`;
-        if (!n.includes('--deny-tool=shell(git push)')) return `The ${s.id} stage should deny git push.`;
+        if (!n.includes('--allow-tool=write') || !n.includes('--allow-tool=shell(npm test)')) return `The ${s.id} stage needs --allow-tool=write and --allow-tool=shell(npm test).`;
+        const wider = n.filter((x) => /^--allow-tool=shell\(/.test(x) && x !== '--allow-tool=shell(npm test)');
+        if (wider.length) return `The ${s.id} stage allows ${wider[0].slice('--allow-tool='.length)}: only npm test. (npm:* also allows npm exec and npm run, which run any code.)`;
+        const missing = GUARDED.filter((d) => !n.includes(`--deny-tool=${d}`));
+        if (missing.length) return `The ${s.id} stage should deny ${missing.join(', ')}: the gate's files, the test script, and pushing.`;
       }
     }
     return true;
@@ -158,6 +165,8 @@ export default (t) => [
     if (!fs.existsSync(w.file('changes.patch'))) return 'No changes.patch in the run folder.';
     const patch = fs.readFileSync(w.file('changes.patch'), 'utf8').replace(/\r\n/g, '\n');
     if (patch !== artifact('changes.patch')) return 'changes.patch should be unifiedDiff(file, before, after) of each file in the plan, from the baseline to the result (it differs from the recording).';
+    if (!fs.existsSync(w.file('tests.patch'))) return 'No tests.patch in the run folder: the test stage writes what the tester changed (empty when it changed nothing).';
+    if (fs.readFileSync(w.file('tests.patch'), 'utf8') !== artifact('tests.patch')) return 'In the recording the tester changed no test, so tests.patch is empty.';
     for (const f of ['test-report.json', 'verdict.json']) if (!fs.existsSync(w.file(f)) || !same(w.json(f), recorded(f))) return `${f} should hold the JSON of the agent's answer (the recording's ${f}).`;
     for (const c of w.fake.calls) {
       const s = w.pipeline.stages.find((x) => x.agent === c.agent);
@@ -198,6 +207,24 @@ export default (t) => [
     const out = await fullRun(t, { extraEdits: { 'grades.js': '// rewritten by the implementer\n' } });
     if (out.second?.status !== 'stopped' || out.second?.stage !== 'implement' || !/grades\.js/.test(out.second?.reason ?? '')) return `An implementer that also changes grades.js (not in the plan) should stop the run at implement, naming grades.js; got ${JSON.stringify(out.second)}.`;
     return !out.fake.calls.some((c) => c.agent === 'tester') || 'After the implementer broke the plan, the tester ran anyway.';
+  }, { milestone: 'M3' }),
+  t.check('The tester changes test files only, and the reviewer sees what it changed', async () => {
+    const addTest = (text) => `${text}\ntest('upcoming keeps an item due today', () => {\n  assert.deepEqual(upcoming(list, '2026-10-20', 0).map((a) => a.id), ['A1']);\n});\n`;
+    const w = await fullRun(t, { testerEdits: { 'deadlines.test.js': addTest } });
+    if (w.second?.status !== 'done') return `A tester that adds a test is doing its job: the run should finish, got ${JSON.stringify(w.second)}.`;
+    const tests = fs.existsSync(w.file('tests.patch')) ? fs.readFileSync(w.file('tests.patch'), 'utf8') : '';
+    if (!/\+\+\+ b\/deadlines\.test\.js/.test(tests) || !/^\+test\('upcoming keeps an item due today'/m.test(tests)) return 'tests.patch should hold the diff of every test file the tester changed (here deadlines.test.js), from the baseline.';
+    const review = w.fake.calls.find((c) => c.agent === 'reviewer');
+    if (!(flag(review?.args ?? [], '-p') ?? '').includes(`${RUN}/tests.patch`)) return 'The reviewer\'s prompt should point at tests.patch.';
+    const bad = await fullRun(t, { testerEdits: { 'grades.js': '// "fixed" by the tester\n' } });
+    if (bad.second?.status !== 'stopped' || bad.second?.stage !== 'test' || !/grades\.js/.test(bad.second?.reason ?? '')) return `A tester that changes grades.js (library code) should stop the run at test, naming grades.js; got ${JSON.stringify(bad.second)}.`;
+    return !bad.fake.calls.some((c) => c.agent === 'reviewer') || 'After the tester changed library code, the reviewer ran anyway.';
+  }, { milestone: 'M3' }),
+  t.check('No agent may touch the run folder during its call', async () => {
+    const forged = (text) => { const p = JSON.parse(text); p.files.push('grades.js'); return `${JSON.stringify(p, null, 2)}\n`; };
+    const w = await fullRun(t, { extraEdits: { [`${RUN}/approval.json`]: '{ "by": "implementer", "at": "now", "plan": "0" }\n', [`${RUN}/plan.json`]: forged } });
+    if (w.second?.status !== 'stopped' || w.second?.stage !== 'implement' || !/approval\.json|plan\.json/.test(w.second?.reason ?? '')) return `An implementer that rewrites approval.json (with any tool, even through a test it runs) should stop the run at implement, naming the file; got ${JSON.stringify(w.second)}.`;
+    return !w.fake.calls.some((c) => c.agent === 'tester') || 'After the implementer touched the run folder, the tester ran anyway.';
   }, { milestone: 'M3' }),
 
   // M4 · The approval gate
@@ -281,5 +308,22 @@ export default (t) => [
     const before = w.fake.calls.length;
     await advance(w, w.fake);
     return newCalls(w.fake, before) === 'implementer → tester → reviewer' || `plan.json changed (and was approved again), so every stage that reads it runs again: expected implementer → tester → reviewer, got ${newCalls(w.fake, before)}.`;
+  }, { milestone: 'M5' }),
+  t.check("Resuming can't get a change outside the plan through, and the plan counts as it is now", async () => {
+    const w = await fullRun(t, { budget: 10000, extraEdits: { 'grades.js': '// rewritten by the implementer\n' } });
+    if (w.second?.status !== 'stopped' || w.second?.stage !== 'implement') return `An implementer that changes grades.js (not in the plan) should stop the run at implement; got ${JSON.stringify(w.second)}.`;
+    const again = await advance(w, w.fake);
+    if (again?.status !== 'stopped' || again?.stage !== 'implement' || !/grades\.js/.test(again?.reason ?? '')) return `Resuming changes nothing about grades.js: it still differs from the run's baseline, so the run must stop again, naming it. Got ${JSON.stringify(again)}. Compare every file with the baseline, not with the moment before the call.`;
+    const plan = w.json('plan.json');
+    const wider = { ...plan, files: [...plan.files, 'grades.js'], steps: [...plan.steps, { id: 'S4', file: 'grades.js', change: 'grades.js gets the header comment the team asked for' }] };
+    fs.writeFileSync(w.file('plan.json'), `${JSON.stringify(wider, null, 2)}\n`);
+    writeApproval(w);
+    const ok = await advance(w, w.fake);
+    if (ok?.status !== 'done') return `Once a person approves a plan that lists grades.js, the change is in the plan: the run should finish; got ${JSON.stringify(ok)}. Read the plan's files from plan.json as it is now.`;
+    if (!/\+\+\+ b\/grades\.js/.test(fs.readFileSync(w.file('changes.patch'), 'utf8'))) return 'changes.patch should now include grades.js (from the baseline), since the plan lists it.';
+    fs.writeFileSync(w.file('plan.json'), `${JSON.stringify(plan, null, 2)}\n`);
+    writeApproval(w);
+    const narrow = await advance(w, w.fake);
+    return (narrow?.status === 'stopped' && narrow?.stage === 'implement' && /grades\.js/.test(narrow?.reason ?? '')) || `A plan that no longer lists grades.js makes its change outside the plan again; got ${JSON.stringify(narrow)}.`;
   }, { milestone: 'M5' }),
 ];

@@ -31,6 +31,10 @@ agents         { "<agent id>": "<role>" }
 mcp            { "<server>": { "<tool>": "read" | "write" } }
 builtinAgents  { "general-purpose": ["*"] }
 ```
+Every role but the reviewer is `"invocation": "explicit"`: only a person or a script starts it (`--agent`,
+`/agent`). An agent that can change files, run commands or reach a service is never picked by inference, and a
+read-only specialist would otherwise take questions meant for the main agent; the reviewer only reads, and being
+handed a review is its job.
 
 **Signals of a conflict**, one line at a time, after a list marker (`-`, `1.`) and a leading `**`:
 - a line that starts with **Run, Execute, Install, Build, Deploy** needs `execute`
@@ -44,13 +48,13 @@ builtinAgents  { "general-purpose": ["*"] }
 ### M1 · What an agent can really do
 - `capabilities(tools, policy)` returns `{ all, caps, from, unknown }`: no `tools` line, or `*` anywhere in it, is
   `all`; `[]` is nothing; a comma-separated string works like a list
-- Aliases count in any case: `Bash` is `execute`, `custom-agent` and `Task` are `agent`, `GREP` is `search`
-  (`ALIASES` holds the docs' table)
+- Aliases count in any case: `Bash` is `execute`, `custom-agent` and `Task` are `agent`, `GREP` is `search`, and so
+  do the CLI's own tool names (`view`, `rg`, `apply_patch`, `read_powershell`, `web_search`, …): `ALIASES` holds them
 - `studybuddy/*` grants every tool the policy's catalog lists for that server: `mcp:read`, and `mcp:write` because of
-  `mark_done`; `studybuddy/get_deadlines` grants `mcp:read`; a server the catalog doesn't know counts as `mcp:write`
-  (the audit can't tell, so it fails closed)
-- Names Copilot doesn't know (`serach`, `studybuddy/nope`) grant nothing and go into `unknown`; `from` names the entry
-  behind each capability, and `caps` keeps the order of `CAPABILITIES`
+  `mark_done`; `studybuddy/get_deadlines` grants `mcp:read`. A server the catalog doesn't know, or a tool it doesn't
+  list (`studybuddy/delete_course`), counts as `mcp:write`: the audit can't tell, so it fails closed
+- Names Copilot doesn't know (`serach`, `exec`) grant nothing and go into `unknown`; `from` names the entry behind
+  each capability, and `caps` keeps the order of `CAPABILITIES`
 
 ### M2 · Against the role policy
 - `audit(agents, policy)` returns `{ agent, kind, detail, message }` findings: `unassigned` (no role, and then
@@ -78,9 +82,9 @@ builtinAgents  { "general-purpose": ["*"] }
 - `node scripts/audit-agents.mjs` lists the findings and exits 1 for `--agents ../tests/fixtures/agents --roles
   ../tests/fixtures/roles.json`, and exits 0 on your `.github/agents/`
 - Your audit and the reference audit find nothing, and `roles.json` is unchanged: fix the agents, not the policy
-- Least privilege, not no privilege: docs-writer can still edit, release can still run (and only when someone picks
-  it), coverage can run its tests, portal can read the portal but not `mark_done`, and triage reads and searches but
-  hands nothing on
+- Least privilege, not no privilege: docs-writer can still edit, release and coverage can still run, portal can read
+  the portal but not `mark_done`, and triage reads and searches but hands nothing on; and all five start only when
+  someone picks them
 
 ## 📂 Work here
 ```bash
@@ -155,9 +159,10 @@ policy assumes it does (`builtinAgents`): an audit assumes the worst until someo
 ### M5
 <details><summary>Five fixes</summary>
 
-Run the audit and go agent by agent: a tools list for release (and `disable-model-invocation: true`); the alias that
-hides a shell; the typo; the wildcard (name the four read tools); and the deputy. Once triage loses `custom-agent`,
-its third instruction fights its tools: rewrite it so that a person passes the bugs on.
+Run the audit and go agent by agent: a tools list for release; the alias that hides a shell; the typo; the wildcard
+(name the four read tools); and the deputy. Once triage loses `custom-agent`, its third instruction fights its
+tools: rewrite it so that a person passes the bugs on. Then `disable-model-invocation: true` on all five: the policy
+says only someone may start them.
 
 </details>
 
@@ -185,4 +190,7 @@ agent has no `tools` line and no `disable-model-invocation`. Can triage get a fi
   `roles.json` an owner in CODEOWNERS.
 - Agents can bring their own MCP servers (`mcp-servers:` in the frontmatter): report them, and count their wildcards
   as `mcp:write`.
+- Your audit sees the repository only. Agents in `~/.copilot/agents/` load too, and win over a repository agent with
+  the same ID: a personal `reviewer` with every tool replaces yours without a trace in git. Audit that folder as
+  well (`--agents ~/.copilot/agents`), and plugins' `agents/` folders.
 - Lab 03 hard++ builds a team of agents with separate duties, and checks it with this audit.

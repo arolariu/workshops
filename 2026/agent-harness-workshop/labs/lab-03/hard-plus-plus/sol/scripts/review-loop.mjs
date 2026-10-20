@@ -118,7 +118,7 @@ export async function reviewLoop({ file = 'deadlines.js', maxRounds = 3, credits
     try { await run(fixerArgs(file, findingsFile, { credits: budget.fixer })); } catch (e) { return finish('error', `The fixer call failed: ${e.message}`); }
     entry.tests = await runTests();
   }
-  return finish('max-rounds', `${maxRounds} round(s) done and the reviewer still has findings.`);
+  return finish('max-rounds', `${maxRounds} round(s) done: the last fix hasn't been reviewed yet.`);
 }
 
 // ---------- M4 · The run report ----------
@@ -152,6 +152,10 @@ export function writeReport(dir, report) {
 
 /** One real Copilot call: returns what it printed, throws when it fails. */
 export function copilotRun(args) {
+  if (process.env.HARNESS_NO_COPILOT) {
+    globalThis.__harnessCopilotCalls = (globalThis.__harnessCopilotCalls ?? 0) + 1;
+    throw new Error('copilotRun() refused: the free checks never call Copilot. Use the run() you are given.');
+  }
   let r = spawnSync('copilot', args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
   if (r.error?.code === 'ENOENT' && process.platform === 'win32') {
     const q = (a) => (/^[\w\-./:=@,]+$/.test(a) ? a : `"${a.replace(/"/g, '""')}"`);
@@ -170,7 +174,10 @@ export function nodeTests() {
 }
 
 const show = (args) => `copilot ${args.map((a) => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')}`;
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths: a symlinked temp folder, a junction or a short 8.3 path still counts as "run directly".
+const isMain = (() => {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) {
   const argv = process.argv.slice(2);
   const VALUE = new Set(['--max-rounds', '--credits-per-round']);
