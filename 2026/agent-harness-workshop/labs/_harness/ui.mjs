@@ -50,12 +50,18 @@ let ASCII = false;
 export const setAscii = (on) => { ASCII = Boolean(on); };
 export const isAscii = () => ASCII;
 const FOLD = new Map(Object.entries({
-  '✅': '[ok]', '❌': '[x]', '⬜': '[ ]', '🕓': '[~]', '🚧': '[!]', '⏩': '[-]', '⛔': '[c]', '⚠': '[?]', '🟠': '[o]',
+  '✅': '[ok]', '❌': '[x]', '⬜': '[ ]', '🕓': '[~]', '🚧': '[!]', '⏩': '[-]', '⛔': '[stop]', '⚠': '[?]', '🟠': '[o]',
   '🟢': 'E', '🟡': 'M', '🔴': 'H', '🟣': 'H+', '⚫': 'H++', '💎': 'H++', '▰': '#', '▱': '.',
   '🤖': '[ai]', '💡': '*', '🏅': '[medal]', '🏆': '[trophy]', '👉': '->', '🔖': '[bookmark]', '⭐': '*', '🎉': '!', '💪': '', '👀': '', '🧭': '',
   '╭': '+', '╮': '+', '╰': '+', '╯': '+', '─': '-', '│': '|', '┼': '+', '┃': '|', '█': '#', '░': '.', '▄': '#', '▀': '#',
   '❯': '>', '•': '*', '●': '*', '○': 'o', '◻': '.', '↳': '->', '↓': 'v', '↑': '^', '→': '->', '←': '<-', '⏎': 'Enter',
   '·': '-', '—': '-', '–': '-', '…': '...', '✔': 'ok', '▸': '>', '◂': '<', '“': '"', '”': '"', '‘': "'", '’': "'", '✗': 'x', '↪': '>',
+  // Glyphs that carry meaning on their own get a marker (--plain, Phase 6): modes, the X-ray's and the chain's file
+  // marks, the change view, trace and replay rows, the doctor, the layer map.
+  '👥': '[live]', '🏠': '[hw]', '🆕': '[new]', '✏': '[chg]', '🧳': '[brought]', '🌱': '[start]', '➖': '[n/a]',
+  '📝': '[edit]', '🗑': '[del]', '➕': '[+]', '−': '-', '🔧': '[tool]', '⏳': '[...]', '✓': 'ok', '≈': '~', 'Σ': 'total',
+  '🙋': '[manual]', '├': '|-', '└': '`-', '┌': '+', '┐': '+', '┘': '+', '┤': '|', '┬': '+', '┴': '+', '◀': '<-', '▶': '->',
+  '≤': '<=', '≥': '>=', '↔': '<->', '▏': '|', '☰': '=', '×': 'x', '÷': '/', '§': 'S',
 }));
 /** Plain-ASCII version of a (possibly styled) string. ANSI codes are kept. */
 export function asciiFold(s) {
@@ -67,6 +73,7 @@ export function asciiFold(s) {
     if (hit !== undefined) { out += hit; continue; }
     if (cp === 0xfe0f || cp === 0xfe0e || cp === 0x200d) continue;
     if (cp >= 0x2800 && cp <= 0x28ff) { out += '*'; continue; }
+    if (cp >= 0x2500 && cp <= 0x257f) { out += '+'; continue; } // any other box-drawing corner or joint
     if (cp >= 0x1f000 || (cp >= 0x2190 && cp <= 0x2bff)) continue;
     const plain = ch.normalize('NFKD').replace(/[^\x00-\x7f]/g, '');
     out += plain || '?';

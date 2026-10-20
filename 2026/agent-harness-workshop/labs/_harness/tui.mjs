@@ -1261,7 +1261,7 @@ ${levelKeyRows()}
 ## Good to know
 - 🔐 **Trust the workshop folder once**: run \`copilot\` in the workshop root and choose "Yes, and remember this folder".
 - 💻 **Without this app**: \`node labs/start.mjs test lab-01 easy\` runs the checks; \`node labs/start.mjs help\` lists every command; \`node labs/start.mjs glossary\` prints the glossary below.
-- 🎬 Calmer screen? \`--no-anim\` (no animations), \`--no-intro\` (no welcome screen), \`--ascii\` (plain characters) or \`--linear\` (one line at a time, for screen readers).
+- 🎬 Calmer screen? \`--no-anim\` (no animations), \`--no-intro\` (no welcome screen), \`--plain\` (ASCII markers instead of emoji) or \`--linear\` (one line at a time, for screen readers).
 
 ## About
 - ✨ ${creditLine()}

@@ -84,9 +84,10 @@ something since, 🚧 means a tool is missing (not your fault), ⏩ means requir
 stopped early and ⛔ that you cancelled it. None of those count as done.
 
 It remembers where you were, shows what you changed and which check to fix next, and celebrates when a level goes
-green. Prefer a calmer screen? `--no-anim` keeps it still, `--no-intro` skips the welcome screen, `--ascii` uses
-plain characters, and `--linear` works one line at a time without any screen control (for screen readers and
-simple terminals). `NO_COLOR=1` turns colors off.
+green. Prefer a calmer screen? `--no-anim` keeps it still, `--no-intro` skips the welcome screen, `--plain` prints
+ASCII markers instead of emoji (for terminals that draw emoji at the wrong width; `--ascii` works too), and `--linear`
+works one line at a time without any screen control (for screen readers and simple terminals). `NO_COLOR=1` turns
+colors off.
 
 ## 🗺️ How the labs work
 ```text

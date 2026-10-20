@@ -68,6 +68,8 @@ for (const a of argv) {
 }
 const cmd = pos[0] ?? '';
 const spec = COMMANDS[cmd];
+// --plain (the spec's name) is --ascii (PR #1's): ASCII markers instead of emoji. Every command takes it.
+if ('plain' in opt) { opt.ascii = opt.plain; delete opt.plain; }
 if (opt.ascii) setAscii(true);
 const rawSay = (s = '') => process.stdout.write(`${style.fg(C.green)}${opt.ascii ? asciiFold(s) : s}${style.reset}\n`);
 const say = rawSay;
@@ -79,7 +81,7 @@ const fail = (msg, code = 2) => {
 if (!spec) fail(`Unknown command "${cmd}".`);
 for (const e of optErrors) fail(e);
 for (const [k, v] of Object.entries(opt)) {
-  const kind = spec.opts[k];
+  const kind = k === 'ascii' ? 'flag' : spec.opts[k];
   if (!kind) fail(`Unknown option --${k}${cmd ? ` for "${cmd}"` : ''}.`);
   if (kind === 'flag' && v !== true) fail(`--${k} does not take a value.`);
   if (kind === 'value' && (v === true || v === '')) fail(`--${k} needs a value, like --${k}=something.`);
@@ -147,7 +149,7 @@ function usage() {
   row('node labs/start.mjs --exercise=lab-03/easy', 'start the app on one exercise');
   say();
   say(`  ${dim('Difficulties:')} ${levelChoices()}`);
-  say(`  ${dim('Display:')} ${cyan('--no-intro')} ${dim('·')} ${cyan('--no-anim')} ${dim('(static screen) ·')} ${cyan('--ascii')} ${dim('(plain characters) ·')} ${cyan('--linear')} ${dim('(one line at a time, for screen readers) ·')} ${dim('NO_COLOR=1 turns colors off')}`);
+  say(`  ${dim('Display:')} ${cyan('--no-intro')} ${dim('·')} ${cyan('--no-anim')} ${dim('(static screen) ·')} ${cyan('--plain')} ${dim('(ASCII markers instead of emoji; --ascii works too) ·')} ${cyan('--linear')} ${dim('(one line at a time, for screen readers) ·')} ${dim('NO_COLOR=1 turns colors off')}`);
   if (!interactive) say(`  ${yellow('Tip:')} ${dim('the full-screen app needs a real terminal (Windows Terminal, PowerShell, macOS Terminal, iTerm, …); --linear works anywhere.')}`);
   say();
   signature();
