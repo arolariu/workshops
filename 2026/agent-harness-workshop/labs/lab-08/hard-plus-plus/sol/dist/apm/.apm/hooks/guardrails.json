@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "node ./scripts/guard.mjs",
+        "powershell": "node ./scripts/guard.mjs",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}

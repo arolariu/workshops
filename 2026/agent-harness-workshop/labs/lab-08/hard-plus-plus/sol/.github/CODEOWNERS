@@ -1,0 +1,34 @@
+# Who must review a change to the harness. HARNESS.md names the owner: Alex Morgan (@alex-morgan), with the
+# course's teaching assistants (@studybuddy/tas) as the second pair of eyes.
+# Lines work like .gitignore, and the LAST matching line wins: broad lines first, the strict ones after them.
+
+# The harness: what the agent loads, how it is guarded and measured, and how it is released.
+/AGENTS.md              @alex-morgan @studybuddy/tas
+**/AGENTS.md            @alex-morgan @studybuddy/tas
+*.instructions.md       @alex-morgan @studybuddy/tas
+/HARNESS.md             @alex-morgan @studybuddy/tas
+/.github/               @alex-morgan @studybuddy/tas
+/.mcp.json              @alex-morgan @studybuddy/tas
+/mcp/                   @alex-morgan @studybuddy/tas
+/apm.yml                @alex-morgan @studybuddy/tas
+/apm.lock.yaml          @alex-morgan @studybuddy/tas
+/scripts/               @alex-morgan @studybuddy/tas
+/evals/                 @alex-morgan @studybuddy/tas
+/attacks/               @alex-morgan @studybuddy/tas
+/attacks.local.json     @alex-morgan @studybuddy/tas
+/CHANGELOG.md           @alex-morgan @studybuddy/tas
+/dist/                  @alex-morgan
+
+# The controls themselves: only the owner. GitHub accepts a review from any one of a line's owners, so these lines
+# name only Alex: a change here can weaken or switch off the other checks (the hooks, the gate's workflows, the
+# scripts whose exit code is the gate, the eval baseline and comparison, the shipped attack pack, this file).
+/harness.json               @alex-morgan
+/.github/hooks/             @alex-morgan
+/.github/workflows/         @alex-morgan
+/.github/CODEOWNERS         @alex-morgan
+/scripts/harness-check.mjs  @alex-morgan
+/scripts/attack.mjs         @alex-morgan
+/scripts/eval.mjs           @alex-morgan
+/scripts/eval/              @alex-morgan
+/evals/baseline.json        @alex-morgan
+/attacks/pack.json          @alex-morgan

@@ -40,6 +40,10 @@
     "lab-08/easy": {
       "overrides": ["AGENTS.md", ".github/hooks/guardrails.json"],
       "_why": "The capstone starts from a brought-in mess: AGENTS.md gains a merged Testing section with a rule twice and a rule that contradicts \"never change a test\" (M1), and the hook config is registered for bash only, so the harness drops below L4 (M3)."
+    },
+    "lab-08/hard-plus-plus": {
+      "overrides": ["REVIEW.md"],
+      "_why": "M6's harness review goes in REVIEW.md: the starter replaces the Lab 03 code review it held (no later level reads it) with the review skeleton."
     }
   }
 }

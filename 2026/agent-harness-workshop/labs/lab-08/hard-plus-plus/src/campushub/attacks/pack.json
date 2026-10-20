@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "name": "CampusHub's own attacks",
+  "about": "TODO(M4): what CampusHub has to protect that StudyBuddy doesn't (the API key and .env.campushub, the deploy, the tickets and their approvals), as attacks and allowed calls in the format of attacks/pack.json. Replay: node scripts/replay-hooks.mjs campushub",
+  "families": {},
+  "attacks": [],
+  "allowed": []
+}

@@ -91,6 +91,36 @@
       }
     },
     {
+      "id": "campushub-no-npm-start",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "npm start loads .env.campushub (the real API key) into the server, out of the guard's sight. Run node api/server.mjs instead (read-only, no key), or ask the human to start the API with the key.",
+      "match": {
+        "tool": "shell",
+        "command": "^(npm|pnpm|yarn|bun)\\s+(start|run\\s+start|run-script\\s+start)\\b"
+      }
+    },
+    {
+      "id": "campushub-no-inline-script-writes",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "An inline script (node -e, python -c …) must not touch tickets/tickets.json or .approvals/: tickets change only through the ticket tools, after a human approves.",
+      "match": {
+        "tool": "shell",
+        "commandLine": "\\b(node|bun|deno|python3?|perl|ruby)\\b[^|;&]*\\s(-e|--eval|-p|--print|-c)\\b.*(tickets[\\\\/]tickets\\.json|\\.approvals\\b)"
+      }
+    },
+    {
+      "id": "campushub-no-self-approval",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "Approvals are a human's: the agent never runs or changes tickets/approve.mjs and never writes .approvals/. Ask a release approver to approve, then call close_ticket again.",
+      "match": {
+        "tool": ["shell", "write"],
+        "path": "(^|[\\\\/])(\\.approvals([\\\\/]|$)|approve\\.mjs$)"
+      }
+    },
+    {
       "id": "campushub-allow-force-push-preview",
       "decision": "allow",
       "override": true,

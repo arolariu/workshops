@@ -6,3 +6,6 @@ jobs/out/
 *.tmp
 .scratch-*/
 node_modules/
+# The agent's logs (guards, the ticket tools) and the approvals a human gives: never in git.
+.agent-logs/
+.approvals/

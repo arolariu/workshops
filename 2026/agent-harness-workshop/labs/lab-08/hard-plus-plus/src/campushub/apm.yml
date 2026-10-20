@@ -1,0 +1,7 @@
+name: campushub
+version: 1.3.0
+description: CampusHub's agent harness, StudyBuddy's package installed (not copied) plus CampusHub's own layer
+# TODO(M1): build the package (node scripts/release.mjs patch --dry-run, from the level's folder), list it below
+# (../dist/apm), then run `apm install --target copilot` here and commit what it wrote, apm.lock.yaml included.
+dependencies:
+  apm: []
