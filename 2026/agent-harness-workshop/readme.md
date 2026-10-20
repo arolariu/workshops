@@ -257,6 +257,18 @@ updates `labs/_harness/starters.json`. Commit everything together, so "restore t
 the published version. The chain's rules (which files travel with `bring`, and per-level exceptions) are in
 `labs/_harness/course.json`.
 
+**After the merge, before the workshop: re-pin the scorecard.** Lab 08 hard+'s CI checks out this repository at a
+fixed commit to load the scorecard. Today that is `d0e58b9` (`d0e58b9d0fd7029ddabe562ece22bece41dd1feb`), a commit of
+the implementation branch, which isn't on `main`. Once the branch is merged, pin a commit on `main` in these three
+places:
+1. `labs/lab-08/hard-plus/todo.md` (the hint's example)
+2. `labs/lab-08/hard-plus/sol/.github/workflows/harness-ci.yml`
+3. `labs/lab-08/hard-plus/sol/.github/workflows/harness-review.md`
+
+Then run `node labs/start.mjs sync-seeds` (hard++ inherits both workflows) and
+`node --test labs/_harness/tests/pins.test.mjs`: it finds every pin of this repository in the levels, and fails if one
+was missed or a copy wasn't synced.
+
 Everything the companion stores stays in the workshop folder and is ignored by git: `labs/.progress.json`
 (progress, bound to fingerprints of the work and the checks), `labs/.recovery/` (starters, checkpoints, backups),
 `labs/.runs/` (agent runs), `labs/.reports/` (exports) and `.workshop/` (private tools). Nothing is sent anywhere.
