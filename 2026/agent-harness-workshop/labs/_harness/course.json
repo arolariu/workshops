@@ -32,6 +32,10 @@
       "_why": "From this lab on, the guard writes audit logs to .agent-logs/, which can hold secrets: .gitignore keeps them out of commits (and still ignores mcp/state.json), so the line belongs to the harness the learner owns. AGENTS.md gains the boundary \"Never change the guardrails in .github/hooks/\"."
     },
     "lab-06/easy": { "local": ["SOLUTION-NOTES.md"] },
-    "lab-07/medium": { "local": ["NOTES.md"] }
+    "lab-07/medium": { "local": ["NOTES.md"] },
+    "lab-08/easy": {
+      "overrides": ["AGENTS.md", ".github/hooks/guardrails.json"],
+      "_why": "The capstone starts from a brought-in mess: AGENTS.md gains a merged Testing section with a rule twice and a rule that contradicts \"never change a test\" (M1), and the hook config is registered for bash only, so the harness drops below L4 (M3)."
+    }
   }
 }
