@@ -19,12 +19,14 @@ export function unrestrictedBash(tools) {
   return list.some((x) => /^:?\*$|^\*/.test(String(x)));
 }
 
-// Optional: compile with the real gh-aw CLI in a throwaway git repo.
+// Optional: compile with the real gh-aw CLI in a throwaway git repo. Compiling is local: no token (so nothing can reach
+// GitHub on the learner's behalf), no update check.
 export function compileStrict(t, name) {
   const dir = t.copy(t.tmp());
   execFileSync('git', ['init', '-q'], { cwd: dir });
+  const env = { ...process.env, GH_TOKEN: '', GITHUB_TOKEN: '', GH_ENTERPRISE_TOKEN: '', GITHUB_ENTERPRISE_TOKEN: '', GH_CONFIG_DIR: t.tmp() };
   try {
-    execFileSync('gh', ['aw', 'compile', name, '--strict'], { cwd: dir, encoding: 'utf8', stdio: 'pipe', timeout: 120000 });
+    execFileSync('gh', ['aw', 'compile', name, '--strict', '--no-check-update'], { cwd: dir, env, encoding: 'utf8', stdio: 'pipe', timeout: 120000 });
   } catch (e) {
     return `gh aw compile --strict failed: ${String(e.stderr || e.stdout || e.message).trim().split('\n').slice(-3).join(' ')}`;
   }
