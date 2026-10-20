@@ -54,7 +54,8 @@ node labs/start.mjs xray lab-08 easy       # layers, budget, scorecard
 node labs/start.mjs test lab-08 easy       # the level's checks
 ```
 `bring` copies the harness files you changed in every level you passed (newest wins) into this level's `src/`, after
-a backup. The starter's own new files stay, so the conflicts you have to resolve are real.
+a backup. The starter's own new files stay, so the conflicts you have to resolve are real; your `AGENTS.md` and hook
+config replace the starter's, so the messes in those two files may be gone (the checks judge whatever is there).
 
 ## 🏛️ In the enterprise
 - **At scale:** one harness, owned by a platform team, installed in dozens of repositories through APM or a plugin,
@@ -86,9 +87,12 @@ StudyBuddy and shows its maturity in the X-ray.
    ≈2,850 tokens into every turn, and the scorecard shows the red rules: an agent with every tool, a guard for bash
    only.
 3. **Bring (2 min):** press `i`. Walk through the plan: every file, the level it comes from, and the starter files
-   that stay. Apply it.
-4. **Resolve and own (3 min):** remove the twin reviewer, the repeats and the contradictions, move the ECTS table
-   into a skill, and drop in `HARNESS.md` (prepared). Run the checks with `t`.
+   that stay. Apply it. Point out that the brought `AGENTS.md` and `.github/hooks/guardrails.json` **replace** the
+   starter's, so the `test.skip` contradiction and the bash-only hook are usually gone already; the twin reviewer,
+   the grading team's Jest and `require` rules and the long `copilot-instructions.md` stay. Press `u` again: still
+   L2 (the twin reviewer), and the every-turn total has grown with the brought skills, agents and MCP tools.
+4. **Resolve and own (3 min):** remove the twin reviewer and whatever repeats and contradictions the checks still
+   name, move the ECTS table into a skill, and drop in `HARNESS.md` (prepared). Run the checks with `t`.
 5. **The verdict (3 min):** press `u` again: **L4 Guarded**, the every-turn total under budget, and the two
    governance rules still red (a CI gate and evals). Say which tier turns each one green, and what **L5 Governed**
    takes. Optionally, ask Copilot to `rm -rf` a folder (one premium request) and show the guard's denial.

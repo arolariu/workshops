@@ -57,3 +57,13 @@ check looks at them, and the advisory "🧱 Your harness so far" group stops at 
 - `verify 08`: src fails 14/14, sol passes 14/14 (advisory group green). `verify 08 --bring`: +90 files from 35
   levels, src fails 12/14, sol passes 14/14 (the brought sol is L4 at ≈1,828 ≈tokens).
 - Budget: src ≈2,854 ≈tokens every turn (L2 Equipped), sol ≈693 (L4 Guarded), MCP measured.
+
+## Review fixes
+- Bring replaces the two overrides (`AGENTS.md`, the hook config): the ticket, its hints and the readme (commands,
+  closing demo) say so, so those two messes may already be gone; the checks judge whatever is in the folder.
+- M4 "still always on" needs three of a topic's markers in one always-on file, and ignores lines that name a skill,
+  so a one-line pointer to the skill passes.
+- Contradictions are judged per clause (split on `, ; : . ! ?` before a space, and on a spaced dash): a negation
+  (including `isn't`, `aren't`, any `n't`, `no longer`) only cancels its own clause, and whatever follows
+  "instead of" / "rather than" never counts. Probed: "Jest instead of node:test" fails, "Jest isn't installed",
+  "node:test instead of Jest" and "no longer CommonJS" pass, "If you can't fix it, mark it `test.skip`" fails.

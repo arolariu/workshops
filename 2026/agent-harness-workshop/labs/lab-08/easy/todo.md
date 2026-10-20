@@ -7,7 +7,8 @@ The university wants every course team to use StudyBuddy's harness, and you are 
 installs it, it has to be one system, and right now it's a pile: the grading team's rules were merged into yours,
 someone added a second reviewer "just in case", the always-on context grew past its 2,500-token budget, and the guard only
 runs for bash. Bring your own work in, resolve the conflicts, write down who owns what, audit the harness up to
-**L4 Guarded**, and put it on a diet.
+**L4 Guarded**, and put it on a diet. (Your brought `AGENTS.md` and hook config replace the starter's, so some of this
+mess may be gone already: the checks judge whatever is in the folder.)
 
 ## 📋 Requirements
 1. No two custom agents do the same job.
@@ -24,7 +25,8 @@ runs for bash. Bring your own work in, resolve the conflicts, write down who own
 ## 🧭 Milestones
 ### M1 · Bring
 - If you passed earlier levels, press `i` on this level first: your harness comes in on top of the starter, and the
-  plan shows every file and where it comes from (the starter's new files stay)
+  plan shows every file and where it comes from. The starter's new files stay; your own `AGENTS.md` and
+  `.github/hooks/guardrails.json` replace the starter's, so the "Testing" section and the bash-only hook may be gone
 - One agent per job: `reviewer` and `code-reviewer` overlap, so one of them goes, after you keep what is useful
 - No rule twice across `AGENTS.md`, `.github/copilot-instructions.md` and `.github/instructions/*.instructions.md`
 - No contradictions: one test runner (`node --test`), one module style (ES modules), one rule for a failing test
@@ -39,7 +41,8 @@ runs for bash. Bring your own work in, resolve the conflicts, write down who own
 ### M3 · Audit
 - The X-ray (`u` on this level) shows **L4 Guarded** or better, with the MCP tools measured
 - Every rule of the instructions, skills, MCP, agents and hooks layers is green
-- `preToolUse` runs the guard for bash **and** powershell, and both deny a recursive delete
+- `preToolUse` runs the guard for bash **and** powershell, and both deny a recursive delete (already true if your
+  brought hook config covers both shells)
 
 ### M4 · Diet
 - The X-ray's "every turn" total is at most 2,500 ≈tokens, MCP tool schemas included
@@ -54,8 +57,9 @@ node labs/start.mjs test lab-08 easy      # from the workshop folder
 ```
 The starter is Lab 07 · easy's solution plus what a careless merge brought in: a second reviewer, the grading
 team's test rules (`.github/instructions/testing.instructions.md`), a long `.github/copilot-instructions.md`, a
-"Testing" section in `AGENTS.md`, a hook config for bash only, and a `HARNESS.md` skeleton. The checks read whatever
-harness is in the folder, so they work on your own brought work too.
+"Testing" section in `AGENTS.md`, a hook config for bash only, and a `HARNESS.md` skeleton. If you pressed `i`, your
+own `AGENTS.md` and `.github/hooks/guardrails.json` replaced the starter's two, so those two messes may not be there
+(the others stay). The checks read whatever harness is in the folder, so they work on your own brought work too.
 
 ## 💡 Hints
 ### M1
@@ -84,8 +88,9 @@ Keep project-wide rules in `AGENTS.md`, rules about tests in the scoped file, an
 <details><summary>Which side of a contradiction wins?</summary>
 
 The project decides: `package.json` runs `node --test` and says `"type": "module"`, and the boundaries in
-`AGENTS.md` say a failing test is fixed in the code. Delete the Jest, `require` and `test.skip` lines. The scoped
-file also has two good rules (sentence names, fixed dates): keep those.
+`AGENTS.md` say a failing test is fixed in the code. Delete the Jest, `require` and `test.skip` lines (the
+`test.skip` one is in the starter's `AGENTS.md`, so it's gone if you brought your own). The scoped file also has two
+good rules (sentence names, fixed dates): keep those.
 
 </details>
 
@@ -118,7 +123,8 @@ maturity level needs. Fix M1 first; the second reviewer is one of the red rules.
 <details><summary>Both shells</summary>
 
 Copilot runs shell commands with `powershell` on Windows and `bash` elsewhere. One `preToolUse` entry can serve both:
-give it a `bash` and a `powershell` key with the same command, and keep the `timeoutSec`.
+give it a `bash` and a `powershell` key with the same command, and keep the `timeoutSec`. (A hook config you brought
+from Lab 05 probably has both already.)
 
 </details>
 

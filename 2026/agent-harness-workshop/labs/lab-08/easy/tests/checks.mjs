@@ -23,12 +23,15 @@ const nodeScript = (command) => String(command ?? '').match(/^\s*node(?:\.exe)?\
 const CATCH_ALL = new Set(['*', '**', '**/*', '**/*.*']);
 const alwaysOn = (scan) => scan.instructions.filter((i) => !i.applyTo || String(i.applyTo).split(',').some((g) => CATCH_ALL.has(g.trim())));
 
-// The rarely needed rules of the starter's copilot-instructions.md; two markers in one file mean the rules are there.
+// The rarely needed rules of the starter's copilot-instructions.md. The rules are still always on when one always-on
+// file has three of a topic's markers (a one-line pointer to the skill doesn't count, and lines that name a skill are
+// ignored); a skill holds them when it has two.
 const RARE = [
   { title: 'The ECTS grade conversion', why: 'the exchange office needs it twice a term', markers: [/\bECTS\b/i, /\bFX\b/, /9\.50/, /exchange office/i, /percentile/i] },
   { title: 'The release checklist', why: 'the team releases once a term', markers: [/release checklist/i, /CHANGELOG\.md/i, /semantic versioning|semver/i, /\bhotfix/i, /release: v/i, /course channel/i] },
 ];
-const holds = (text, topic) => topic.markers.filter((re) => re.test(text ?? '')).length >= 2;
+const markers = (text, topic) => topic.markers.filter((re) => re.test(text ?? '')).length;
+const namesSkill = (line, skills) => /\bskills?\b/i.test(line) || skills.some((s) => line.includes(`\`${s}\``));
 
 export default (t) => [
   // ---------- M1 · Bring ----------
@@ -121,11 +124,13 @@ export default (t) => [
     const scan = scanHarness(t.dir);
     const on = alwaysOn(scan);
     const skills = scan.skills.map((s) => ({ path: s.path, text: t.read(s.path) }));
+    const names = scan.skills.flatMap((s) => [s.name, s.folder]).filter(Boolean);
+    const rules = (i) => textLines(i.text).map((l) => l.text).filter((l) => !namesSkill(l, names)).join('\n');
     const problems = [];
     for (const topic of RARE) {
-      const still = on.filter((i) => holds(textLines(i.text).map((l) => l.text).join('\n'), topic)).map((i) => i.path);
+      const still = on.filter((i) => markers(rules(i), topic) >= 3).map((i) => i.path);
       if (still.length) problems.push(`${topic.title} is still in ${still.join(' and ')}, so it is sent on every turn although ${topic.why}`);
-      else if (!skills.some((s) => holds(s.text, topic))) problems.push(`${topic.title} is in no skill: ${topic.why}, so move it into one (.github/skills/<name>/SKILL.md), don't delete it`);
+      else if (!skills.some((s) => markers(s.text, topic) >= 2)) problems.push(`${topic.title} is in no skill: ${topic.why}, so move it into one (.github/skills/<name>/SKILL.md), don't delete it`);
     }
     return !problems.length || `${problems.join('. ')}.`;
   }, { milestone: 'M4' }),

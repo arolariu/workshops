@@ -62,8 +62,13 @@ export function repeatedRules(scan) {
   return [...seen.values()].filter((r) => r.places.length > 1);
 }
 
-// "Don't use Jest" is not a Jest rule: a line with a negation states the opposite.
-const NEGATED = /\b(no|not|never|don'?t|do not|without|instead of|avoid|nor)\b/i;
+// "Don't use Jest" is not a Jest rule: a negation in the same clause states the opposite ("Jest isn't installed",
+// "we no longer use Jest"). What follows "instead of" or "rather than" is what the rule rejects, so it never counts:
+// "Use Jest instead of node:test" is a Jest rule, "Use node:test instead of Jest" is not.
+const NEGATION = /\b(no|not|never|no longer|without|avoid|nor|\w+n['’]t)\b/i;
+const clauses = (line) => line.split(/[.;:!?,](?=\s|$)|\s[-–—]\s/).map((c) => c.replace(/\b(instead of|rather than)\b.*$/i, ''));
+/** Does a rule line state `re` (in a clause without a negation)? */
+export const states = (line, re) => clauses(line).some((c) => re.test(c) && !NEGATION.test(c));
 const OTHER_RUNNERS = /\b(jest|mocha|vitest|jasmine|ava)\b/i;
 
 /** The known topics two teams' rules tend to disagree on, judged against what the project really does (package.json). */
@@ -98,7 +103,7 @@ export function topics(pkg) {
 /** Instruction lines that state the wrong side of a topic: [{ place, text }]. */
 export function contradictions(scan, topic) {
   return scan.instructions.flatMap((file) => textLines(file.text)
-    .filter(({ text }) => topic.wrong.test(text) && !NEGATED.test(text))
+    .filter(({ text }) => states(text, topic.wrong))
     .map(({ n, text }) => ({ place: `${file.path}:${n}`, text })));
 }
 
