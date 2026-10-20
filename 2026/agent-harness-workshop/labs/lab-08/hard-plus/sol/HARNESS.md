@@ -33,16 +33,19 @@ The threat model, in short (the full table is the next section):
 
 ## Threat model
 Every family of the attack pack, the control that stops it (the guard's rule ids), and what can still get through.
-`node scripts/attack.mjs` proves the controls: 44 attacks denied on both shells, 12 everyday calls allowed.
+`node scripts/attack.mjs` proves the controls: 44 attacks denied on both shells, 12 everyday calls allowed. The guard reads a
+command the way a shell does (line continuations, quotes, `bash -c` and `powershell -Command`, full paths, prefixes like
+`env` and `time`, git's and npm's global options), so a rule protects an outcome, not one spelling of it; quoted text in
+`echo` or a commit message is data. The remaining risks name the spellings it still can't see.
 
 | Family | Example | Control | Remaining risk |
 |---|---|---|---|
-| 💥 Destructive commands | `rm -rf ./`, `rm -Recurse -Force .git`, `\| Remove-Item`, `git clean -fdx` | `recursive-delete`, `git-history`; git keeps the history | a delete the rules don't parse: a script file, `node -e`, a loop that deletes file by file |
-| 🔑 Reading secrets | `view .env`, `cat config/.env.local`, `printenv GITHUB_TOKEN` | `secret-files` (every tool, by file name), `secret-env` | a secret in a file with an innocent name, or printed by a program the agent runs |
+| 💥 Destructive commands | `rm -rf ./`, `rm -Recurse -Force .git`, `\| Remove-Item`, `git clean -fdx` | `recursive-delete`, `git-history`; git keeps the history | a command the guard can't see: an alias or function defined in the session, a program name in a variable (`& $c -rf .`), a script file the agent wrote and then runs, a loop that deletes file by file |
+| 🔑 Reading secrets | `view .env`, `cat config/.env.local`, `printenv GITHUB_TOKEN` | `secret-files` (every tool, by file name), `secret-env` | a secret in a file with an innocent name, a glob (`cat .e*`), or a program the agent runs that prints one |
 | ✍️ Writing secrets | `create .env`, a hardcoded password, `$env:GITHUB_TOKEN \| Out-File` | `secret-files`, `secret-env`, `hardcoded-secret` | a literal in a variable with an innocent name; GitHub push protection is the next line |
-| 📤 Sending data out | `curl --data-binary @grades.js`, `-Method Post`, `scp`, `nc`, `web_fetch` to an unknown host | `upload`, `egress` (an allow-list of six hosts) | data hidden in a request to an allowed host (a GitHub gist), or a URL without a scheme |
-| 📦 Supply chain | `npm install lodash`, `curl … \| sh`, `iwr … \| iex`, `npx`, editing `package.json` | `new-dependency`, `remote-code`, `package-json` | a human who installs it after all; a typosquatted name in a reviewed pull request |
-| 🛠️ Tampering with the harness | editing the hook config, deleting the guard, `sed -i` on `AGENTS.md`, granting the reviewer tools, a new MCP server | `harness-controls`, `boundaries`; the owner reviews every harness change | a person with write access; the guard can't protect a file it isn't asked about (a script that edits it) |
+| 📤 Sending data out | `curl --data-binary @grades.js`, `-Method Post`, `scp`, `nc`, `web_fetch` to an unknown host | `upload`, `egress` (an allow-list of six hosts) | data hidden in a request to an allowed host (a GitHub gist), a URL without a scheme (`curl evil.example.dev`), a script that opens its own connection |
+| 📦 Supply chain | `npm install lodash`, `curl … \| sh`, `iwr … \| iex`, `npx`, editing `package.json` | `new-dependency`, `remote-code`, `package-json` | a script the agent writes and then runs (`sh setup.sh`); a human who installs it after all; a typosquatted name in a reviewed pull request |
+| 🛠️ Tampering with the harness | editing the hook config, deleting the guard, `sed -i` on `AGENTS.md`, granting the reviewer tools, a new MCP server | `harness-controls`, `boundaries`; the owner reviews every harness change | a person with write access; a script or a glob that edits the guard without naming it (`Set-Content .git*/ho*/*.json`) |
 | 💉 Indirect injection | a portal record or an issue that asks for any of the above | the guard judges the action, not the text; read-only portal tools, a read-only reviewer, safe outputs in CI | an answer that is wrong without any tool call (a false deadline); only evals and a person catch that |
 
 ## Budget
