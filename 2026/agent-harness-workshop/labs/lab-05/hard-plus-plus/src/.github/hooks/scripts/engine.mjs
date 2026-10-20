@@ -20,12 +20,15 @@ const READ = new Set(['view', 'read', 'grep', 'glob', 'rg']);
 /**
  * Split a shell command into segments at &&, ||, ;, |, & and newlines: not inside quotes, not inside ( ), { } or $( ),
  * and not in a redirection (2>&1, >&2, &>). A backslash (bash), backtick (PowerShell) or caret (cmd) escapes the next
- * character. If the brackets don't balance (`echo {; rm -rf x`), it splits as if there were none.
+ * character. If the brackets don't balance (`echo {; rm -rf x`), it splits as if there were none; if the quotes don't
+ * (`echo $'\''; rm -rf x`), as if there were no quotes either: a shell reads such a line its own way, so a `;` the
+ * quotes seemed to hide must still count.
  */
 export function segments(command, dialect = 'bash') {
-  return split(String(command ?? ''), dialect, true) ?? split(String(command ?? ''), dialect, false);
+  const s = String(command ?? '');
+  return split(s, dialect, true, true) ?? split(s, dialect, false, true) ?? split(s, dialect, false, false);
 }
-function split(s, dialect, nest) {
+function split(s, dialect, nest, quotes) {
   const out = [];
   const esc = dialect === 'powershell' ? '`' : dialect === 'cmd' ? '^' : '\\';
   let cur = '';
@@ -35,14 +38,14 @@ function split(s, dialect, nest) {
     const ch = s[i];
     if (ch === esc && quote !== "'" && i + 1 < s.length && s[i + 1] !== '\n') { cur += ch + s[i + 1]; i++; continue; }
     if (quote) { cur += ch; if (ch === quote) quote = null; continue; }
-    if (ch === '"' || ch === "'") { quote = ch; cur += ch; continue; }
+    if (quotes && (ch === '"' || ch === "'")) { quote = ch; cur += ch; continue; }
     if (nest && (ch === '(' || ch === '{')) depth++;
     if (nest && (ch === ')' || ch === '}') && depth > 0) depth--;
     const redirect = ch === '&' && (/[<>]$/.test(cur) || s[i + 1] === '>');
     if (!depth && !redirect && (ch === ';' || ch === '\n' || ch === '|' || ch === '&')) { if (cur.trim()) out.push(cur.trim()); cur = ''; if (s[i + 1] === ch) i++; continue; }
     cur += ch;
   }
-  if (depth) return null;
+  if (depth || quote) return null;
   if (cur.trim()) out.push(cur.trim());
   return out;
 }
@@ -281,6 +284,14 @@ function commandsOf(command, dialect, depth) {
 }
 
 /** A tool call, ready for the rules: { tool, kind, commands, commandLine, paths, text }. */
+// What the shell reads: CRLF as LF and no NUL (bash drops it). A bash \-newline joins the lines with nothing between
+// them (`r\<newline>m` is rm); a PowerShell backtick-newline goes on with a space. PowerShell also reads typographic
+// quotes and dashes as plain ones (“x” is "x", –Force is -Force).
+function shellText(command, dialect) {
+  const s = String(command ?? '').replace(/\r\n?/g, '\n').replace(/\0/g, '');
+  if (dialect !== 'powershell') return s.replace(/\\\n/g, '');
+  return s.replace(/`\n/g, ' ').replace(/[\u2018-\u201B]/g, "'").replace(/[\u201C-\u201E]/g, '"').replace(/[\u2013-\u2015]/g, '-');
+}
 export function normalize(toolName, args = {}) {
   const tool = String(toolName ?? '');
   const a = args && typeof args === 'object' ? args : {};
@@ -288,7 +299,7 @@ export function normalize(toolName, args = {}) {
   const dialect = tool === 'powershell' ? 'powershell' : 'bash';
   // A newline separates commands like `;` does (a line ending in \\ or a PowerShell backtick goes on), so only the
   // spaces in a line are collapsed before splitting; commandLine is the whole call on one line.
-  const raw = kind === 'shell' ? String(a.command ?? '').replace(/\r\n?/g, '\n').replace(dialect === 'powershell' ? /`\n/g : /\\\n/g, ' ') : '';
+  const raw = kind === 'shell' ? shellText(a.command, dialect) : '';
   const commandLine = raw.replace(/\s+/g, ' ').trim();
   const commands = kind === 'shell' ? commandsOf(raw.replace(/[ \t]+/g, ' ').trim(), dialect, 0) : [];
   const paths = [...(typeof a.path === 'string' ? [a.path] : []), ...commands.flatMap((c) => c.args)];

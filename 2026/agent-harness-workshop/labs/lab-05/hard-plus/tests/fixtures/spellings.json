@@ -52,7 +52,15 @@
     ["powershell", "if ($true) { Remove-Item build -Recurse -Force }"],
     ["powershell", "try { Remove-Item build -Recurse -Force } catch { }"],
     ["powershell", "Invoke-Command { Remove-Item build -Recurse -Force }"],
-    ["powershell", "iex -Command 'Remove-Item build -Recurse -Force'"]
+    ["powershell", "iex -Command 'Remove-Item build -Recurse -Force'"],
+    ["bash", "r\\\nm -rf build"],
+    ["bash", "rm -\\\nrf build"],
+    ["bash", "rm -\\\r\nrf build"],
+    ["bash", "echo $'\\''; rm -rf build"],
+    ["bash", "r\u0000m -rf build"],
+    ["powershell", "Write-Output “hi\"; Remove-Item -Recurse -Force build"],
+    ["powershell", "Write-Output ‘hi'; Remove-Item -Recurse -Force build"],
+    ["powershell", "Remove-Item –Recurse –Force build"]
   ],
   "allow": [
     ["bash", "rm notes.txt"],
