@@ -91,6 +91,8 @@ test('the live track does not teach "it is always answer 2": answers vary, and t
 
 test('every reference solution passes the scorecard rules of the layers earlier labs taught, and climbs the maturity ladder', () => {
   const expected = { 'lab-00': 'L0', 'lab-01': 'L1', 'lab-02': 'L2', 'lab-03': 'L3', 'lab-04': 'L3', 'lab-05': 'L4', 'lab-06': 'L4', 'lab-07': 'L4' };
+  // The capstone climbs inside the lab: governance (a CI gate and evals) reaches L5 at hard+.
+  const capstone = { easy: 'L4', medium: 'L4', hard: 'L4', 'hard-plus': 'L5', 'hard-plus-plus': 'L5' };
   for (const ex of levels) {
     const scan = scanHarness(ex.sol);
     assert.deepEqual(scan.problems, [], ex.key);
@@ -98,17 +100,21 @@ test('every reference solution passes the scorecard rules of the layers earlier 
     const earlier = new Set(LAYERS.filter((l) => l.lab < ex.labId).map((l) => l.id));
     const bad = rules.filter((r) => earlier.has(r.layer) && r.ok === false);
     assert.deepEqual(bad.map((r) => `${r.id}: ${r.message}`), [], `${ex.key}: the inherited checks fail on the reference`);
-    if (expected[ex.labId]) assert.equal(maturity(rules, scan).level, expected[ex.labId], `${ex.key} maturity`);
+    const want = catalog.find((l) => l.id === ex.labId)?.capstone ? capstone[ex.level] : expected[ex.labId];
+    if (want) assert.equal(maturity(rules, scan).level, want, `${ex.key} maturity`);
   }
 });
 
 // Labs whose homework ladder is complete (Phase 4). Their levels above easy follow the ticket format of spec §5.3.
 // CONTENT_TEST_LABS=lab-01,lab-02 checks other labs while their ladders are being written.
 const GROWN = new Set(process.env.CONTENT_TEST_LABS ? process.env.CONTENT_TEST_LABS.split(',').map((s) => s.trim()) : ['lab-00', 'lab-01', 'lab-02', 'lab-03', 'lab-04', 'lab-05', 'lab-06', 'lab-07']);
-const tierRange = (d) => {
-  const [lo, hi = lo] = d.time.match(/[\d.]+/g).map(Number);
-  const unit = /\bh\b/.test(d.time) ? 60 : 1;
-  return [lo * unit, hi * unit];
+// The capstone's tiers have their own times. "about 1 h" leaves a quarter either way.
+const tierRange = (d, capstone = false) => {
+  const time = capstone ? d.capstoneTime : d.time;
+  const [lo, hi = lo] = time.match(/[\d.]+/g).map(Number);
+  const unit = /\bh\b/.test(time) ? 60 : 1;
+  const slack = /^about\b/.test(time) ? 0.25 : 0;
+  return [lo * unit * (1 - slack), hi * unit * (1 + slack)];
 };
 test('the grown labs are labs that exist (a typo in CONTENT_TEST_LABS would test nothing)', () => {
   const ids = new Set(catalog.map((l) => l.id));
@@ -117,11 +123,12 @@ test('the grown labs are labs that exist (a typo in CONTENT_TEST_LABS would test
 test('every homework level of a grown lab follows the ticket format, fits its tier, and keeps agent checks cheap', async () => {
   for (const lab of catalog.filter((l) => GROWN.has(l.id))) {
     assert.deepEqual(lab.levels.map((e) => e.level), DIFFICULTIES.map((d) => d.id), `${lab.id}: all five tiers`);
-    for (const ex of lab.levels.filter((e) => e.level !== 'easy')) {
+    // The capstone's easy is homework too, so it follows the ticket format.
+    for (const ex of lab.levels.filter((e) => e.level !== 'easy' || lab.capstone)) {
       const d = DIFFICULTIES.find((x) => x.id === ex.level);
-      const [lo, hi] = tierRange(d);
+      const [lo, hi] = tierRange(d, lab.capstone);
       const [a, b] = ex.minutesRange ?? [];
-      assert.ok(a >= lo && b <= hi, `${ex.key}: 🕐 ${ex.time} is outside ${d.time}`);
+      assert.ok(a >= lo && b <= hi, `${ex.key}: 🕐 ${ex.time} is outside ${lab.capstone ? d.capstoneTime : d.time}`);
       assert.match(ex.meta, /🏠 homework/, ex.key);
       assert.equal(ex.buildsOn, predecessorOf(order, ex.key).key, `${ex.key}: 🧱 builds on`);
       assert.ok(ex.mission.split('\n').length >= 3, `${ex.key}: 🎯 a story of 3-6 lines`);

@@ -31,7 +31,7 @@ test('search, difficulty, status and time budget combine', () => {
 
 test('learning paths keep their explicit order', () => {
   const { catalog, view } = setup();
-  assert.deepEqual(PATHS.map((p) => p.id), ['all', 'deeper', 'security', 'platform', 'internals']);
+  assert.deepEqual(PATHS.map((p) => p.id), ['all', 'deeper', 'security', 'platform', 'internals', 'capstone']);
   assert.deepEqual(selectExercises(catalog, view, { path: 'deeper' }).map((x) => x.key), ['lab-00/medium', 'lab-01/medium', 'lab-02/medium', 'lab-03/medium', 'lab-04/medium', 'lab-05/medium', 'lab-06/medium', 'lab-07/medium']);
   assert.deepEqual(selectExercises(catalog, view, { path: 'security' }).map((x) => x.key), ['lab-05/medium', 'lab-05/hard']);
   assert.deepEqual(selectExercises(catalog, view, { path: 'platform' }).map((x) => x.key), ['lab-02/hard', 'lab-06/hard']);

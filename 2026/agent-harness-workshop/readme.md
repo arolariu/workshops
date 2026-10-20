@@ -179,6 +179,7 @@ Difficulty names: `easy`, `medium`, `hard` (or `e`, `m`, `h`), and `hard+` / `ha
 | [05](labs/lab-05/readme.md) | 🔒 **Guardrails & hooks**<br>What the agent may do | A hook that says no | Soft rules → hard rules | Defense in depth |
 | [06](labs/lab-06/readme.md) | 📦 **Plugins, extensions & APM**<br>Extend and share | Install, don't copy | A zero-credit command | Ship it as a plugin |
 | [07](labs/lab-07/readme.md) | 🚀 **Agentic workflows**<br>Agents in CI | Make it safe | Two kinds of change | A reviewer in CI |
+| [08](labs/lab-08/readme.md) | 🏛️ **Capstone**<br>Ship an enterprise-ready harness | Assemble and own it (🏠 homework, and the live closing demo) | Red-team it | Measure it |
 
 ## 🕐 The workshop (110 minutes)
 Only the 🟢 easy levels are done live, together. Everything above easy is optional homework.
@@ -187,7 +188,7 @@ Only the 🟢 easy levels are done live, together. Everything above easy is opti
 |---|---|
 | 0–10 | Welcome and why a harness matters, then clone the repo, trust the folder and start the app |
 | 10–98 | Labs 00–07, 11 minutes each: the idea (2), under the hood (2; for Lab 00, the 🎬 replay of an agent run without and with a harness), the easy level together (6), and the takeaway with its check-yourself question (1) |
-| 98–110 | Lab 08 kickoff (when it ships): bring a finished harness together and look at its maturity. Then walk through the homework map: tiers, times and paths |
+| 98–110 | Lab 08, the closing demo: bring a finished harness together live, X-ray it and show its maturity (the capstone's 🟢 easy, done for you). Then walk through the homework map: tiers, times and paths |
 
 Anyone who falls behind presses **n**: on an easy level it moves to the next lab's easy level, which starts from the
 reference result, so they keep up with the room.
@@ -204,16 +205,19 @@ a mandate: every level starts from its own reference starting point, so you can 
 | 🟣 hard-plus (hard+) | **Break it.** Attacks, failure modes and edge cases. | 1.5–2 h | 🏠 homework |
 | 💎 hard-plus-plus (hard++) | **Scale it.** Make it work at org scale, or build the mechanism yourself. | 2–3 h | 🏠 homework |
 
-Labs 00–07 have all five tiers (Lab 08, the capstone, comes next); each level's own 🕐 says how long it takes.
+Every lab has all five tiers; each level's own 🕐 says how long it takes. Lab 08, the 🏛️ capstone, brings every layer
+together, so its tiers take longer (🟢 about 1 h · 🟡 1.5–2 h · 🔴 2–2.5 h · 🟣 about 3 h · 💎 3–4 h), and its 🟢 easy
+is homework too.
 Suggested paths (press **p** in the app, or use
 `--path=`; **n** always goes to the path's next unfinished level, and `node labs/start.mjs path` shows each path's time):
 
 | Path | Levels |
 |---|---|
 | **One level deeper** (`deeper`) | every 🟡 medium level, Lab 00 to Lab 07 |
-| **Security** (`security`) | 🟡 🔴 🟣 Lab 05 (guardrails, then policy as code), 🟣 Lab 04 (untrusted tool output) and 🟣 Lab 07 (hostile input in CI); Lab 08's red team joins it when it ships |
-| **Platform** (`platform`) | 🔴 🟣 Lab 02 (a skill with a script, then vetting other people's skills) and 🔴 🟣 Lab 06 (ship it as a plugin, then the supply chain) |
+| **Security** (`security`) | 🟡 🔴 🟣 Lab 05 (guardrails, then policy as code), 🟣 Lab 04 (untrusted tool output), 🟣 Lab 07 (hostile input in CI) and 🟡 Lab 08 (red-team your whole harness) |
+| **Platform** (`platform`) | 🔴 🟣 Lab 02 (a skill with a script, then vetting other people's skills), 🔴 🟣 Lab 06 (ship it as a plugin, then the supply chain) and 🔴 Lab 08 (measure the harness with evals) |
 | **Internals** (`internals`) | 🔴 🟣 💎 Lab 00 (the agent in a script, the flight recorder, your own agent loop) and 💎 Lab 04 (MCP from the protocol up) |
+| **Capstone** (`capstone`) | every tier of Lab 08: assemble and own it, red-team it, measure it, put it under change control, roll it out to a second codebase |
 
 **Done early?** Harness your own project with what you built.
 

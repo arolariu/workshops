@@ -1231,6 +1231,8 @@ ${levels}
 
 Each tier's time is how long its levels take; a level's own 🕐 says how long it takes.
 
+Lab 08, the 🏛️ capstone, brings every layer together, so its tiers take longer: ${DIFFICULTIES.map((d) => `${d.badge} ${d.capstoneTime}`).join(' · ')}. Its 🟢 easy is homework too; the workshop ends with a live demo of it.
+
 Every level starts from the reference result of the level before it (down the easy column, and along each lab's row), so you can start anywhere. Each level has:
 - \`todo.md\` - your mission. Long levels are split into milestones, each with its own checks and hints.
 - \`src/\` - where you work. Press **c** to start Copilot right there.

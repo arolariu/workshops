@@ -8,8 +8,7 @@ import { deriveStatus, evidenceTracker } from './progress.mjs';
 export class SelectionError extends Error {}
 
 /**
- * The homework paths (spec §5.1), in their explicit order. Only levels that exist are listed; the deeper tiers join their
- * paths as they are written, and the Capstone path arrives with Lab 08.
+ * The homework paths (spec §5.1), in their explicit order. Only levels that exist are listed.
  */
 export const PATHS = [
   { id: 'all', label: 'All exercises', description: 'Every exercise: the live track (every easy level) first, then the homework tiers.', keys: null },
@@ -17,6 +16,7 @@ export const PATHS = [
   { id: 'security', label: 'Security', description: 'Guardrails that hold, and how agents get attacked.', keys: ['lab-05/medium', 'lab-05/hard', 'lab-05/hard-plus', 'lab-04/hard-plus', 'lab-07/hard-plus'] },
   { id: 'platform', label: 'Platform', description: 'Skills and plugins a whole team installs.', keys: ['lab-02/hard', 'lab-02/hard-plus', 'lab-06/hard', 'lab-06/hard-plus'] },
   { id: 'internals', label: 'Internals', description: 'The agent loop from the inside: scripted runs, JSON events, variance, your own loop and the MCP protocol.', keys: ['lab-00/hard', 'lab-00/hard-plus', 'lab-00/hard-plus-plus', 'lab-04/hard-plus-plus'] },
+  { id: 'capstone', label: 'Capstone', description: 'Every tier of Lab 08: own your whole harness, attack it, measure it, govern it and roll it out.', keys: ['lab-08/easy'] },
 ];
 export const STATUS_FILTERS = ['unfinished', 'pass', 'fail', 'stale', 'not-run', 'blocked', 'skipped', 'interrupted'];
 export const pathById = (id) => PATHS.find((p) => p.id === id) ?? null;

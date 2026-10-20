@@ -6,7 +6,7 @@ import { PassThrough } from 'node:stream';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { startTui } from '../tui.mjs';
-import { loadCatalog, exerciseByKey } from '../catalog.mjs';
+import { loadCatalog, exerciseByKey, DIFFICULTIES } from '../catalog.mjs';
 import { progressStore, captureEvidence } from '../progress.mjs';
 import { inline, stripAnsi, renderMarkdown, setAscii, width } from '../ui.mjs';
 import { loadCourse } from '../course.mjs';
@@ -446,6 +446,15 @@ test('NO_COLOR and --no-anim: plain frames that fit 80 columns', () => {
 test('every key in the table reaches a handler, and the more menu lists exactly its keys', async () => {
   const t = await app({ open: 'lab-00/easy' });
   assert.deepEqual(t.unhandled(), [], 'bindings without a handler');
+  t.quit();
+});
+
+test('the help screen gives the capstone its own tier times', async () => {
+  const t = await app({ open: 'lab-00/easy', size: { columns: 120, rows: 200 } });
+  press(t.input, '?');
+  const s = text(t.output).replace(/\s+/g, ' ');
+  assert.match(s, new RegExp(`capstone.*${DIFFICULTIES.map((d) => `${d.badge} ${d.capstoneTime}`).join(' · ')}`));
+  assert.match(s, /easy is homework too/);
   t.quit();
 });
 
