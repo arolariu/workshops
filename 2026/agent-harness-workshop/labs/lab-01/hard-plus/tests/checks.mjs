@@ -3,7 +3,6 @@
 // level's instruction files), so the answers never depend on how far your refactor got. M4–M5 look at your folder.
 import fs from 'node:fs';
 import path from 'node:path';
-import { freeNode, freeImport } from './helpers.mjs';
 
 const LINT = 'scripts/lint-instructions.mjs';
 const LEGACY = '.github/copilot-instructions.md';
@@ -20,7 +19,7 @@ const key = (r) => `${r?.file}:${r?.line}`;
 const pair = (a, b) => [key(a), key(b)].sort().join(' ~ ');
 const list = (xs, n = 3) => `${xs.slice(0, n).join('; ')}${xs.length > n ? ` (and ${xs.length - n} more)` : ''}`;
 const lid = (i) => `L${String(i + 1).padStart(2, '0')}`;
-const load = (t) => freeImport(t, LINT);
+const load = (t) => t.import(LINT);
 
 /** The checks' own reading of rules (the same as parseRules() in your script). */
 function parseRules(text, file = '') {
@@ -187,8 +186,7 @@ export default (t) => [
     const copy = t.copy(t.tmp());
     fs.mkdirSync(path.join(copy, '.github'), { recursive: true });
     fs.writeFileSync(path.join(copy, LEGACY), fx(t, 'legacy-instructions.md'));
-    const r = freeNode(t, [LINT, '--json'], { cwd: copy });
-    if (r.triedCopilot) return `node ${LINT}: ${r.spent}`;
+    const r = t.node([LINT, '--json'], { cwd: copy });
     let out;
     try { out = JSON.parse(r.stdout); } catch { return `node ${LINT} --json did not print JSON. ${r.all.trim().slice(0, 200)}`; }
     if (r.code !== 1) return `With the legacy file back in place, the linter should exit 1 (findings, over budget); it exited ${r.code}.`;
@@ -268,8 +266,7 @@ export default (t) => [
     return true;
   }, { milestone: 'M4' }),
   t.check('Your linter is happy with your folder (exit 0)', () => {
-    const r = freeNode(t, [LINT, '--json']);
-    if (r.triedCopilot) return `node ${LINT}: ${r.spent}`;
+    const r = t.node([LINT, '--json']);
     if (r.code === 0) return true;
     let out = {};
     try { out = JSON.parse(r.stdout); } catch { return `node ${LINT} exits ${r.code}. ${r.all.trim().slice(0, 200)}`; }

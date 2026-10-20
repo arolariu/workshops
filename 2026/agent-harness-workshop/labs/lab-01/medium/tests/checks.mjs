@@ -1,7 +1,6 @@
 // Free checks for Lab 01 · medium: rules for one folder.
 import fs from 'node:fs';
 import path from 'node:path';
-import { freeNode, freeImport } from './helpers.mjs';
 
 const TESTS = '.github/instructions/tests.instructions.md';
 const DOCS = '.github/instructions/docs.instructions.md';
@@ -115,12 +114,12 @@ export default (t) => [
 
   // M4 · Which rules apply where
   t.check('matches() understands **, *, ? and {a,b}', async () => {
-    const { matches } = await freeImport(t, WHICH);
+    const { matches } = await t.import(WHICH);
     const wrong = GLOBS.filter(([g, p, want]) => matches(g, p) !== want);
     return !wrong.length || `matches() is off for ${wrong.length} case(s): ${wrong.slice(0, 3).map(([g, p, want]) => `\`matches("${g}", "${p}")\` should be ${want}`).join('; ')}.`;
   }, { milestone: 'M4' }),
   t.check('applicable() lists the always-on files and every match', async () => {
-    const { applicable } = await freeImport(t, WHICH);
+    const { applicable } = await t.import(WHICH);
     const sources = [
       { path: 'AGENTS.md', applyTo: null },
       { path: TESTS, applyTo: ['**/*.test.js'] },
@@ -144,8 +143,7 @@ export default (t) => [
     fs.mkdirSync(path.join(copy, 'packages', 'x'), { recursive: true });
     fs.writeFileSync(path.join(copy, 'packages', 'x', 'AGENTS.md'), '# Package x\n- A rule for package x.\n');
     const paths = ['grades.js', 'grades.test.js', 'README.md', 'docs/grading.md', 'packages/x/a.js'];
-    const r = freeNode(t, [WHICH, '--json', ...paths], { cwd: copy });
-    if (r.triedCopilot) return `node ${WHICH}: ${r.spent}`;
+    const r = t.node([WHICH, '--json', ...paths], { cwd: copy });
     let rows;
     try { rows = JSON.parse(r.stdout); } catch { return `node ${WHICH} --json … did not print JSON. ${r.all.trim().slice(0, 200)}`; }
     const { applyToMatches } = t.globs;
@@ -159,7 +157,7 @@ export default (t) => [
     return true;
   }, { milestone: 'M4' }),
   t.check('Copilot agrees about the scoped files and their applyTo', async () => {
-    const { instructionSources } = await freeImport(t, WHICH);
+    const { instructionSources } = await t.import(WHICH);
     const mine = instructionSources(t.dir);
     const r = t.copilot(['instruction', 'list', '--json']);
     let list;

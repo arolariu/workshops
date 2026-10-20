@@ -3,10 +3,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { freeNode, freeImport } from './helpers.mjs';
 
 const AB = 'scripts/ab.mjs';
-const load = (t) => freeImport(t, AB);
+const load = (t) => t.import(AB);
 const fixturePath = (t, name) => path.join(t.exDir, 'tests', 'fixtures', name);
 const fixture = (t, name) => JSON.parse(fs.readFileSync(fixturePath(t, name), 'utf8'));
 // The checks' own copy of the rules (independent of the RULES in your script).
@@ -81,7 +80,7 @@ function fromFixture(t, name) {
   const copy = t.copy(t.tmp());
   const file = path.join(copy, 'saved.json');
   fs.copyFileSync(fixturePath(t, name), file);
-  return { copy, r: freeNode(t, [AB, '--from', 'saved.json'], { cwd: copy }) };
+  return { copy, r: t.node([AB, '--from', 'saved.json'], { cwd: copy }) };
 }
 
 export default (t) => [
@@ -133,8 +132,7 @@ export default (t) => [
     }
   }, { milestone: 'M1' }),
   t.check('The dry run shows both variants, and where "without" runs', () => {
-    const r = freeNode(t, [AB, '--dry-run', '--runs', '2']);
-    if (r.triedCopilot) return `node ${AB} --dry-run: ${r.spent}`;
+    const r = t.node([AB, '--dry-run', '--runs', '2']);
     const lines = r.stdout.split('\n').filter((l) => /^\s*copilot /.test(l));
     const off = lines.filter((l) => l.includes('--no-custom-instructions')).length;
     if (lines.length !== 4 || off !== 2) return `Expected 4 commands (2 without instructions), got ${lines.length} (${off} without). ${r.stderr.trim().slice(0, 160)}`;
@@ -203,7 +201,6 @@ export default (t) => [
   }, { milestone: 'M4' }),
   t.check('node scripts/ab.mjs --from saves the report without spending a credit', () => {
     const { copy, r } = fromFixture(t, 'results.json');
-    if (r.triedCopilot) return `node scripts/ab.mjs --from: ${r.spent}`;
     if (r.code !== 0) return `node scripts/ab.mjs --from saved.json exited with ${r.code}. ${r.all.trim().slice(0, 200)}`;
     const ok = expectRows(r.stdout, REPORT_ROWS.slice(0, 2), 'The printed report');
     if (ok !== true) return ok;
@@ -245,7 +242,6 @@ export default (t) => [
   }, { milestone: 'M5' }),
   t.check('--from on ablation results prints the ablation table', () => {
     const { copy, r } = fromFixture(t, 'ablation.json');
-    if (r.triedCopilot) return `node scripts/ab.mjs --from: ${r.spent}`;
     if (r.code !== 0) return `node scripts/ab.mjs --from (ablation) exited with ${r.code}. ${r.all.trim().slice(0, 200)}`;
     const ok = expectRows(r.stdout, ABLATION_ROWS.slice(2, 3), 'The printed ablation table');
     if (ok !== true) return ok;
