@@ -14,7 +14,7 @@ rollback runbook with a script. Spec §5.6 (hard+), plan Task 12 and the wave co
 | | |
 |---|---|
 | 🕐 | about 3 h · 🏠 homework · 🆓 free checks · 🧱 builds on: Lab 08 · hard |
-| M1 · CI gate | `.github/workflows/harness-ci.yml`: `pull_request` (with `labeled`) and `push` to `main`, on harness `paths`; every time: scorecard ≥ L4 (`scripts/harness-check.mjs`), `node scripts/attack.mjs`, `node --test`, the eval self-test (`--from evals/runs/full --baseline`); real evals (`scripts/eval.mjs --runs 1 --budget 240 --baseline … --threshold 75 --report …`) only on the `run-evals` label or on `main`; `permissions` read-only, `timeout-minutes` on every job, a `concurrency` group, every `uses:` pinned to a 40-hex SHA |
+| M1 · CI gate | `.github/workflows/harness-ci.yml`: `pull_request` (with `labeled`) and `push` to `main`, on harness `paths`; every time: scorecard ≥ L4 (`scripts/harness-check.mjs`), `node scripts/attack.mjs`, `node --test`, the eval self-test (`--from evals/runs/full --baseline`); real evals (`scripts/eval.mjs --runs 1 --budget 240 --baseline … --threshold 75 --report …`) only when someone adds the `run-evals` label (the `labeled` event) or on a push to `main`; `permissions` read-only, `timeout-minutes` on every job, `concurrency` on the jobs (the gate cancels, the paid job queues), every `uses:` pinned to a 40-hex SHA |
 | M2 · Ownership | `.github/CODEOWNERS` owns every harness file of the folder (last match wins; itself included; the owner `HARNESS.md` names is among the owners); `.github/pull_request_template.md` has a checklist that covers the scorecard, attacks, evals, the budget and rollback |
 | M3 · Release | `harness.json` (`name`, semver `version`), `CHANGELOG.md` (Keep a Changelog; top release = the version); `scripts/release.mjs <major\|minor\|patch> [--dry-run] [--json]`: bump, validate (scorecard ≥ L4, attacks clean, an Unreleased entry, a new tag), package `dist/plugin/` + `dist/apm/`, commit and tag `v<version>` only in its own repository |
 | M4 · AI review | `.github/workflows/harness-review.md` (gh-aw): harness paths, imports the Lab 03 reviewer, read-only permissions, runs the scorecard in pre-agent `steps:` and the prompt reads its output, one `add-comment` (max 1), `timeout-minutes`, `max-ai-credits`; the scorecard's workflow rules stay green; `gh aw compile` optional |
@@ -54,6 +54,15 @@ args, git helpers, file copy; `bump`, `validate`, `pack`, the release steps are 
   deploys the config without the script.
 - The scorecard's CI-gate rule reads `.yml` workflows only; `apm-pinned` rejects a local path dependency (its PINNED
   regex needs `#<tag|sha>`), and skills are scanned only in `.github/skills/`: both matter to hard++ (see the report).
+- Review fixes (after the first commit): the paid eval job runs only on `push` to `main` or on the `labeled` event
+  whose `github.event.label.name` is `run-evals` (a person decides; push and re-label to re-run), and concurrency
+  moved onto the jobs (the gate cancels, the evals job queues with `cancel-in-progress: false`; a workflow-level
+  `cancel-in-progress` would cancel a run that already spent credits). The check evaluates the job's and the
+  step's `if:` (and the `if:` of every job it needs) with a small GitHub-expression evaluator over six events
+  (opened; a push to a labelled PR; another label added; reopened with the label; the run-evals label added; a push
+  to main), so any spelling of the right condition passes. "About 240 credits" (the cap is soft). `eval.mjs` gets
+  `--trust-folder` from hard (a CI runner trusts no folder). CODEOWNERS names only the owner for the gate's scripts,
+  `evals/baseline.json` and `attacks/pack.json` (GitHub accepts any one listed owner).
 
 ## Implementation notes
 - Files: `todo.md`; `tests/checks.mjs` (22 checks: M1 6, M2 2, M3 7, M4 4 with the optional `gh aw compile`, M5 3),

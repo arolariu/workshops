@@ -8,7 +8,8 @@ team's work (a removed rule, a stricter guard), a minor one for a new layer or r
 ## [Unreleased]
 ### Added
 - A CI gate for harness changes (`.github/workflows/harness-ci.yml`): the scorecard, the attack pack, the
-  self-tests and the eval self-test on every pull request; real evals on the `run-evals` label and on `main`.
+  self-tests and the eval self-test on every pull request; real evals when someone adds the `run-evals` label, and
+  on `main`.
 - Code owners for every harness path, and a pull-request template with the harness checklist.
 - `scripts/release.mjs`: a version, this changelog, a plugin (`dist/plugin/`) and an APM package (`dist/apm/`).
 - An AI review of harness pull requests with the reviewer agent (`.github/workflows/harness-review.md`).

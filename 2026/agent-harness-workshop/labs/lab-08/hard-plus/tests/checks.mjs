@@ -6,9 +6,9 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  ancestors, changelog, checklist, codeowners, commitAll, compareSemver, eventsOf, filesUnder, front, gatesHarness,
+  ancestors, changelog, checklist, codeowners, commitAll, compareSemver, EVENTS, eventsOf, filesUnder, front, gatesHarness,
   git, gitEnv, gitTry, harnessFiles, hookScripts, jsonOut, maturity, nextVersion, norm, ownersOf, parseYaml, readIn, readOnly,
-  repoOf, restricts, SAFE_OUTPUT_SETTINGS, scanHarness, scorecard, script, sections, SEMVER, some, stepsOf, tail, toldScorecard,
+  repoOf, restricts, SAFE_OUTPUT_SETTINGS, scanHarness, scorecard, script, sections, SEMVER, some, stepRuns, stepsOf, tail, toldScorecard,
   triggers, unpinned, unrestrictedBash, walk, writeIn,
 } from './helpers.mjs';
 
@@ -96,7 +96,7 @@ export default (t) => [
     return toldScorecard(score) || 'Outside the workshop harness-check.mjs can\'t find the scorecard by walking up: set `HARNESS_SCORECARD` on the step (or pass `--scorecard`), pointing at a pinned checkout of the workshop\'s labs/_harness/scorecard.mjs.';
   }, { milestone: 'M1' }),
 
-  t.check('Real evals: against the baseline, within a budget, only on the run-evals label or on main', () => {
+  t.check('Real evals: against the baseline, within a budget, only when someone adds the run-evals label or on main', () => {
     const wf = ciOf(t);
     const real = stepsOf(wf).filter((s) => EVAL_REAL(s.run));
     if (!real.length) return 'No step runs scripts/eval.mjs for real yet (without --from or --dry-run).';
@@ -105,13 +105,20 @@ export default (t) => [
       if (!/--baseline\s+\S/.test(s.run)) p.push('compare with the baseline (`--baseline evals/baseline.json`)');
       const budget = s.run.match(/--budget[\s=]+(\d+(?:\.\d+)?)/);
       if (!budget || !(Number(budget[1]) > 0)) p.push('cap the credits (`--budget <credits>`)');
-      if (!/run-evals/.test(s.cond) || !/\bmain\b/.test(s.cond)) p.push(`run only on the run-evals label or on main (an \`if:\` on the job or the step; now: ${s.cond ? `\`${s.cond}\`` : 'none, so every pull request spends credits'})`);
+      for (const [what, want, github] of EVENTS) {
+        let runs;
+        try { runs = stepRuns(wf, s, { github }); } catch (e) { p.push(`have an \`if:\` the checks can read (${e.message})`); break; }
+        if (runs !== want) {
+          p.push(want ? `run when ${what}` : `not run when ${what}: a person decides when to spend credits, and adding the label is that decision (use \`github.event.action == 'labeled' && github.event.label.name == 'run-evals'\`, not "the pull request has the label")`);
+          break;
+        }
+      }
       return p.map((x) => `job ${s.job}: ${x}`);
     });
     return !problems.length || `The real eval step needs to ${problems.join('; ')}.`;
   }, { milestone: 'M1' }),
 
-  t.check('Locked down: read-only permissions, a timeout on every job, a concurrency group, actions pinned to SHAs', () => {
+  t.check('Locked down: read-only permissions, a timeout on every job, concurrency that never cancels a paid run, actions pinned to SHAs', () => {
     const wf = ciOf(t);
     const problems = [];
     if (!readOnly(wf.permissions)) problems.push(`top-level \`permissions\` must be read-only (\`contents: read\`)${wf.permissions == null ? ': without it the token may write' : ''}`);
@@ -121,7 +128,11 @@ export default (t) => [
     }
     const jobs = Object.values(wf.jobs ?? {});
     const group = (c) => (typeof c === 'string' ? c : c?.group);
-    if (!group(wf.concurrency) && !(jobs.length && jobs.every((j) => group(j?.concurrency)))) problems.push('add a `concurrency` group (with `cancel-in-progress: true`), so a new push stops the old run');
+    const cancels = (c) => c != null && typeof c === 'object' && c['cancel-in-progress'] != null && c['cancel-in-progress'] !== false;
+    if (!group(wf.concurrency) && !(jobs.length && jobs.every((j) => group(j?.concurrency)))) problems.push('add a `concurrency` group (on the workflow, or on every job), so a new push stops the old free run');
+    const paid = [...new Set(stepsOf(wf).filter((s) => EVAL_REAL(s.run)).map((s) => s.job))];
+    if (paid.length && cancels(wf.concurrency)) problems.push('a workflow-level `cancel-in-progress` cancels the paid eval job too, after it spent credits: move the concurrency onto the jobs (the gate may cancel, the evals job queues)');
+    for (const j of paid) if (cancels(wf.jobs[j]?.concurrency)) problems.push(`job ${j} spends credits: its concurrency must queue (\`cancel-in-progress: false\`), never cancel a run halfway`);
     const loose = unpinned(wf);
     if (loose.length) problems.push(`pin to a full commit SHA: ${some(loose)}`);
     return !problems.length || `${CI}: ${problems.join('; ')}.`;

@@ -5,7 +5,7 @@ on:
   # TODO(M1): run on pull requests that change a harness file (with the `labeled` type), and on pushes to main.
   workflow_dispatch:
 
-# TODO(M1): read-only permissions, and a concurrency group.
+# TODO(M1): read-only permissions, and concurrency that cancels the free gate but never a paid eval run halfway.
 
 jobs:
   gate:
@@ -22,4 +22,5 @@ jobs:
       # is), the attack pack, the self-tests and the eval self-test from the recorded runs.
       - run: echo "TODO(M1)"
 
-  # TODO(M1): real evals against the baseline, within a credit budget, only on the run-evals label or on main.
+  # TODO(M1): real evals against the baseline, within a credit budget, only when someone adds the run-evals label
+  # (that labeled event, not every event of a pull request that has the label), or on a push to main.

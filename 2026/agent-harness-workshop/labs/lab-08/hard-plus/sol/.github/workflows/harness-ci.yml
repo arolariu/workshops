@@ -1,5 +1,6 @@
 # Harness CI: the gate every change to the agent's context goes through (HARNESS.md, "Changing the harness").
-# Free checks on every pull request; real evals, which spend AI credits, on the run-evals label or on main.
+# Free checks on every pull request. Real evals spend AI credits, so a person decides when: they run once when
+# someone adds the run-evals label (push again and re-label to re-run), and on every push to main.
 name: Harness CI
 
 on:
@@ -45,15 +46,16 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: harness-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+# Concurrency lives on the jobs: a new push cancels the free gate, but never a paid eval run halfway through.
 
 jobs:
   gate:
     name: Scorecard, attacks and self-tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    concurrency:
+      group: harness-gate-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
     defaults:
       run:
         working-directory: harness
@@ -86,11 +88,19 @@ jobs:
         run: node scripts/eval.mjs --from evals/runs/full --baseline evals/baseline.json
 
   evals:
-    name: Evals against the baseline (real runs, at most 240 credits)
+    name: Evals against the baseline (real runs, about 240 credits)
     needs: gate
-    if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'run-evals')
+    # Only on a push to main, or on the event of a person adding the run-evals label: not on every event of a
+    # pull request that has the label (a push, another label), which would spend the credits again unasked.
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      || (github.event.action == 'labeled' && github.event.label.name == 'run-evals')
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Queued, never cancelled: a cancelled run has spent its credits and measured nothing.
+    concurrency:
+      group: harness-evals-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -100,7 +110,8 @@ jobs:
           node-version: 24
       - name: Install the Copilot CLI (a pinned version)
         run: npm install --global @github/copilot@1.0.100
-      - name: Evals (worst case 8 cases x 1 run x 30 credits = 240)
+      # eval.mjs passes --trust-folder to each run: a CI runner trusts no folder, so the harness wouldn't load.
+      - name: Evals (worst case about 240 credits = 8 cases x 1 run x 30, a soft cap)
         run: node scripts/eval.mjs --runs 1 --budget 240 --baseline evals/baseline.json --threshold 75 --report evals/reports
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

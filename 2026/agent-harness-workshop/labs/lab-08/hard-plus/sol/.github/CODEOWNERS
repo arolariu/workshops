@@ -19,8 +19,16 @@
 /CHANGELOG.md           @alex-morgan @studybuddy/tas
 /dist/                  @alex-morgan
 
-# The controls themselves: only the owner. A change here can switch the other checks off.
-/harness.json           @alex-morgan
-/.github/hooks/         @alex-morgan
-/.github/workflows/     @alex-morgan
-/.github/CODEOWNERS     @alex-morgan
+# The controls themselves: only the owner. GitHub accepts a review from any one of a line's owners, so these lines
+# name only Alex: a change here can weaken or switch off the other checks (the hooks, the gate's workflows, the
+# scripts whose exit code is the gate, the eval baseline and comparison, the shipped attack pack, this file).
+/harness.json               @alex-morgan
+/.github/hooks/             @alex-morgan
+/.github/workflows/         @alex-morgan
+/.github/CODEOWNERS         @alex-morgan
+/scripts/harness-check.mjs  @alex-morgan
+/scripts/attack.mjs         @alex-morgan
+/scripts/eval.mjs           @alex-morgan
+/scripts/eval/              @alex-morgan
+/evals/baseline.json        @alex-morgan
+/attacks/pack.json          @alex-morgan

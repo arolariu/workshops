@@ -118,6 +118,109 @@ export function readOnly(perms) {
 /** Is the scorecard's location given to the step (variable or --scorecard)? */
 export const toldScorecard = (s) => /--scorecard\s+\S/.test(s.run) || /HARNESS_SCORECARD=/.test(s.run) || Boolean(s.env?.HARNESS_SCORECARD);
 
+// ---------- GitHub Actions expressions (enough of them to judge an `if:`) ----------
+class Filtered extends Array {}
+const lower = (v) => (typeof v === 'string' ? v.toLowerCase() : v);
+const truthy = (v) => !(v === false || v === 0 || v === '' || v == null || Number.isNaN(v));
+function looseEq(a, b) {
+  if (typeof a === 'string' && typeof b === 'string') return a.toLowerCase() === b.toLowerCase();
+  if (typeof a === typeof b) return a === b;
+  const num = (v) => (v == null ? 0 : typeof v === 'boolean' ? Number(v) : typeof v === 'string' ? (v.trim() === '' ? 0 : Number(v)) : typeof v === 'number' ? v : NaN);
+  return num(a) === num(b);
+}
+const FUNCS = {
+  contains: (a, b) => (Array.isArray(a) ? a.some((x) => looseEq(x, b)) : String(a ?? '').toLowerCase().includes(String(b ?? '').toLowerCase())),
+  startswith: (a, b) => String(a ?? '').toLowerCase().startsWith(String(b ?? '').toLowerCase()),
+  endswith: (a, b) => String(a ?? '').toLowerCase().endsWith(String(b ?? '').toLowerCase()),
+  success: () => true, always: () => true, cancelled: () => false, failure: () => false,
+};
+/** Evaluates an `if:` expression (`${{ }}` optional) against a context such as { github: { … } }. Throws on what it can't read. */
+export function evalExpr(src, ctx) {
+  const text = String(src ?? '').trim().replace(/^\$\{\{([\s\S]*)\}\}$/, '$1').trim();
+  const toks = [];
+  const re = /\s*(?:('(?:[^']|'')*')|(\d+(?:\.\d+)?)|(==|!=|<=|>=|&&|\|\||[()!<>,.[\]*])|([A-Za-z_][\w-]*))/y;
+  while (re.lastIndex < text.length) {
+    const at = re.lastIndex;
+    const m = re.exec(text);
+    if (!m) { if (!text.slice(at).trim()) break; throw new Error(`can't read "${text.slice(at, at + 24)}"`); }
+    toks.push(m[1] != null ? { t: 'str', v: m[1].slice(1, -1).replace(/''/g, "'") } : m[2] != null ? { t: 'num', v: Number(m[2]) } : m[3] != null ? { t: 'op', v: m[3] } : { t: 'id', v: m[4] });
+  }
+  let i = 0;
+  const peek = (v) => toks[i]?.t === 'op' && toks[i].v === v;
+  const take = (v) => { if (!peek(v)) throw new Error(`expected "${v}" in ${text}`); i++; };
+  const or = () => { let v = and(); while (peek('||')) { i++; const r = and(); v = truthy(v) ? v : r; } return v; };
+  const and = () => { let v = cmp(); while (peek('&&')) { i++; const r = cmp(); v = truthy(v) ? r : v; } return v; };
+  const cmp = () => {
+    const a = unary();
+    for (const op of ['==', '!=', '<=', '>=', '<', '>']) {
+      if (!peek(op)) continue;
+      i++;
+      const b = unary();
+      if (op === '==') return looseEq(a, b);
+      if (op === '!=') return !looseEq(a, b);
+      return { '<': lower(a) < lower(b), '>': lower(a) > lower(b), '<=': lower(a) <= lower(b), '>=': lower(a) >= lower(b) }[op];
+    }
+    return a;
+  };
+  const unary = () => (peek('!') ? (i++, !truthy(unary())) : postfix());
+  const prop = (v, k) => (v instanceof Filtered ? Filtered.from(v.flatMap((x) => (x != null && typeof x === 'object' ? [x[k]] : []))) : v != null && typeof v === 'object' && !Array.isArray(v) ? v[k] ?? null : null);
+  const postfix = () => {
+    let v = primary();
+    for (;;) {
+      if (peek('.')) {
+        i++;
+        if (peek('*')) { i++; v = Filtered.from(Array.isArray(v) ? v : v && typeof v === 'object' ? Object.values(v) : []); continue; }
+        const id = toks[i++];
+        if (id?.t !== 'id') throw new Error(`expected a name after "." in ${text}`);
+        v = prop(v, id.v);
+      } else if (peek('[')) {
+        i++;
+        const k = or();
+        take(']');
+        v = Array.isArray(v) && !(v instanceof Filtered) ? v[k] ?? null : prop(v, k);
+      } else return v;
+    }
+  };
+  const primary = () => {
+    const tok = toks[i++];
+    if (!tok) throw new Error(`the expression ends too early: ${text}`);
+    if (tok.t === 'str' || tok.t === 'num') return tok.v;
+    if (tok.t === 'op' && tok.v === '(') { const v = or(); take(')'); return v; }
+    if (tok.t !== 'id') throw new Error(`unexpected "${tok.v}" in ${text}`);
+    if (peek('(')) {
+      i++;
+      const args = [];
+      while (!peek(')')) { args.push(or()); if (peek(',')) i++; else break; }
+      take(')');
+      const fn = FUNCS[tok.v.toLowerCase()];
+      if (!fn) throw new Error(`the checks can't evaluate ${tok.v}()`);
+      return fn(...args);
+    }
+    const word = tok.v.toLowerCase();
+    if (word === 'true') return true;
+    if (word === 'false') return false;
+    if (word === 'null') return null;
+    return ctx[tok.v] ?? null;
+  };
+  const v = or();
+  if (i < toks.length) throw new Error(`can't read "${toks.slice(i).map((x) => x.v).join(' ')}" in ${text}`);
+  return truthy(v);
+}
+/** Would this step run for this event? Its job, every job it needs, and the step itself must all say yes. */
+export function stepRuns(wf, s, ctx) {
+  const ifs = [...ancestors(wf, s.job), s.job].map((j) => wf.jobs?.[j]?.if).concat(s.step?.if).filter((c) => c != null);
+  return ifs.every((c) => evalExpr(c, ctx));
+}
+/** The events a paid step may and may not run on. */
+export const EVENTS = [
+  ['a pull request is opened', false, { event_name: 'pull_request', ref: 'refs/pull/7/merge', event: { action: 'opened', pull_request: { number: 7, labels: [] } } }],
+  ['someone pushes to a pull request that has the run-evals label', false, { event_name: 'pull_request', ref: 'refs/pull/7/merge', event: { action: 'synchronize', pull_request: { number: 7, labels: [{ name: 'run-evals' }] } } }],
+  ['someone adds another label to a pull request that has run-evals', false, { event_name: 'pull_request', ref: 'refs/pull/7/merge', event: { action: 'labeled', label: { name: 'documentation' }, pull_request: { number: 7, labels: [{ name: 'run-evals' }, { name: 'documentation' }] } } }],
+  ['a pull request with the run-evals label is reopened', false, { event_name: 'pull_request', ref: 'refs/pull/7/merge', event: { action: 'reopened', pull_request: { number: 7, labels: [{ name: 'run-evals' }] } } }],
+  ['someone adds the run-evals label', true, { event_name: 'pull_request', ref: 'refs/pull/7/merge', event: { action: 'labeled', label: { name: 'run-evals' }, pull_request: { number: 7, labels: [{ name: 'run-evals' }] } } }],
+  ['a push to main', true, { event_name: 'push', ref: 'refs/heads/main', event: { ref: 'refs/heads/main' } }],
+];
+
 // ---------- a gh-aw workflow's frontmatter ----------
 function depthOf(s) {
   let d = 0, q = null;

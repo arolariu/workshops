@@ -12,9 +12,10 @@ reviewer, and a runbook and a script that roll back to the last good version. Yo
 ## 📋 Requirements
 1. `.github/workflows/harness-ci.yml` runs on every pull request that changes a harness file, and on pushes to
    `main`. Every time: the scorecard (L4 Guarded or better), the attack pack, the self-tests and the eval self-test.
-   Real evals, against the baseline and within a credit budget, run only on the `run-evals` label or on `main`.
-2. The workflow is locked down: read-only `permissions`, a `timeout-minutes` on every job, a `concurrency` group,
-   and every action pinned to a full commit SHA.
+   Real evals, against the baseline and within a credit budget, run only when someone adds the `run-evals` label,
+   and on `main`.
+2. The workflow is locked down: read-only `permissions`, a `timeout-minutes` on every job, `concurrency` that never
+   cancels a paid run halfway, and every action pinned to a full commit SHA.
 3. `.github/CODEOWNERS` owns every harness file, and `.github/pull_request_template.md` has a harness checklist.
 4. `harness.json` (`name`, semantic `version`) and `CHANGELOG.md` version the harness. `scripts/release.mjs` bumps
    the version, validates, packages `dist/plugin/` and `dist/apm/`, commits and tags `v<version>`, but only at the
@@ -37,10 +38,11 @@ node scripts/rollback.mjs --to <version> [--dry-run] [--json]
   to `main`, and its `paths` let every harness file of this folder through
 - In jobs without an `if`: the scorecard (`scripts/harness-check.mjs`, at least L4, told where the scorecard is),
   `node scripts/attack.mjs`, `node --test` and `node scripts/eval.mjs --from … --baseline …`
-- A step runs `scripts/eval.mjs` for real, with `--baseline` and a `--budget`, only when the `run-evals` label is
-  on the pull request or the run is on `main`
-- `permissions` is read-only, every job has a `timeout-minutes`, there is a `concurrency` group, and every `uses:`
-  is pinned to a 40-character commit SHA
+- A step runs `scripts/eval.mjs` for real, with `--baseline` and a `--budget`, only on a push to `main` or when
+  someone adds the `run-evals` label (the `labeled` event for that label): never on the other events of a pull
+  request that has the label
+- `permissions` is read-only, every job has a `timeout-minutes`, there is a `concurrency` group that never cancels
+  a paid eval run halfway, and every `uses:` is pinned to a 40-character commit SHA
 - The X-ray now shows **L5 Governed**
 
 ### M2 · Ownership
@@ -110,23 +112,37 @@ out at a pinned commit, next to your harness, and point `HARNESS_SCORECARD` at i
 
 </details>
 
-<details><summary>Real evals only on a label or on main</summary>
+<details><summary>Real evals: a person decides when</summary>
 
-Put them in their own job with `needs:` on the gate and an `if:` that reads the event:
-`github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'run-evals')`. A label is only
-an event when `types:` lists `labeled`. Size the budget from the worst case: 8 cases × 1 run × 30 credits (the
-smallest cap a Copilot session takes) = 240, so `--runs 1 --budget 240`. With one run a case scores 0 or 100%, so
-`--threshold 75` flags only a case that always passed and now fails. The job needs a Copilot token
-(`secrets.COPILOT_GITHUB_TOKEN`) and the CLI at a pinned version. Pull requests from forks get no secrets: that's a
-feature here.
+Put them in their own job, with `needs:` on the gate and an `if:` that reads the **event**, not the label list:
+```yaml
+evals:
+  needs: gate
+  if: >-
+    (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    || (github.event.action == 'labeled'
+        && github.event.label.name == 'run-evals')
+```
+Adding the label is the decision to spend credits, and it runs the evals once. "The pull request has the label"
+would run them again on every push and on every other label, without anyone deciding; to re-run, push and then
+remove and add the label again. A label is only an event when `types:` lists `labeled`. Size the budget from the
+worst case: 8 cases × 1 run × 30 credits (the smallest cap a Copilot session takes) = about 240 (the cap is soft: a
+run can go one response over), so `--runs 1 --budget 240`. With one run a case scores 0 or 100%, so `--threshold 75`
+flags only a case that always passed and now fails. The job needs a Copilot token (`secrets.COPILOT_GITHUB_TOKEN`)
+and the CLI at a pinned version. On a CI runner no folder is trusted, so Copilot wouldn't load your MCP server,
+hooks or agents: `eval.mjs` passes `--trust-folder` to each run, which trusts the folder for that one session only.
+Pull requests from forks get no secrets: that's a feature here.
 
 </details>
 
-<details><summary>Pinning actions</summary>
+<details><summary>Pinning actions, and a paid run nobody cancels</summary>
 
 A tag like `@v7` can be moved to other code at any time; a commit SHA can't. Write the SHA and keep the version in
 a comment: `actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0`. Dependabot updates both. Add
-`persist-credentials: false` to the checkouts: nothing in this workflow pushes.
+`persist-credentials: false` to the checkouts: nothing in this workflow pushes. A workflow-level `concurrency` with
+`cancel-in-progress: true` would also cancel an eval run that has already spent its credits. Put concurrency on
+the jobs instead: the gate's group cancels (a new push makes the old check pointless), the evals job's group has
+`cancel-in-progress: false`, so a second paid run waits for the first.
 
 </details>
 
@@ -135,8 +151,10 @@ a comment: `actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
 
 Lines read like `.gitignore`: `/AGENTS.md` is the root file only, `*.instructions.md` matches at any depth, and
 `/.github/` is everything under it. The **last** matching line wins, so put the broad lines first and the stricter
-ones (the hooks, the workflows, `CODEOWNERS` itself) after them. A line with no owner un-owns its files. Owners are
-`@user`, `@org/team` or an e-mail address, and they need write access to the repository.
+ones after them. GitHub accepts a review from **any one** of a line's owners, so the controls (the hooks, the
+workflows, the scripts whose exit code is the gate, the eval baseline, the shipped attack pack, `CODEOWNERS` itself)
+get lines that name only the harness owner. A line with no owner un-owns its files. Owners are `@user`,
+`@org/team` or an e-mail address, and they need write access to the repository.
 
 </details>
 
@@ -170,9 +188,9 @@ this repository's own rules.
 <details><summary>Only in its own repository</summary>
 
 `git rev-parse --show-cdup` prints the way up to the top of the repository: nothing at the top. Inside the
-workshop it prints `../../../../../`, so a real release refuses there; `--dry-run` never tags, so it works
-anywhere. A release commits `dist/` too: an install pinned to a tag needs the package inside the tagged tree, the
-way a JavaScript action commits its `dist/`.
+workshop (from `labs/lab-08/hard-plus/src`) it prints `../../../../../../`, so a real release refuses there;
+`--dry-run` never tags, so it works anywhere. A release commits `dist/` too: an install pinned to a tag needs the
+package inside the tagged tree, the way a JavaScript action commits its `dist/`.
 
 </details>
 

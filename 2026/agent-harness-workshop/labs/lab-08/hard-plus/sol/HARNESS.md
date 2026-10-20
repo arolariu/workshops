@@ -50,8 +50,9 @@ Every family of the attack pack, the control that stops it (the guard's rule ids
   this harness is ≈690).
 - Issue triage: `max-ai-credits: 50` credits and `timeout-minutes: 10` per run.
 - Harness review: `max-ai-credits: 60` credits and `timeout-minutes: 15` per pull request that changes the harness.
-- Harness CI: the gate is free (no model); real evals run on the `run-evals` label and on `main`, at most **240
-  credits** a run (8 cases × 1 run × 30 credits, `--budget 240`), and 45 minutes.
+- Harness CI: the gate is free (no model). Real evals run once when someone adds the `run-evals` label, and on every
+  push to `main`: about **240 credits** a run (8 cases × 1 run × 30 credits, `--budget 240`; the cap is soft, a run
+  can go one response over), and 45 minutes. A paid run is queued, never cancelled halfway.
 - Interactive sessions: a person watches them; scripted runs need their own credit limit before they are added.
 
 ## Changing the harness
@@ -60,8 +61,10 @@ Every family of the attack pack, the control that stops it (the guard's rule ids
   and the pull-request template carries the harness checklist.
 - The CI gate (`.github/workflows/harness-ci.yml`) runs on every such pull request: the scorecard must stay at L4
   Guarded or better (`node scripts/harness-check.mjs`), `node scripts/attack.mjs` has no miss and no false positive,
-  `node --test` is green, and the eval self-test passes against `evals/baseline.json`. Add the `run-evals` label to
-  measure a change to instructions, skills, agents, MCP or hooks for real; `main` always gets a real run.
+  `node --test` is green, and the eval self-test passes against `evals/baseline.json`. To measure a change to
+  instructions, skills, agents, MCP or hooks for real, add the `run-evals` label: adding it is the decision to spend
+  the credits, and it runs the evals once (push, then remove and add the label to run them again). `main` always
+  gets a real run.
 - In the workshop, the checks (`node labs/start.mjs test lab-08 hard+`) and the X-ray show the same: L5 Governed with
   the always-on total under budget. Update the numbers on this page.
 - A new guard rule comes with an attack it stops and an everyday call it must still allow, in `attacks.local.json`.
