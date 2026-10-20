@@ -121,3 +121,43 @@ Then I, alone: merge, `sync-seeds` once, resolve conflicts, `verify --chain --br
 
 - §5.1 times → Task 1 enforces them; §5.3 ticket format → Task 1; §5.4 ladders → Tasks 2 and 4; §5.10 catalog tests and "every milestone has a check" → Task 1 and `verify`; §6 "one plan per lab, Lab 05 first" → Tasks 2 and 4; §8 risks (content volume, ripples, agent behaviour) → exemplar review, `sync-seeds` once, re-validation of changed agent checks.
 - Coordinator decisions 1–5 → Tasks 2, 1, 2/4, 4, 3.
+
+## Implementation notes (as built, 20 Oct 2026)
+
+**Fan-out.** Seven general-purpose subagents (Labs 00, 01, 02, 03, 04, 06, 07) ran in parallel, one lab each, from a
+shared brief (`files/phase4-fanout-brief.md` in the session: the exemplar's seven rules plus the coordinator's two,
+the chain rules, allowed commands, and "never touch other labs, git state, sync-seeds or agent checks"). Each wrote its
+own plan (`2026-10-19-phase-4-lab-XX.md`), kept its row consistent by hand (`sync-seeds --dry-run`: 0 changes), and
+reported. I committed each lab separately and ran `sync-seeds` once (it wrote only `starters.json`, and later the
+easy-guard fix into Labs 06 and 07).
+
+**Central changes (deviations from this plan, each with a test):**
+| Change | Why |
+|---|---|
+| `bring` carries **support files**: a passed level's new starter files on the harness paths that its work uses unchanged (e.g. `org.json`, `roles.json`), only into a level that lacks them, never over real work, never on their own. | Found by Lab 03: a brought audit script or Lab 05 hard++ guard would run without its policy (the guard would deny every call). |
+| `/.mcp.json`, `/apm.yml`, `/apm.lock.yaml` pinned to the root in `harnessPaths`. | Lab 06: a plugin folder's own `apm.yml` travelled alone. |
+| `lab-02/hard-plus` `local: ["VERDICT.md", "vendor/**"]`. | The vendor samples (one malicious, inert) are hard+ evidence only. |
+| Scorecard: `tools: []` is "no tools"; gh-aw's global safe-output options and system types need no `max`; workflow rules follow `imports:`. | Copilot and gh-aw docs; Labs 03 and 07. |
+| Agent checks may compute `agent` from the copy (`<plugin>:<agent>`); a spec function that throws fails its case. | Validation: Copilot names plugin agents `<plugin>:<agent>` (plugin skills keep their names). |
+| `t.tmp()` returns real paths; each check's temp folders go when it ends. | Review: through a symlink (macOS `/var`), a junction or an 8.3 name, a script's main-module test fails and a guard silently allows everything. Every lab's scripts now compare real paths too. |
+| Content test: every lab 00–07 (`CONTENT_TEST_LABS` for one), and a `TODO(Mn)` marker per milestone in each hard+/hard++ level's own starters. | Coordinator decision (skeletons with markers). |
+| Crash-left `mcp/state.json.*.tmp` is a runtime file (fingerprints, chain, `.gitignore`). | Lab 04. |
+| Help screen and readme give tier times as they are now; homework paths per spec §5.1. | Phase 4 fills the tiers. |
+
+**Spikes (free):** Lab 06's marketplace format (`marketplace.json` in `.github/plugin/`, needs `name`, `owner`,
+`plugins`; relative `marketplace add` paths fail) and Lab 07's gh-aw shared configuration (budgets in a shared file
+do reach the lock, against the docs; `timeout-minutes`/`cancel-in-progress` there are compile errors). Details in
+those labs' plans. The CLI auto-updated to 1.0.101-0 during the phase.
+
+**Agent validation (fan-out budget 31, each `--max-ai-credits 30`):** 27 prompts. Batch 1 (12): lab-00 hard and hard+,
+lab-01 hard and hard++, lab-03 medium, hard and hard+, lab-04 hard+ and hard++ pass; lab-06 hard failed before any
+model call (the plugin agent's name), fixed. Batch 2 (4): lab-02 medium and hard++, lab-06 hard pass. After the review
+fixes, batches 3–5 (11): lab-02 medium, lab-04 hard and hard++, lab-05 hard+ and hard++, lab-03 medium and hard,
+lab-01 hard and hard++.
+
+**Independent review of the whole range (nine reviewers: seven labs, the Lab 05 fixes, the harness): every one "with
+fixes", no critical issue left.** The lab subagents fixed their labs' findings; I fixed Lab 05 (a newline let a second
+command past the engine and past "allow covers every command"; prefix depth; substitutions; escaped quotes;
+PowerShell script blocks) and the harness. Cross-cutting fixes: free checks that a learner's bug could turn into paid
+Copilot runs now run with Copilot unreachable, and every script's main-module test compares real paths.
+
