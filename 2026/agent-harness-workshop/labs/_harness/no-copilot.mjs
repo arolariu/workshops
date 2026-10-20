@@ -112,14 +112,15 @@ export const guardNodeOptions = (env = process.env) => (env.HARNESS_COPILOT_LOG 
 /**
  * Windows only: a program started by name without a shell (CreateProcess, libuv, Python, Go …) is found as .com or
  * .exe, never as the stub copilot.cmd, so a PATH folder that holds copilot.exe/.com would let it reach the real CLI.
- * Each such folder is replaced by a mirror of its other files: hard links, else symlinks, else a .cmd shim (found by
- * shells, and by the kit, which falls back to the shell when a name isn't found).
+ * Each such folder is replaced by a mirror of its other files: hard links, else symlinks, else a .cmd shim for an
+ * .exe/.com (found by shells, and by the kit, which falls back to the shell when a name isn't found). When both links
+ * fail (another volume, or Program Files without Developer Mode), the folder's other files (.cmd, .ps1 …) are left out.
  */
 function hideCopilotExe(dir, value) {
   if (process.platform !== 'win32') return value;
   const has = (d, f) => { try { fs.lstatSync(path.join(d, f)); return true; } catch { return false; } };
   return value.split(';').map((entry, i) => {
-    const d = entry.replace(/^"|"$/g, '');
+    const d = entry.trim().replace(/^"|"$/g, '');
     if (!d || !(has(d, 'copilot.exe') || has(d, 'copilot.com'))) return entry;
     const mirror = path.join(dir, `path-${i}`);
     fs.mkdirSync(mirror, { recursive: true });

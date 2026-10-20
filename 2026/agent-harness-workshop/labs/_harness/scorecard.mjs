@@ -55,6 +55,19 @@ const SAFE_OUTPUT_OPTIONS = new Set(['allowed-domains', 'allowed-github-referenc
 const toolList = (v) => (v == null ? null : (Array.isArray(v) ? v : String(v).split(',')).map((x) => String(x).trim().replace(/^['"]|['"]$/g, '')).filter(Boolean));
 
 /** What the folder holds, layer by layer. Broken JSON or YAML becomes a `problems` entry, never a throw. */
+/** Does a relative dependency path (./x, ../x) resolve inside the repository that holds `dir`? */
+function inRepo(dir, dep) {
+  if (!/^\.{1,2}[\\/]/.test(dep)) return false;
+  let root = path.resolve(dir);
+  for (let d = root; ; d = path.dirname(d)) {
+    if (fs.existsSync(path.join(d, '.git'))) { root = d; break; }
+    if (path.dirname(d) === d) break;
+  }
+  const target = path.resolve(dir, dep);
+  const rel = path.relative(root, target);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
 export function scanHarness(dir) {
   const files = walk(dir);
   const read = (rel) => { try { return fs.readFileSync(path.join(dir, ...rel.split('/')), 'utf8').replace(/\r\n/g, '\n'); } catch { return null; } };
@@ -254,8 +267,9 @@ export function scorecard(scan, { mcpTools } = {}) {
   // Distribution
   if (!scan.apm) none('distribution', 'apm.yml')('apm-pinned');
   else {
-    // A local path (../dist/apm, ./packages/x) is pinned by the repository's own history.
-    const loose = scan.apm.deps.filter((d) => !PINNED.test(d) && !/^\.{1,2}[\\/]/.test(d));
+    // A local path (../dist/apm, ./packages/x) is pinned by the repository's own history, as long as it stays inside
+    // that repository (the nearest folder with a .git above the harness, or the harness folder itself).
+    const loose = scan.apm.deps.filter((d) => !PINNED.test(d) && !inRepo(scan.dir, d));
     add('apm-pinned', 'distribution', !loose.length, loose.length ? `Pin these to a tag (owner/repo#v1.0.0): ${loose.join(', ')}` : `Every dependency is pinned (${scan.apm.deps.length}).`, ['apm.yml']);
   }
   if (!scan.plugins.length) none('distribution', 'plugin.json')('plugin-manifest');

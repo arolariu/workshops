@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { test } from 'node:test';
 import { LAYERS, scanHarness, scorecard, maturity } from '../scorecard.mjs';
 import { tmpdir, writeTree } from './helpers.mjs';
@@ -55,10 +56,16 @@ test('skills: a good description reaches L2; a name that is not the folder name 
 
 test('distribution: a local APM dependency is pinned by the repository itself; a remote one needs a tag or a commit', () => {
   const deps = (list) => run({ 'apm.yml': `name: x\ndependencies:\n  apm:\n${list.map((d) => `    - ${d}\n`).join('')}` }).rule('apm-pinned');
-  assert.equal(deps(['../dist/apm', './packages/harness', 'microsoft/apm-sample-package#v1.0.0', 'org/repo#0a1b2c3']).ok, true);
-  const loose = deps(['microsoft/apm-sample-package', 'https://example.com/pkg', '../dist/apm']);
+  assert.equal(deps(['./packages/harness', 'microsoft/apm-sample-package#v1.0.0', 'org/repo#0a1b2c3']).ok, true);
+  const loose = deps(['microsoft/apm-sample-package', 'https://example.com/pkg', '../../outside', 'C:/pkg']);
   assert.equal(loose.ok, false);
-  assert.match(loose.message, /microsoft\/apm-sample-package, https:\/\/example\.com\/pkg$/);
+  assert.match(loose.message, /microsoft\/apm-sample-package, https:\/\/example\.com\/pkg, \.\.\/\.\.\/outside, C:\/pkg$/);
+  // Inside a repository, ../ is fine while it stays in it: campushub/apm.yml → ../dist/apm.
+  const repo = writeTree(tmpdir(), { '.git/HEAD': 'ref: refs/heads/main\n', 'campushub/apm.yml': 'name: c\ndependencies:\n  apm:\n    - ../dist/apm\n    - ../../elsewhere\n' });
+  const scan = scanHarness(path.join(repo, 'campushub'));
+  const rule = scorecard(scan).find((r) => r.id === 'apm-pinned');
+  assert.equal(rule.ok, false);
+  assert.match(rule.message, /\.\.\/\.\.\/elsewhere$/, 'only the path that leaves the repository is loose');
 });
 
 test('agents: an explicit tool list reaches L3; a reviewer that can edit does not; a fixer may edit', () => {
