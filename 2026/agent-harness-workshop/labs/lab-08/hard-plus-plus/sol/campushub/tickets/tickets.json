@@ -1,0 +1,136 @@
+{
+  "project": "CampusHub",
+  "prefix": "CH",
+  "tickets": [
+    {
+      "id": "CH-101",
+      "title": "Room search: filter by feature",
+      "status": "done",
+      "assignee": "mara.ionescu",
+      "labels": [
+        "api",
+        "feature"
+      ],
+      "body": "Students asked for rooms with a projector. GET /api/rooms?feature=projector now returns only the rooms that have one. Shipped in 1.3.0."
+    },
+    {
+      "id": "CH-102",
+      "title": "Back-to-back bookings rejected as a conflict",
+      "status": "closed",
+      "assignee": "andrei.stan",
+      "labels": [
+        "api",
+        "bug"
+      ],
+      "body": "A booking that started exactly when another one ended came back as 409 conflict. Bookings are half-open ranges now, so 10:00-11:00 and 11:00-12:00 can both exist. Fixed in 1.3.0."
+    },
+    {
+      "id": "CH-103",
+      "title": "Events page: mark cancelled events",
+      "status": "done",
+      "assignee": "ioana.dobre",
+      "labels": [
+        "web",
+        "bug"
+      ],
+      "body": "Cancelled events vanished from /events without a word, and people still turned up. They now stay listed, struck through and marked Cancelled."
+    },
+    {
+      "id": "CH-104",
+      "title": "Nightly digest: one digest per building",
+      "status": "in-progress",
+      "assignee": "radu.matei",
+      "labels": [
+        "jobs",
+        "feature"
+      ],
+      "body": "Facilities want one digest per building, mailed to that building's porters, instead of one long digest for the whole campus."
+    },
+    {
+      "id": "CH-105",
+      "title": "Room page: show accessibility details",
+      "status": "open",
+      "assignee": null,
+      "labels": [
+        "web",
+        "accessibility"
+      ],
+      "body": "Step-free access is a yes or no today. Show the nearest lift and accessible toilet on the room page; Facilities will send the data as a CSV file."
+    },
+    {
+      "id": "CH-106",
+      "title": "Rate-limit booking creation per API key",
+      "status": "open",
+      "assignee": "andrei.stan",
+      "labels": [
+        "api",
+        "security"
+      ],
+      "body": "One misbehaving script created 400 bookings in a minute last term. Limit POST /api/bookings to 30 a minute per API key and answer 429 after that."
+    },
+    {
+      "id": "CH-107",
+      "title": "Digest mail goes out twice when the job is re-run",
+      "status": "blocked",
+      "assignee": "radu.matei",
+      "labels": [
+        "jobs",
+        "bug"
+      ],
+      "body": "When the scheduler retries the job after a timeout, the digest mail goes out twice. Blocked on the mail relay team: their API has no idempotency key yet."
+    },
+    {
+      "id": "CH-108",
+      "title": "Release 1.4.0",
+      "status": "open",
+      "assignee": "mara.ionescu",
+      "labels": [
+        "release"
+      ],
+      "body": "Scope: CH-104 and CH-105. Follow the release checklist in README.md (Releasing): bump the version, update CHANGELOG.md, run the tests, dry-run the deploy, and ask the release approver to deploy."
+    },
+    {
+      "id": "CH-109",
+      "title": "Rotate the staging API key",
+      "status": "open",
+      "assignee": "ops.oncall",
+      "labels": [
+        "ops",
+        "security"
+      ],
+      "body": "The staging API key is 90 days old. Rotate it in the campus secret store and restart the staging API. Keys never go into a ticket, a commit or a chat."
+    },
+    {
+      "id": "CH-110",
+      "title": "Bookings API: reject bookings longer than 4 hours",
+      "status": "done",
+      "assignee": "andrei.stan",
+      "labels": [
+        "api"
+      ],
+      "body": "Long bookings blocked rooms for whole afternoons. POST /api/bookings now rejects anything over 4 hours with a 400 that names the end field."
+    },
+    {
+      "id": "CH-111",
+      "title": "Room names with an ampersand break the rooms page",
+      "status": "closed",
+      "assignee": "ioana.dobre",
+      "labels": [
+        "web",
+        "bug"
+      ],
+      "body": "A room called \"Tom & Jerry's room\" broke the table on the rooms page. Pages now build their HTML with the html helper, which escapes every value."
+    },
+    {
+      "id": "CH-112",
+      "title": "Flaky test: the server test used a fixed port",
+      "status": "done",
+      "assignee": "mara.ionescu",
+      "labels": [
+        "api",
+        "tests"
+      ],
+      "body": "server.test.mjs listened on port 3080 and failed while a dev server was running. It now listens on port 0 and reads the port back."
+    }
+  ]
+}

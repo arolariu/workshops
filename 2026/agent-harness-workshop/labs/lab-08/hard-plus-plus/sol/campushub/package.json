@@ -1,0 +1,19 @@
+{
+  "name": "campushub",
+  "version": "1.3.0",
+  "private": true,
+  "description": "Campus rooms, bookings and events: the API, the web pages and the nightly digest",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"api/**/*.test.mjs\" \"web/**/*.test.mjs\" \"jobs/**/*.test.mjs\" \"tickets/**/*.test.mjs\"",
+    "test:api": "node --test \"api/**/*.test.mjs\"",
+    "test:web": "node --test \"web/**/*.test.mjs\"",
+    "test:jobs": "node --test \"jobs/**/*.test.mjs\"",
+    "test:tickets": "node --test \"tickets/**/*.test.mjs\"",
+    "start": "node --env-file=.env.campushub api/server.mjs",
+    "digest": "node jobs/nightly-digest.mjs --dry-run",
+    "deploy": "echo CampusHub deploy - lab copy, nothing is deployed. Production runs deploy.sh on the release runner."
+  }
+}

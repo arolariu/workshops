@@ -1,0 +1,2 @@
+# deploy.sh runs in bash on the release runner: keep LF line endings, even in a Windows checkout.
+*.sh text eol=lf
