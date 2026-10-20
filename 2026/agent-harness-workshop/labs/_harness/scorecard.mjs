@@ -29,7 +29,7 @@ const NEEDS = {
   agents: 'a custom agent with an explicit tools list',
   hooks: 'a preToolUse hook for both shells, with a timeout',
   distribution: 'a pinned, shared harness (APM or a plugin)',
-  governance: 'a HARNESS.md that names an owner, the layers, the threat model and the budget',
+  governance: 'a HARNESS.md that names an owner, the layers, the threat model and the budget, with a CI gate on harness changes and evals',
 };
 
 const SKIP = new Set(['node_modules', '.git', '.agent-logs', 'apm_modules', 'runs']);
@@ -130,6 +130,22 @@ export function scanHarness(dir) {
   });
   scan.harnessMd = files.includes('HARNESS.md') ? { path: 'HARNESS.md', text: read('HARNESS.md') ?? '' } : null;
   if (scan.harnessMd) art('governance', 'HARNESS.md');
+  // Plain GitHub Actions workflows (a gh-aw `.lock.yml` is compiled from a `.md` workflow, read above).
+  scan.ci = files.filter((f) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(f) && !/\.lock\.ya?ml$/.test(f)).map((f) => {
+    let data = null;
+    try { data = parseYaml(read(f) ?? ''); } catch (e) { problems.push(`${f} cannot be read: ${e.message}`); }
+    return { path: f, on: data?.on ?? null };
+  });
+  scan.evals = null;
+  if (files.includes('evals/cases.json')) {
+    const cfg = json('evals/cases.json');
+    const cases = Array.isArray(cfg) ? cfg : Array.isArray(cfg?.cases) ? cfg.cases : [];
+    scan.evals = { path: 'evals/cases.json', cases };
+  }
+  if (scan.harnessMd) {
+    for (const w of scan.ci) art('governance', w.path);
+    if (scan.evals) art('governance', scan.evals.path);
+  }
   return scan;
 }
 
@@ -269,8 +285,35 @@ export function scorecard(scan, { mcpTools } = {}) {
     const t = scan.harnessMd.text;
     const missing = [[/owner/i, 'an owner'], [/layer/i, 'the layers'], [/threat/i, 'the threat model'], [/budget|credit/i, 'the budget']].filter(([re]) => !re.test(t)).map(([, w]) => w);
     add('harness-owner', 'governance', !missing.length, missing.length ? `HARNESS.md should name ${missing.join(', ')}.` : 'HARNESS.md names an owner, the layers, the threat model and the budget.', ['HARNESS.md']);
+    const gates = scan.ci.filter((w) => gatesHarness(w.on));
+    add('governance-ci-gate', 'governance', gates.length > 0, gates.length
+      ? `${list(gates.map((w) => w.path))} runs on pull requests that change the harness.`
+      : 'A harness change needs a CI gate: a .github/workflows/*.yml that runs on pull_request, with paths (if any) that include the harness (AGENTS.md, .github/**, mcp/**, scripts/**, evals/**…).', gates.length ? gates.map((w) => w.path) : scan.ci.map((w) => w.path));
+    const cases = scan.evals?.cases.length ?? 0;
+    add('governance-evals', 'governance', cases > 0, cases
+      ? `evals/cases.json has ${cases} case${cases === 1 ? '' : 's'}.`
+      : scan.evals ? 'evals/cases.json has no cases: an empty suite is no evidence.' : 'A governed harness has evals: an evals/cases.json with at least one case.', ['evals/cases.json']);
   }
   return out;
+}
+
+// Paths a harness change touches; a gate's `paths` filter has to let at least one of them through.
+const HARNESS_SAMPLES = ['AGENTS.md', 'HARNESS.md', '.github/copilot-instructions.md', '.github/instructions/a.instructions.md', '.github/skills/a/SKILL.md', '.github/agents/a.agent.md', '.github/hooks/guard.json', '.github/workflows/a.md', '.mcp.json', 'mcp/server.mjs', 'apm.yml', 'scripts/a.mjs', 'evals/cases.json'];
+const globRe = (g) => new RegExp(`^${String(g).replace(/^\.\//, '').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*\/?/g, '\u0000').replace(/\*/g, '[^/]*').replace(/\?/g, '[^/]').replace(/\u0000/g, '.*')}$`);
+const anyGlob = (globs, p) => {
+  let hit = false;
+  for (const g of globs.map(String)) if (g.startsWith('!')) { if (globRe(g.slice(1)).test(p)) hit = false; } else if (globRe(g).test(p)) hit = true;
+  return hit;
+};
+
+/** Does a workflow's `on` run on pull requests that change the harness? */
+export function gatesHarness(on) {
+  const events = typeof on === 'string' ? { [on]: null } : Array.isArray(on) ? Object.fromEntries(on.map((e) => [String(e), null])) : on ?? {};
+  if (!Object.hasOwn(events, 'pull_request')) return false;
+  const pr = events.pull_request ?? {};
+  const paths = Array.isArray(pr.paths) ? pr.paths : null;
+  const ignored = Array.isArray(pr['paths-ignore']) ? pr['paths-ignore'] : null;
+  return HARNESS_SAMPLES.some((p) => (!paths || anyGlob(paths, p)) && !(ignored && anyGlob(ignored, p)));
 }
 
 /** { level, name, reached, next } — the highest level reached together with every level below it. */

@@ -13,7 +13,7 @@ const BOTH = { type: 'command', bash: 'node g.mjs', powershell: 'node g.mjs', ti
 const HARNESS_MD = '# HARNESS.md\n\nOwner: Ana (platform team)\n\n## Layers\n- instructions, skills\n\n## Threat model\n- prompt injection\n\n## Budget\n- 50 AI credits per run\n';
 
 const run = (files, opts = {}) => {
-  const dir = writeTree(tmpdir(), files);
+  const dir = writeTree(tmpdir(), Object.fromEntries(Object.entries(files).filter(([, v]) => v !== undefined)));
   const scan = scanHarness(dir);
   const rules = scorecard(scan, opts);
   return { scan, rules, m: maturity(rules, scan), rule: (id) => rules.find((r) => r.id === id) };
@@ -124,7 +124,19 @@ test('L5 needs a pinned, shared harness and HARNESS.md; workflows are checked wh
   const pinned = 'name: x\ndependencies:\n  apm:\n    - microsoft/apm-sample-package#v1.0.0\n';
   assert.equal(run({ ...l4, 'apm.yml': pinned }).m.level, 'L4', 'no HARNESS.md yet');
   assert.match(run({ ...l4, 'apm.yml': pinned }).m.next, /HARNESS\.md/);
-  assert.equal(run({ ...l4, 'apm.yml': pinned, 'HARNESS.md': HARNESS_MD }).m.level, 'L5');
+  const gate = 'name: harness\non:\n  pull_request:\n    paths: [\'AGENTS.md\', \'.github/**\']\npermissions:\n  contents: read\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node scripts/scorecard.mjs\n';
+  const evals = JSON.stringify([{ id: 'rules', prompt: 'x', expect: [] }]);
+  const governed = { ...l4, 'apm.yml': pinned, 'HARNESS.md': HARNESS_MD, '.github/workflows/harness-ci.yml': gate, 'evals/cases.json': evals };
+  assert.equal(run(governed).m.level, 'L5');
+  const noGate = run({ ...governed, '.github/workflows/harness-ci.yml': undefined });
+  assert.equal(noGate.m.level, 'L4', 'L5 needs a CI gate on harness changes (spec §5.5)');
+  assert.match(noGate.rule('governance-ci-gate').message, /pull_request/);
+  assert.equal(run({ ...governed, 'evals/cases.json': undefined }).m.level, 'L4', 'L5 needs evals');
+  assert.equal(run({ ...governed, 'evals/cases.json': '[]' }).rule('governance-evals').ok, false, 'an empty suite is no evidence');
+  const elsewhere = run({ ...governed, '.github/workflows/harness-ci.yml': gate.replace("[\'AGENTS.md\', \'.github/**\']", "[\'src/**\']") });
+  assert.equal(elsewhere.rule('governance-ci-gate').ok, false, 'a gate that never runs on harness paths is no gate');
+  const everyPr = run({ ...governed, '.github/workflows/harness-ci.yml': 'on: [pull_request]\njobs: {}\n' });
+  assert.equal(everyPr.rule('governance-ci-gate').ok, true, 'a workflow on every pull request covers the harness too');
   const unpinned = run({ ...l4, 'apm.yml': 'name: x\ndependencies:\n  apm:\n    - microsoft/apm-sample-package\n', 'HARNESS.md': HARNESS_MD });
   assert.equal(unpinned.rule('apm-pinned').ok, false);
   assert.equal(unpinned.m.level, 'L4');
