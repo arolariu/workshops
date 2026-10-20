@@ -1,0 +1,25 @@
+# TODO(M1): the CI gate for harness changes. The milestone and its hints are in todo.md.
+name: Harness CI
+
+on:
+  # TODO(M1): run on pull requests that change a harness file (with the `labeled` type), and on pushes to main.
+  workflow_dispatch:
+
+# TODO(M1): read-only permissions, and a concurrency group.
+
+jobs:
+  gate:
+    name: Scorecard, attacks and self-tests
+    runs-on: ubuntu-latest
+    # TODO(M1): a timeout.
+    steps:
+      # TODO(M1): pin every action to a full commit SHA (keep the version in a comment).
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # TODO(M1): every time: the scorecard (scripts/harness-check.mjs, at least L4: tell it where the scorecard
+      # is), the attack pack, the self-tests and the eval self-test from the recorded runs.
+      - run: echo "TODO(M1)"
+
+  # TODO(M1): real evals against the baseline, within a credit budget, only on the run-evals label or on main.

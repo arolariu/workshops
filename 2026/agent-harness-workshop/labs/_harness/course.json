@@ -13,6 +13,8 @@
     "evals/**",
     "attacks/**",
     "/attacks.local.json",
+    "/harness.json",
+    "/CHANGELOG.md",
     "HARNESS.md"
   ],
   "levels": {
