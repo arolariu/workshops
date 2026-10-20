@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-18 (revision 2)
 - **Scope:** `2026/agent-harness-workshop/`, which covers the lab companion TUI (`labs/_harness/`) and the lab content (`labs/lab-*`)
-- **Status:** Draft, waiting for review
+- **Status:** Implemented (20 October 2026), on top of PR #1. See [§9 What shipped vs the spec](#9-what-shipped-vs-the-spec).
 - **Path:** Architectural. This changes the course structure, the TUI, the content schema and the check engine, and it adds a lab.
 
 **What changed in revision 2**, after your review:
@@ -768,3 +768,35 @@ Phases 1 and 3.
 | **Bringing work in clutters or breaks a level.** | Only harness paths travel. Learners see a preview and get a backup, they can always start over, and `verify --bring` and the author rules guard against breakage. |
 | **Copilot CLI facts change.** This covers JSON events, the marketplace format, gh-aw and hook payloads. | Run a spike at the start of each phase that relies on them, keep CLI-specific strings in one module, and use a tolerant trace parser. |
 | **Learners read the token estimates as exact numbers.** | Always show "≈" and explain the method in one line. The point is to compare layers, not to measure exactly. |
+
+## 9. What shipped vs the spec
+
+Everything in §5 and §6 shipped, phase by phase, on top of PR #1 (the workshop companion overhaul), which the
+coordinator chose as the base before any code was written. Each phase plan records its deviations, with the reason
+and, where a tool's behaviour decided it, the evidence:
+
+| Phase | What shipped | Deviations |
+|---|---|---|
+| 1 · Engine | Five tiers on PR #1's catalog; the seeded chain (`chain.mjs`, `sync-seeds`, `verify --chain`) on PR #1's `starters.json`; `bring` and `verify --bring`; milestones in the check engine and the TUI | [Phase 1 plan](../plans/2026-10-19-phase-1-engine.md#deviations-from-the-spec-because-pr-1-is-the-base) |
+| 2 · The live track | Every 🟢 easy level fits its 8–10 minutes and builds on the last; the takeaway and quiz; next-up; homework paths in PR #1's `learning.mjs`; the verifiable credit meter | [Phase 2 plan](../plans/2026-10-19-phase-2-live-track.md#deviations-from-the-spec) |
+| 3 · Make it visible | The X-ray (`u`), the scorecard and maturity levels, the replay with recorded traces, "your harness so far" | [Phase 3 plan](../plans/2026-10-19-phase-3-visible.md#deviations-from-the-spec) |
+| 4 · The homework ladders | Labs 00–07, medium to hard++ in the ticket format, Lab 05 first as the exemplar | [Phase 4 plan](../plans/2026-10-19-phase-4-ladders.md#implementation-notes-as-built-20-oct-2026), and per lab: [00](../plans/2026-10-19-phase-4-lab-00.md#deviations-from-the-spec) · [01](../plans/2026-10-19-phase-4-lab-01.md#deviations-from-the-spec) · [02](../plans/2026-10-19-phase-4-lab-02.md#deviations-from-the-spec) · [03](../plans/2026-10-19-phase-4-lab-03.md#deviations-from-the-spec) · [04](../plans/2026-10-19-phase-4-lab-04.md#deviations-from-the-spec) · [05](../plans/2026-10-19-phase-4-lab-05.md#deviations-from-the-spec) · [06](../plans/2026-10-19-phase-4-lab-06.md#deviations-from-the-spec) · [07](../plans/2026-10-19-phase-4-lab-07.md#deviations-from-the-spec) |
+| 5 · The capstone | Lab 08 in five tiers (CampusHub for hard++); the kit's "free checks never start Copilot" guard; the cross-platform CI workflow; L5 evidence in the scorecard | [Phase 5 plan](../plans/2026-10-19-phase-5-capstone.md#deviations), [part 2](../plans/2026-10-19-phase-5-capstone.md#deviations-part-2), and per tier: [easy](../plans/2026-10-19-phase-5-lab-08-easy.md#deviations) · [medium](../plans/2026-10-19-phase-5-lab-08-medium.md#deviations) · [hard](../plans/2026-10-19-phase-5-lab-08-hard.md#deviations) · [hard+](../plans/2026-10-19-phase-5-lab-08-hard-plus.md#deviations-and-notes) · [hard++](../plans/2026-10-19-phase-5-lab-08-hard-plus-plus.md#implementation-notes) · [CampusHub](../plans/2026-10-19-phase-5-lab-08-campushub.md#implementation-notes) |
+| 6 · Polish | Presenter mode (`present`), `--plain`, the accessibility pass, the facilitator's re-pin checklist | [Phase 6 plan](../plans/2026-10-19-phase-6-polish.md#deviations-from-the-spec-decided-up-front) |
+
+**Decisions made on the way** (by the reviewer of each phase, recorded in the plans):
+
+- **PR #1 is the base.** Its concepts were extended instead of duplicated: the five-tier `DIFFICULTIES` table, the
+  starter manifest (the chain's seed manifest), progress fingerprints (a source counts as passed only when its pass is
+  fresh), `learning.mjs` paths, its test layout, its doctor and its linear mode. G6 and a new setup doctor were dropped
+  because PR #1 has one.
+- **The credit meter shows what is verifiable**: agent-check runs this month and the upper bound from their caps, with
+  `/usage` for the real number, never an estimate.
+- **`--plain` is PR #1's `--ascii`** under the spec's name, with one fold table that gives every meaning-carrying glyph
+  an ASCII marker.
+- **Facts the tools decided:** `--max-ai-credits` has a minimum of 30 and is a soft cap (`copilot help limits`);
+  `--trust-folder` trusts one prompt-mode session, which evals and the hard++ agent check use; Copilot CLI loads project
+  skills from `.agents/skills/` too (where APM installs them); gh-aw v0.92.0 is the tested version (the doctor warns on
+  another one).
+- **Open after the merge:** Lab 08 hard+'s CI pins this repository at a commit of the implementation branch; the
+  readme's *For facilitators* section lists the three places to re-pin, and `pins.test.mjs` finds every pin.
