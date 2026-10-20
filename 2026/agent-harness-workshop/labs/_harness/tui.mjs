@@ -499,7 +499,10 @@ export async function startTui({
     const cellW = wide ? 11 : 5;
     const nameW = Math.max(8, Math.min(36, W() - 6 - tiers.length * cellW));
     const homeworkW = Math.max(0, tiers.length - 1) * cellW;
-    L.push(`       ${pad('', nameW)}${pad(wide ? `👥 ${dim('together')}` : ' 👥', cellW)}${homeworkW ? clip(` 🏠 ${dim(wide ? 'homework, optional' : 'homework')}`, homeworkW) : ''}`);
+    // --plain: words that fit the column (a marker such as [live] is wider than the emoji it replaces).
+    const live = isAscii() ? dim(wide ? 'together' : 'live') : wide ? `👥 ${dim('together')}` : ' 👥';
+    const hw = `${isAscii() ? '' : ' 🏠'} ${dim(wide ? 'homework, optional' : 'homework')}`;
+    L.push(`       ${pad('', nameW)}${pad(live, cellW)}${homeworkW ? clip(hw, homeworkW) : ''}`);
     L.push(`       ${dim(pad('LAB', nameW))}${tiers.map((d) => pad(wide ? `${d.badge} ${dim(d.label.toUpperCase())}` : ` ${d.badge}`, cellW)).join('')}`);
     const pulse = ANIM && Math.floor(now() / 600) % 2 === 0;
     let focus = null;

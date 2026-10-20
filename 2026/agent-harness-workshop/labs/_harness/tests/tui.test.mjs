@@ -260,6 +260,12 @@ test('ASCII mode keeps difficulties and statuses apart with plain characters', a
   assert.match(shown, /^[\x00-\x7f]*$/);
   assert.match(shown, /\[ \]/);
   assert.match(shown, /E EASY/);
+  // The column header stays over its columns: a word, not a marker wider than the cell.
+  const rows = frame(t.output);
+  const head = rows.find((l) => /\blive\b|together/.test(l) && /homework/.test(l));
+  const tiersRow = rows.find((l) => /\bLAB\b/.test(l) && /\bE\b/.test(l));
+  assert.ok(head && tiersRow, rows.join('\n'));
+  assert.equal(head.search(/\b(live|together)\b/), tiersRow.search(/\bE\b/), `${head}\n${tiersRow}`);
   t.quit();
   setAscii(false);
 });

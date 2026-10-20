@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { layerMapLines } from '../screens/layers.mjs';
-import { stripAnsi, width } from '../ui.mjs';
+import { stripAnsi, width, setAscii, asciiFold } from '../ui.mjs';
 
 const fmt = Object.fromEntries(['green', 'bright', 'dim', 'white', 'yellow', 'bold', 'cyan'].map((k) => [k, (s) => s]));
 const lab = (num, emoji, title, extra = {}) => ({ id: `lab-${num}`, num, emoji, title, layer: null, maturity: null, threads: [], capstone: false, ...extra });
@@ -51,4 +51,12 @@ test('many threads wrap onto more lines, one whole thread at a time, never cut',
     const text = lines.slice(lines.findIndex((l) => l.includes('Threads:'))).join(' ');
     for (const th of threads) assert.ok(text.includes(th), `${W}: ${th} is shown whole`);
   }
+});
+test('--plain: a thread keeps its name, not its icon (🔴 is the Hard badge elsewhere)', () => {
+  setAscii(true);
+  try {
+    const s = asciiFold(stripAnsi(layerMapLines(catalog, catalog[1], { W: 76, fmt }).join('\n')));
+    assert.match(s, /Threads: The red build - Measurement/);
+    assert.doesNotMatch(s, /\bH The red build/);
+  } finally { setAscii(false); }
 });
