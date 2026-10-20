@@ -157,6 +157,9 @@ export function score(events, expect) {
 /**
  * The arguments of one eval run: prompt mode, quiet, JSON events, never waits for a human, capped, and read-only
  * (no file writes, no shell), plus the case's custom agent and the read-only tools it may use without asking.
+ * `--trust-folder` trusts this folder for this one session (nothing is saved): Copilot loads a folder's skills, MCP
+ * servers, hooks and agents only when it trusts the folder, so without it (in CI, on a fresh runner) the eval would
+ * measure a bare agent instead of the harness.
  * @param {{ prompt: string, agent?: string, allow?: string[], credits?: number }} c
  * @returns {string[]}
  */
@@ -170,6 +173,7 @@ export function evalArgs(c) {
     ...(c.agent ? ['--agent', c.agent] : []),
     '-p', c.prompt, '-s',
     '--no-ask-user',
+    '--trust-folder',
     '--output-format', 'json',
     `--max-ai-credits=${cap}`,
     ...allow.map((a) => `--allow-tool=${a}`),
@@ -179,7 +183,8 @@ export function evalArgs(c) {
 }
 
 /**
- * What a real run of these cases would cost at most: every run spends at most its cap.
+ * What a real run of these cases would cost if every run used its whole cap: about `worstCase` credits. The cap is
+ * soft (`copilot help limits`): a run can go over it by one response, so this is an estimate, not a hard bound.
  * @param {object[]} cases
  * @param {{ runs: number, budget: number }} options
  * @returns {{ cases: { id: string, runs: number, credits: number }[], runs: number, worstCase: number, budget: number, ok: boolean }}

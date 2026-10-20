@@ -14,7 +14,8 @@ without spending a credit.
 1. `evals/cases.json` has at least 8 golden cases. Every layer of your harness that a prompt can exercise
    (instructions, skills, agents, MCP, hooks) has one, and every case is scored by deterministic `expect` rules.
 2. `scripts/eval.mjs` runs each case N times, read-only, quiet and credit-capped (every run at least 30 credits, the
-   CLI's minimum), and refuses a plan whose worst case is over the budget: `--dry-run`, `--runs <n>`,
+   CLI's minimum), in a folder it trusts for that session (`--trust-folder`), so the harness loads; it refuses a plan
+   whose worst case (every run using its whole cap) is over the budget: `--dry-run`, `--runs <n>`,
    `--budget <credits>`.
 3. It scores each run from its JSON events, computes the pass rate, pass@k, variance and tokens of each case, and
    writes `report.json` and `report.md` (`--report <dir>`, by default `evals/reports`).
@@ -56,10 +57,10 @@ Optional: "agent": "reviewer", "allow": ["studybuddy(get_grades)"],
 
 ### M2 · Runner
 - In `scripts/eval/score.mjs`: `score(events, expect)` returns `{ pass, failed }`; `evalArgs(c)` builds one run's
-  arguments (`--agent` when the case has one, the prompt, `-s`, `--no-ask-user`, `--output-format json`,
-  `--max-ai-credits` = the case's `credits` or 30, the `allow` list, `--deny-tool=write` and `--deny-tool=shell`; it
-  throws when `allow` asks for write or shell, or when the cap is under 30 or over 60); `plan()` gives the worst
-  case: every run spends its whole cap
+  arguments (`--agent` when the case has one, the prompt, `-s`, `--no-ask-user`, `--trust-folder` (Copilot only
+  loads the harness in a trusted folder), `--output-format json`, `--max-ai-credits` = the case's `credits` or 30,
+  the `allow` list, `--deny-tool=write` and `--deny-tool=shell`; it throws when `allow` asks for write or shell, or
+  when the cap is under 30 or over 60); `plan()` gives the worst case: about every run's cap, added up
 - In `scripts/eval/stats.mjs`: `passRate`, `passAtK(n, c, k)` (the unbiased estimator), `variance` (the population
   variance) and `caseReport` (runs, passed, pass rate, pass@k for every k, variance, mean tokens per run)
 - `node scripts/eval.mjs --from evals/runs/full` scores the recordings with your cases, and every case gets a row
@@ -134,12 +135,17 @@ Check it by hand: 4 runs, 1 passed, k = 2 → 1 − C(3,2)/C(4,2) = 1 − 3/6 = 
 
 </details>
 
-<details><summary>The budget is the worst case, not the average</summary>
+<details><summary>Arguments that measure the harness, and a budget that is the worst case</summary>
 
-A run usually spends far less than its cap, but nothing stops it from spending all of it. So the plan multiplies:
-runs × the case's cap, summed over the cases. The CLI refuses a cap under 30 (`copilot help limits`), so every run
-counts 30 at least: 8 cases with `--runs 3` is 720 credits, which the default `--budget 100` refuses; `--runs 1`
-is 240.
+Copilot loads a folder's skills, MCP servers, hooks and agents only when it trusts the folder. Your machine may
+trust the workshop folder already, but a CI runner trusts nothing, and the eval would quietly measure a bare agent.
+`--trust-folder` trusts this folder for this one session (nothing is saved); `--deny-tool=write` and
+`--deny-tool=shell` keep the run read-only all the same.
+
+A run usually spends far less than its cap, but it may use all of it, and the cap is soft (`copilot help limits`): a
+run can go over it by one response. So the plan multiplies runs × the case's cap, summed over the cases, and calls
+that about N credits. The CLI refuses a cap under 30, so every run counts 30 at least: 8 cases with `--runs 3` is
+about 720 credits, which the default `--budget 100` refuses; `--runs 1` is about 240.
 
 </details>
 
@@ -168,9 +174,10 @@ dropped beyond the threshold. Keep `{ layer, before, after, dropPp, cases }` and
 
 <details><summary>A layer worth nothing?</summary>
 
-Without the hooks the suite does no worse: the eval runs are read-only, so the CLI's own `--deny-tool=shell` denies
-the `rm -rf` before anything else could. Read-only evals can't see the guard; the attack pack (medium) is what
-measures it. Write that down instead of deleting the hooks.
+Without the hooks the suite does no worse. With them, the guard denies the `rm -rf` first (`Denied by preToolUse
+hook: …` in `full/hooks-denied-delete.jsonl`); without the guard, the run's own `--deny-tool=shell` still denies it
+(`ablate-hooks/`), so the outcome is the same. Read-only evals can't tell the guard is there; the attack pack
+(medium) is what measures it. Write that down instead of deleting the hooks.
 
 </details>
 
@@ -194,14 +201,15 @@ impression this level replaces: with enough runs, a drop is a fact.
 </details>
 
 ## 🚀 Going further
-- Record a real suite: `node scripts/eval.mjs --runs 1 --budget 240` (worst case 8 × 30), then score it with
-  `--from` and compare it with the recordings. Which cases fail on your machine?
+- Record a real suite: `node scripts/eval.mjs --runs 1 --budget 240` (worst case about 8 × 30 credits), then score
+  it with `--from` and compare it with the recordings. Which cases fail on your machine?
 - Gate a pull request on it (hard+ does): on every pull request, for free,
   `node scripts/eval.mjs --from evals/runs/full --baseline evals/baseline.json` (the runner and the baseline still
   agree); with the `run-evals` label or on `main`,
   `node scripts/eval.mjs --runs 1 --budget 240 --baseline evals/baseline.json --threshold 75 --report evals/reports`
-  (worst case 8 × 1 × 30 = 240 credits). With one run a case scores 0% or 100%, so a 75 pp threshold flags only a
-  case that always passed and now fails; for finer gates, run a subset more often (`--case a,b --runs 2`).
-- Record an ablation for real: copy the project into a folder Copilot trusts (inside the workshop folder), remove a
-  layer there (say `.github/agents/`), run the suite in the copy, and save its run folder as `evals/runs/ablate-agents/`.
+  (worst case about 8 × 1 × 30 = 240 credits; a run can go over its cap by one response). With one run a case scores
+  0% or 100%, so a 75 pp threshold flags only a case that always passed and now fails; for finer gates, run a subset
+  more often (`--case a,b --runs 2`).
+- Record an ablation for real: copy the project, remove a layer in the copy (say `.github/agents/`), run the suite
+  there (`--trust-folder` makes Copilot load what is left), and save its run folder as `evals/runs/ablate-agents/`.
 - Add a rule of your own to the vocabulary (`maxTools`, `maxTokens`…) and a case that needs it.

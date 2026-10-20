@@ -142,23 +142,27 @@ export function score(events, expect) {
 
 /**
  * The arguments of one eval run: prompt mode, quiet, JSON events, never waits for a human, capped, and read-only
- * (no file writes, no shell), plus the case's custom agent and the read-only tools it may use without asking.
+ * (no file writes, no shell), plus the case's custom agent and the read-only tools it may use without asking. It
+ * also trusts this folder for this one session: Copilot loads a folder's skills, MCP servers, hooks and agents only
+ * when it trusts the folder, so without that (in CI, on a fresh runner) the eval would measure a bare agent.
  * @param {{ prompt: string, agent?: string, allow?: string[], credits?: number }} c
  * @returns {string[]}
  */
 export function evalArgs(c) {
   // TODO(M2): like Lab 05's leashArgs(), but read-only: throw when c.allow grants anything WRITE_PERMISSION matches,
-  // and when the cap (c.credits, else CAP) is outside MIN_CAP..MAX_CAP: the CLI refuses a cap under 30.
+  // and when the cap (c.credits, else CAP) is outside MIN_CAP..MAX_CAP: the CLI refuses a cap under 30. Add
+  // --trust-folder (one session only, nothing saved), or the harness doesn't load.
   return [];
 }
 
 /**
- * What a real run of these cases would cost at most: every run spends at most its cap.
+ * What a real run of these cases would cost if every run used its whole cap: about `worstCase` credits. The cap is
+ * soft (`copilot help limits`): a run can go over it by one response, so this is an estimate, not a hard bound.
  * @param {object[]} cases
  * @param {{ runs: number, budget: number }} options
  * @returns {{ cases: { id: string, runs: number, credits: number }[], runs: number, worstCase: number, budget: number, ok: boolean }}
  */
 export function plan(cases, { runs, budget }) {
-  // TODO(M2): the worst case is every run spending its whole cap (the case's credits, or CAP).
+  // TODO(M2): the worst case is every run using its whole cap (the case's credits, or CAP), added up.
   return null;
 }

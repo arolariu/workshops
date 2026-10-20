@@ -40,7 +40,7 @@ export default [
       if (c?.runs !== 1) return `evals/reports/report.json should show 1 run of ${CASE.id}; got ${JSON.stringify(c ?? null).slice(0, 200)}.`;
       if (!(c.tokens?.input > 0)) return 'The report has no tokens for the run: did it end with its usage events?';
       const args = (c.args ?? []).join(' ');
-      return (/--max-ai-credits[= ]\d+/.test(args) && /--deny-tool[= ]write/.test(args) && !/--allow-all|--yolo/.test(args)) || `The report's arguments should be capped and read-only: ${args || '(none)'}`;
+      return (/--max-ai-credits[= ]\d+/.test(args) && /--deny-tool[= ]write/.test(args) && /--trust-folder\b/.test(args) && !/--allow-all|--yolo/.test(args)) || `The report's arguments should be capped, read-only and trust the folder (or the harness doesn't load): ${args || '(none)'}`;
     },
   },
 ];

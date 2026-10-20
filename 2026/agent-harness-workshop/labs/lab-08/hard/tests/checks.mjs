@@ -158,6 +158,7 @@ export default (t) => [
     if ((flag(a, '-p') ?? flag(a, '--prompt')) !== 'TASK') return 'Pass the case\'s prompt with -p.';
     if (!n.includes('-s') && !n.includes('--silent')) return 'Quiet: add -s (no stats, only the run).';
     if (!n.includes('--no-ask-user')) return 'Unattended: add --no-ask-user, or a run can wait for an answer nobody gives.';
+    if (!n.includes('--trust-folder')) return 'Add --trust-folder: the harness only loads in a trusted folder, so without it the eval measures a bare agent (in CI, on a fresh runner, no folder is trusted). It trusts this folder for this one session; nothing is saved.';
     if (flag(a, '--output-format') !== 'json') return 'The runner scores JSON events: --output-format json.';
     const cap = flags(a, '--max-ai-credits');
     if (cap.length !== 1 || Number(cap[0]) !== 30) return `Cap every run with one --max-ai-credits: 30 when the case sets no credits, the smallest cap the CLI accepts (got ${cap.join(', ') || 'none'}).`;

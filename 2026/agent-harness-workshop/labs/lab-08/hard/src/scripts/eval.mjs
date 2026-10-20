@@ -7,7 +7,8 @@
 //   node scripts/eval.mjs … --baseline evals/baseline.json [--threshold 10]   exit 1 on a regression
 //   node scripts/eval.mjs --ablate <layer|all> [--from evals/runs/full]       the layer-value report (free)
 // Reports: report.json and report.md (layer-value.json and .md for --ablate) in --report (default evals/reports).
-// Every run is capped at 30 credits or more (the CLI's minimum), so the worst case is runs × cases × 30 at least.
+// Every run is capped at 30 credits or more (the CLI's minimum), so the worst case is about runs × cases × 30 or more;
+// the cap is soft (`copilot help limits`): a run can go over it by one response.
 // Exit codes: 0 done · 1 a regression beyond the threshold · 2 refused (arguments, cases, budget, missing runs) or
 // nothing measured (no run started: Copilot's error is printed).
 import { spawnSync } from 'node:child_process';
@@ -231,8 +232,8 @@ export function main(argv) {
     if (!p) throw new Refused('plan() returns nothing yet.');
     console.log(`📋 ${cases.length} case(s) × ${o.runs} run(s) = ${p.runs} runs, each capped (--max-ai-credits).`);
     for (const row of p.cases) console.log(`   ${row.id}: ${row.runs} × ${row.credits} credits`);
-    console.log(`   Worst case: ${p.worstCase} credits · budget: ${o.budget} credits`);
-    if (!p.ok) throw new Refused(`The worst case (${p.worstCase} credits) is over the budget (${o.budget}): fewer runs or cases, or a bigger --budget.`);
+    console.log(`   Worst case: about ${p.worstCase} credits, if every run uses its whole cap (a run can go over its cap by one response) · budget: ${o.budget} credits`);
+    if (!p.ok) throw new Refused(`The worst case (about ${p.worstCase} credits) is over the budget (${o.budget}): fewer runs or cases, or a bigger --budget.`);
     if (o.dryRun) {
       console.log(`   One run: copilot ${evalArgs(cases[0]).map((a) => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')}`);
       console.log('🧪 Dry run: nothing ran.');

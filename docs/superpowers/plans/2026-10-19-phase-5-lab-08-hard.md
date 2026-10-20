@@ -31,9 +31,9 @@ No inherited file changes (nothing easy's `sol/` has is touched). Nothing under 
   exists, an agent with `noTool` on edits, a `<server>-<tool>` of a configured MCP server, `{ denied: true }`, an
   instructions case with `answerMatches`). src fails: 2 cases.
 - **M2 · Runner**: `passRate`/`passAtK`/`variance` on hand-picked inputs; `score()` on built events (each rule, an
-  incomplete run); `evalArgs()` like `leashArgs` (prompt, `-s`, `--no-ask-user`, JSON, cap = `credits` ?? 30,
-  `--deny-tool=write` + `--deny-tool=shell`, no `--allow-all`/`--yolo`, throws on a write/shell allow and on a cap
-  outside 30–60); `--dry-run` worst case and `--budget` refusal (exit 2, nothing written); failed runs with a fake CLI
+  incomplete run); `evalArgs()` like `leashArgs` (prompt, `-s`, `--no-ask-user`, `--trust-folder`, JSON, cap =
+  `credits` ?? 30, `--deny-tool=write` + `--deny-tool=shell`, no `--allow-all`/`--yolo`, throws on a write/shell allow
+  and on a cap outside 30–60); `--dry-run` worst case and `--budget` refusal (exit 2, nothing written); failed runs with a fake CLI
   (`EVAL_COPILOT`: a run that never starts is a failed run with its stderr shown, exit 2 when no run starts); the
   report of the reference recordings (hand-checked); the learner's own recordings parse and every case of their
   `cases.json` gets a row.
@@ -69,8 +69,10 @@ Ablations, 2 runs per case (passes, in the order above):
   yet two cases regress: skill-ects .75 → 0 = **75 pp**, skill-release .25 → 0 = **25 pp**). This is also the
   baseline regression case: `--from ablate-skills --baseline baseline.json` exits **1** naming both; `--threshold 30`
   names skill-ects only; `--threshold 80` exits **0**.
-- `ablate-hooks`: 2, 2, 2, 1, 2, 2, 1, 2 → 7 / 8 = **.875**; drop **−9.375 pp**, no dependent case: the read-only evals
-  can't see the guard (the CLI's own `--deny-tool=shell` denies the call too), which is why the attack pack exists.
+- `ablate-hooks`: 2, 2, 2, 1, 2, 2, 1, 2 → 7 / 8 = **.875**; drop **−9.375 pp**, no dependent case: with the hooks
+  the guard denies the `rm -rf` first (`Denied by preToolUse hook: …` in `full/`); without them the run's own
+  `--deny-tool=shell` still denies it, so the outcome is the same. Read-only evals can't tell the guard is there,
+  which is why the attack pack exists.
 - `--ablate all` order: instructions (15.625), skills (9.375), hooks (−9.375).
 
 ## Deviations
@@ -90,9 +92,10 @@ Ablations, 2 runs per case (passes, in the order above):
 
 CI, every pull request (free): `node scripts/eval.mjs --from evals/runs/full --baseline evals/baseline.json` (exit 0:
 the runner and the baseline agree). With the `run-evals` label or on `main` (real runs): `node scripts/eval.mjs --runs
-1 --budget 240 --baseline evals/baseline.json --threshold 75 --report evals/reports`: worst case 8 cases × 1 run × 30
-credits = **240**. With one run a case scores 0 or 1, so a 75 pp threshold flags only a case that always passed in the
-baseline and now fails (a 100 pp drop). `--runs 3 --budget 400` is refused (720 worst case). A subset with more runs
+1 --budget 240 --baseline evals/baseline.json --threshold 75 --report evals/reports`: worst case about 8 cases × 1 run ×
+30 credits = **240** (the cap is soft, `copilot help limits`: a run can go over it by one response). With one run a case
+scores 0 or 1, so a 75 pp threshold flags only a case that always passed in the
+baseline and now fails (a 100 pp drop). `--runs 3 --budget 400` is refused (about 720 worst case). A subset with more runs
 is the alternative: `--case rules-footer,reviewer-read-only,mcp-deadlines,hooks-denied-delete --runs 2 --budget 240
 --threshold 50` (4 × 2 × 30 = 240; a regression is a stable case failing both runs). Exit codes: 0 ok, 1 regression
 beyond the threshold, 2 refused (budget, invalid cases or arguments) or nothing measured (no run started).
@@ -115,3 +118,9 @@ beyond the threshold, 2 refused (budget, invalid cases or arguments) or nothing 
   ≥ 1) so runs stay split, and a result that says 0 while the process exited non-zero takes the process's code. The
   report keeps each case's arguments. On Windows, `copilot.cmd` needs the shell fallback; the command is quoted for
   cmd.exe. `--case` takes a comma list.
+- Fixes after the independent review: (1) `evalArgs()` adds `--trust-folder` (`copilot --help`, 1.0.100+: trusts the
+  working directory for one prompt-mode session, nothing saved). Without trust, skills, MCP servers, hooks and agents
+  don't load (`copilot help environment`), so on a fresh CI runner every harness case would look like a regression;
+  the free check requires it and says why. (2) The cap is soft (`copilot help limits`: a response can exceed the
+  limit before the CLI sees it), so the plan's total is "about N credits", not a hard bound; the arithmetic is the
+  same. (3) The hooks hint now has the order right: the guard denies first, `--deny-tool=shell` only without it.
