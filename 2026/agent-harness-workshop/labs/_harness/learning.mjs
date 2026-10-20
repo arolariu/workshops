@@ -13,10 +13,10 @@ export class SelectionError extends Error {}
 export const PATHS = [
   { id: 'all', label: 'All exercises', description: 'Every exercise: the live track (every easy level) first, then the homework tiers.', keys: null },
   { id: 'deeper', label: 'One level deeper', description: 'Every 🟡 medium level: shape each layer for a real need.', keys: ['lab-00/medium', 'lab-01/medium', 'lab-02/medium', 'lab-03/medium', 'lab-04/medium', 'lab-05/medium', 'lab-06/medium', 'lab-07/medium'] },
-  { id: 'security', label: 'Security', description: 'Guardrails that hold, and how agents get attacked.', keys: ['lab-05/medium', 'lab-05/hard', 'lab-05/hard-plus', 'lab-04/hard-plus', 'lab-07/hard-plus'] },
-  { id: 'platform', label: 'Platform', description: 'Skills and plugins a whole team installs.', keys: ['lab-02/hard', 'lab-02/hard-plus', 'lab-06/hard', 'lab-06/hard-plus'] },
+  { id: 'security', label: 'Security', description: 'Guardrails that hold, and how agents get attacked.', keys: ['lab-05/medium', 'lab-05/hard', 'lab-05/hard-plus', 'lab-04/hard-plus', 'lab-07/hard-plus', 'lab-08/medium'] },
+  { id: 'platform', label: 'Platform', description: 'Skills and plugins a whole team installs.', keys: ['lab-02/hard', 'lab-02/hard-plus', 'lab-06/hard', 'lab-06/hard-plus', 'lab-08/hard'] },
   { id: 'internals', label: 'Internals', description: 'The agent loop from the inside: scripted runs, JSON events, variance, your own loop and the MCP protocol.', keys: ['lab-00/hard', 'lab-00/hard-plus', 'lab-00/hard-plus-plus', 'lab-04/hard-plus-plus'] },
-  { id: 'capstone', label: 'Capstone', description: 'Every tier of Lab 08: own your whole harness, attack it, measure it, govern it and roll it out.', keys: ['lab-08/easy'] },
+  { id: 'capstone', label: 'Capstone', description: 'Every tier of Lab 08: own your whole harness, attack it, measure it, govern it and roll it out.', keys: ['lab-08/easy', 'lab-08/medium', 'lab-08/hard'] },
 ];
 export const STATUS_FILTERS = ['unfinished', 'pass', 'fail', 'stale', 'not-run', 'blocked', 'skipped', 'interrupted'];
 export const pathById = (id) => PATHS.find((p) => p.id === id) ?? null;

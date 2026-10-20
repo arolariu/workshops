@@ -162,5 +162,6 @@ test('the homework paths only name levels that exist (Phases 4 and 5 add the dee
     for (const k of p.keys) assert.ok(keys.has(k), `${p.id}: ${k} does not exist`);
   }
   const order = (id) => PATHS.find((p) => p.id === id).keys.map((k) => k.split('/')[0]);
-  assert.deepEqual([...new Set(order('security'))], ['lab-05', 'lab-04', 'lab-07'], 'Security: guardrails first, then the attacks (spec §5.1)');
+  assert.deepEqual([...new Set(order('security'))], ['lab-05', 'lab-04', 'lab-07', 'lab-08'], 'Security: guardrails first, then the attacks, then red-teaming your own harness (spec §5.1)');
+  assert.deepEqual([...new Set(order('capstone'))], ['lab-08'], 'Capstone: Lab 08 only');
 });
