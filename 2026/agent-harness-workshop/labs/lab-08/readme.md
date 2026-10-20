@@ -1,4 +1,4 @@
-# Lab 08 · 🏛️ Capstone: ship an enterprise-ready harness
+# Lab 08 · 🏛️ Capstone — Ship an enterprise-ready harness
 
 > **Harness layer:** every layer · **Maturity:** L4 → L5 Governed · 🟢 🟡 🔴 🟣 💎 homework
 >

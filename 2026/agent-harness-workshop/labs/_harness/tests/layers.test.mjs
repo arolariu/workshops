@@ -41,3 +41,14 @@ test('a long name is cut with an ellipsis, never run into the lab number', () =>
   const s = stripAnsi(layerMapLines(long, long[1], { W: 60, fmt }).join('\n'));
   assert.match(s, /└─ 📦 Plugins, extensions[^\n]*… 06/);
 });
+
+test('many threads wrap onto more lines, one whole thread at a time, never cut', () => {
+  const threads = ['🔴 The red build', '📏 Measurement', '🪙 Tokens and budget', '🔐 Least privilege', '🕵️ Trust boundaries', '🧪 Evals'];
+  const cap = { ...catalog[3], threads };
+  for (const W of [76, 40]) {
+    const lines = layerMapLines(catalog, cap, { W, fmt }).map(stripAnsi);
+    for (const l of lines) assert.ok(width(l) <= W + 2, `${W}: ${l}`);
+    const text = lines.slice(lines.findIndex((l) => l.includes('Threads:'))).join(' ');
+    for (const th of threads) assert.ok(text.includes(th), `${W}: ${th} is shown whole`);
+  }
+});
