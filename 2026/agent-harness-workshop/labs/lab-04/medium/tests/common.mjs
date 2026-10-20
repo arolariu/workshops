@@ -2,6 +2,7 @@
 // file without blocking. (Free checks never start Copilot: the kit's guard sees to that, in this process and in every
 // Node child, so nothing here has to.)
 import { spawn, spawnSync } from 'node:child_process';
+import { guardNodeOptions } from '../../../_harness/no-copilot.mjs';
 
 export function serverConfig(t) {
   const cfg = t.json('.mcp.json', 'Create `.mcp.json` in src/ (see the lab guide for the format).');
@@ -25,7 +26,6 @@ export function killTree(child) {
 }
 
 // Like the kit's t.unitTests: no NODE_OPTIONS of yours, but the kit's own --import (its guard) goes along.
-const kitNodeOptions = () => (process.env.NODE_OPTIONS ?? '').split(/\s+/).filter((o) => /^--import=.*no-copilot\.mjs$/.test(o)).join(' ');
 
 /**
  * Run a node:test file in `cwd`, asynchronously, so several runs can go at once (the mutant checks) and a check's own
@@ -34,7 +34,7 @@ const kitNodeOptions = () => (process.env.NODE_OPTIONS ?? '').split(/\s+/).filte
  */
 export function suiteRun(t, cwd, file, { timeout = 120000 } = {}) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, ['--test', '--test-reporter=tap', file], { cwd, env: { ...process.env, NODE_OPTIONS: kitNodeOptions() }, windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, ['--test', '--test-reporter=tap', file], { cwd, env: { ...process.env, NODE_OPTIONS: guardNodeOptions() }, windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', () => {});

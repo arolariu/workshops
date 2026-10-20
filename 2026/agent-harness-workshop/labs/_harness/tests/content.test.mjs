@@ -174,3 +174,24 @@ test('every milestone of a grown lab\'s hard+ and hard++ level has a TODO(Mn) ma
     }
   }
 });
+
+// Phase 4 leftovers: the kit guards free checks (no-copilot.mjs), so no level keeps its own copy, and no level keeps a
+// test helper nothing uses.
+test('no level keeps dead test helpers or its own copy of the kit\'s Copilot guard', () => {
+  const dead = [];
+  const copies = [];
+  for (const ex of levels) {
+    const dir = path.join(ex.dir, 'tests');
+    if (!fs.existsSync(dir)) continue;
+    const files = fs.readdirSync(dir, { recursive: true }).map(String).filter((f) => /\.m?js$/.test(f));
+    const text = Object.fromEntries(files.map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]));
+    for (const f of files) {
+      const name = path.basename(f).replace(/\.m?js$/, '');
+      const used = Object.entries(text).some(([g, t]) => g !== f && t.includes(name));
+      if (!/^(checks|agent)\.mjs$/.test(f) && !used) dead.push(`${ex.key}/tests/${f}`);
+      if (/no-copilot\\\.mjs|PATH: ''|HARNESS_NO_COPILOT/.test(text[f])) copies.push(`${ex.key}/tests/${f}`);
+    }
+  }
+  assert.deepEqual(dead, [], 'test helpers nothing imports');
+  assert.deepEqual(copies, [], 'use the kit: import { guardNodeOptions } from labs/_harness/no-copilot.mjs');
+});
