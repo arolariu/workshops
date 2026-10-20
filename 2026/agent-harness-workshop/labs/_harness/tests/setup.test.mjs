@@ -67,7 +67,11 @@ function machine({ copilotHelp = HELP } = {}) {
   });
   if (!WIN) for (const f of ['copilot']) fs.chmodSync(path.join(userBin, f), 0o755);
   const sys = WIN ? [path.join(process.env.SystemRoot, 'System32')] : ['/usr/bin', '/bin'];
-  const env = { PATH: [userBin, ...sys].join(WIN ? ';' : ':'), PATHEXT: process.env.PATHEXT, SystemRoot: process.env.SystemRoot, ComSpec: process.env.ComSpec, HOME: root, USERPROFILE: root };
+  // Tools the doctor probes from the system (gh, git …) keep their own state under the XDG folders (~/.local/state/gh
+  // on a Linux runner): send that elsewhere, so the fake home shows only what the setup itself writes.
+  const xdg = tmpdir('setup xdg ');
+  const xdgEnv = Object.fromEntries(['CONFIG', 'DATA', 'STATE', 'CACHE'].map((k) => [`XDG_${k}_HOME`, path.join(xdg, k.toLowerCase())]));
+  const env = { PATH: [userBin, ...sys].join(WIN ? ';' : ':'), PATHEXT: process.env.PATHEXT, SystemRoot: process.env.SystemRoot, ComSpec: process.env.ComSpec, HOME: root, USERPROFILE: root, ...xdgEnv };
   return { root, userBin, env, toolsDir: path.join(root, 'workshop tools'), cacheDir: path.join(root, 'workshop tools', 'cache') };
 }
 const run = (m, opts) => prepare({ toolsDir: m.toolsDir, cacheDir: m.cacheDir, env: m.env, readTrust: () => null, ...opts });
@@ -109,7 +113,9 @@ test('a requested tool is prepared privately, verified, probed, and reused on th
   const secondRun = await run(m, { install: ['apm'], pins: { apm: pin('apm') } });
   assert.deepEqual(secondRun.installs, []);
   assert.deepEqual(secondRun.downloads, []);
-  assert.deepEqual(fs.readdirSync(m.root).sort(), ['user tools', 'workshop tools'], 'nothing written outside the tools folder');
+  const stray = fs.readdirSync(m.root).filter((n) => !['user tools', 'workshop tools'].includes(n));
+  const where = stray.flatMap((n) => { const p = path.join(m.root, n); return fs.statSync(p).isDirectory() ? fs.readdirSync(p, { recursive: true }).slice(0, 8).map((f) => `${n}/${f}`) : [n]; });
+  assert.deepEqual(stray, [], `nothing written outside the tools folder: ${where.join(', ')}`);
 });
 
 test('a checksum mismatch installs nothing and the lab app is not launched', async () => {
