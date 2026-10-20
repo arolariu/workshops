@@ -402,3 +402,35 @@ tier's folder") and writes `docs/superpowers/plans/2026-10-19-phase-5-lab-08-<ti
   `HARNESS_COPILOT_REAL`, `HARNESS_COPILOT_LOG`, `HARNESS_NO_COPILOT`; Lab 08 contracts in the wave table.
 - Risk: Task 2's in-process patch must not break checks that use `child_process` for git, gh or node: only calls that
   resolve to a `copilot` word are touched, everything else passes untouched (tested by `verify`).
+
+## Implementation notes (in progress)
+
+- **Task 1** (e505625): root cause measured (per-call pipe handoffs on Windows, not the scanner or backpressure); one
+  write of the same 40,000 lines. 5 consecutive full runs green (333/333).
+- **Task 2** (fcccd8c): `labs/_harness/no-copilot.mjs`; run-checks installs it in-process and through `NODE_OPTIONS`
+  for every Node child, plus a PATH stub for shells. Agent checks are outside it on purpose.
+- **Task 3** (6dc2a0b … ceed3d4, one commit per lab): every lab's own guard removed; each lab proved a `copilot -p`
+  mutant fails with the kit's message and starts nothing. Lab 04 kept `suiteRun`/`killTree` (parallel suites and
+  process-tree kill on timeout, not about Copilot) and now passes the kit's `--import` on instead of clearing
+  `NODE_OPTIONS`. Lab 03's `starters.json` hashes followed its `review-loop.mjs` starter change.
+- **Task 4** (7d6970f), **Task 5** (8a10ad7): as planned.
+- **Task 6** (2e600ca): validated on a `sol/` copy, 1 prompt, pass in 17 s.
+- **Task 7** (d0e58b9): `scan.ci` (plain `.github/workflows/*.yml`, gh-aw `.lock.yml` excluded) and `scan.evals`;
+  `gatesHarness(on)` accepts `on: pull_request` in string, list or map form and honours `paths` and `paths-ignore`
+  globs against sample harness paths. Red then green (the old scorecard fails the new test with "L5 needs a CI gate");
+  no Lab 00–07 reference changed maturity.
+- **Task 8** (eb9788d): Capstone path (levels join as they ship), help and readme capstone times, the agenda's closing
+  demo, Security and Platform paths name Lab 08. The content test's `tierRange` reads `capstoneTime` and gives "about"
+  a quarter either way (about 1 h = 45–75 min, about 3 h = 135–225 min). The real-course home test (45 levels,
+  Workshop 0/8, Homework 0/37, the Lab 08 row at 80 and 120 columns) lands with the last tier.
+
+### Deviations
+- **Wave layout.** The easy + medium subagent ran out of context (192k > 128k tokens) before writing anything. Easy was
+  relaunched alone with a context-discipline brief (e81f9de); then **medium and hard ran in parallel**: hard was built
+  on easy's `sol/` under a no-shared-files contract and moved onto medium's result centrally (apply medium's delta to
+  hard's `src/` and `sol/`, stop on any shared file), then `sync-seeds`. Hard+ and hard++ stay sequential.
+- **Lab 08 easy overrides:** `AGENTS.md` and `.github/hooks/guardrails.json`, with a `_why` in `course.json` (the
+  brought-in mess: a repeated and a contradicting rule; a bash-only hook).
+- **CampusHub** (871c942): 1,448 lines of code and tests (55 tests), 391 of data and docs; room availability and a
+  porters' board were added to reach the size with real features. It has no `todo.md`, so the catalog ignores it until
+  hard++ lands.
