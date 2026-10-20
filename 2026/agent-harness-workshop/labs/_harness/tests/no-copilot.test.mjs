@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { isPaidCopilot, paidInShell } from '../no-copilot.mjs';
+import { isPaidCopilot, paidInShell, paidCall, guardEnvironment } from '../no-copilot.mjs';
 import { runChecks } from '../checks.mjs';
 import { tmpdir, makeExercise } from './helpers.mjs';
 
@@ -77,4 +78,42 @@ export default (t) => [
   } finally {
     if (saved === undefined) delete process.env.HARNESS_COPILOT; else process.env.HARNESS_COPILOT = saved;
   }
+});
+
+test('a .cmd run through cmd /d /s /c counts, quoted or not (how process.mjs and the kit run .cmd files)', () => {
+  for (const args of [['/d', '/s', '/c', '"C:\\npm\\copilot.cmd -p "fix it""'], ['/d', '/s', '/c', '"^"C:\\npm\\copilot.cmd^" -p x"'], ['/c', 'C:\\npm\\copilot.cmd --prompt=x']]) {
+    assert.equal(paidCall('cmd', args, {}), true, args.join(' '));
+  }
+  assert.equal(paidCall('cmd', ['/d', '/s', '/c', '"C:\\npm\\copilot.cmd skill list"'], {}), false);
+});
+
+// Windows finds a program by name without a shell (CreateProcess, libuv, Python, Go …) only as .com/.exe, so the stub
+// copilot.cmd can't shadow a real copilot.exe: the guarded PATH leaves out folders that hold one, and keeps their
+// other programs reachable. A worker thread or a non-Node helper, which the in-process guard doesn't reach, then
+// finds no Copilot at all.
+test('on Windows, no program finds copilot.exe through the guarded PATH; the folder\'s other programs stay', { skip: process.platform !== 'win32' && 'Windows only' }, () => {
+  const root = tmpdir();
+  const tools = path.join(root, 'tools');
+  fs.mkdirSync(tools);
+  // Stand-ins: node.exe under two names. "copilot" prints REAL when it runs.
+  for (const name of ['copilot.exe', 'helper.exe']) {
+    try { fs.linkSync(process.execPath, path.join(tools, name)); } catch { fs.copyFileSync(process.execPath, path.join(tools, name)); }
+  }
+  const key = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH';
+  const env = { ...process.env, [key]: `${tools};${process.env[key]}` };
+  delete env.NODE_OPTIONS;
+  const real = spawnSync('copilot', ['-e', 'console.log("REAL")'], { env, encoding: 'utf8' });
+  assert.equal(real.stdout.trim(), 'REAL', 'without the guard, the stand-in is found by name');
+  const guarded = { ...env, ...guardEnvironment({ dir: path.join(root, 'guard'), env }) };
+  assert.ok(!guarded[key].split(';').some((d) => path.resolve(d) === path.resolve(tools)), 'the folder with copilot.exe is not on the guarded PATH');
+  const direct = spawnSync('copilot', ['-e', 'console.log("REAL")'], { env: guarded, encoding: 'utf8' });
+  assert.notEqual(direct.stdout?.trim(), 'REAL', 'a direct spawn finds no copilot.exe');
+  const helper = spawnSync('helper', ['-e', 'console.log("HELPER")'], { env: guarded, encoding: 'utf8' });
+  assert.equal(helper.stdout?.trim(), 'HELPER', `the folder's other programs are still found: ${helper.error?.code ?? helper.stderr}`);
+  const worker = spawnSync(process.execPath, ['-e', `
+    const { Worker } = require('node:worker_threads');
+    new Worker("const r = require('node:child_process').spawnSync('copilot', ['-e', 'console.log(\\"REAL\\")'], { encoding: 'utf8' }); console.log('WORKER', r.error ? r.error.code : r.stdout.trim());", { eval: true });
+  `], { env: guarded, encoding: 'utf8' });
+  assert.match(worker.stdout, /WORKER/, worker.stderr);
+  assert.doesNotMatch(worker.stdout, /WORKER REAL/, 'a worker thread finds no copilot.exe either');
 });
