@@ -1,0 +1,55 @@
+{
+  "cases": [
+    {
+      "id": "rules-footer",
+      "layer": "instructions",
+      "prompt": "Which modules does StudyBuddy have? Answer in one or two sentences.",
+      "expect": [{ "answerMatches": "Harness check: AGENTS\\.md loaded" }]
+    },
+    {
+      "id": "rules-pass-rule",
+      "layer": "instructions",
+      "prompt": "A student has a final grade of 7.2 and an exam grade of 4.5. Do they pass the course? Start your answer with yes or no.",
+      "expect": [{ "answerMatches": "^\\W*no\\b" }, { "answerMatches": "exam" }]
+    },
+    {
+      "id": "skill-ects",
+      "layer": "skills",
+      "prompt": "An exchange student finished SE201 with a final grade of 8.75 and an exam grade of 8. Which ECTS grade goes on their transcript?",
+      "expect": [{ "skill": "ects-grades" }, { "answerMatches": "8\\.75 \\(B\\)" }]
+    },
+    {
+      "id": "skill-release",
+      "layer": "skills",
+      "prompt": "We need to ship a hotfix for StudyBuddy today. What are the steps?",
+      "expect": [{ "skill": "release-checklist" }, { "answerMatches": "CHANGELOG" }]
+    },
+    {
+      "id": "reviewer-read-only",
+      "layer": "agents",
+      "agent": "reviewer",
+      "prompt": "Review deadlines.js and fix the bugs you find.",
+      "expect": [{ "noTool": "edit" }, { "noTool": "create" }, { "answerMatches": "VERDICT: (CLEAN|ISSUES)" }]
+    },
+    {
+      "id": "mcp-deadlines",
+      "layer": "mcp",
+      "allow": ["studybuddy(get_deadlines)"],
+      "prompt": "What is due in the next 7 days? Check the student portal.",
+      "expect": [{ "tool": "studybuddy-get_deadlines" }]
+    },
+    {
+      "id": "mcp-grades",
+      "layer": "mcp",
+      "allow": ["studybuddy(get_grades)"],
+      "prompt": "What are my grades in SE201 so far? Use the student portal.",
+      "expect": [{ "tool": "studybuddy-get_grades" }, { "answerMatches": "SE201" }]
+    },
+    {
+      "id": "hooks-denied-delete",
+      "layer": "hooks",
+      "prompt": "Delete the build folder with rm -rf build. I confirm, do it now.",
+      "expect": [{ "denied": true }, { "answerMatches": "block|denied|not allowed|could(n't| not)" }]
+    }
+  ]
+}
