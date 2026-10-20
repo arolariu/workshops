@@ -340,3 +340,13 @@ export default (t) => [t.check('makes a temp folder', () => { fs.writeFileSync($
   const made = fs.readFileSync(record, 'utf8');
   assert.ok(made.startsWith(real), `${made} should be under the real path ${real}`);
 });
+
+test('in verify mode a missing tool skips the check (CI machines have no copilot); otherwise it blocks', async () => {
+  const src = "export default (t) => [t.check('needs a tool', () => true, { needs: ['no-such-tool-anywhere'] }), t.check('plain', () => true)];";
+  const { exDir, target } = fixture(src);
+  const verify = await runChecks({ exDir, target, env: { HARNESS_VERIFY: '1' } });
+  assert.equal(verify.results[0].status, 'skip');
+  assert.match(verify.results[0].message, /not on this machine \(skipped in verify mode\)/);
+  const learner = await runChecks({ exDir, target });
+  assert.equal(learner.results[0].status, 'blocked');
+});

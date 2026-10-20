@@ -102,8 +102,12 @@ for (const [idx, c] of checks.entries()) {
   const missing = (c.needs ?? []).find((n) => !available(n));
   if (missing) {
     needs = missing;
-    status = c.optional ? 'skip' : 'blocked';
-    message = `${c.optional ? 'Skipped: this optional check needs' : 'Blocked: this check needs'} \`${missing}\`, which is not available. ${recoveryFor(missing)}`;
+    // Verify (facilitators, CI) checks the course, not this machine: a missing tool skips. Learners see "blocked".
+    const verifying = process.env.HARNESS_VERIFY === '1';
+    status = c.optional || verifying ? 'skip' : 'blocked';
+    message = verifying && !c.optional
+      ? `\`${missing}\` is not on this machine (skipped in verify mode).`
+      : `${c.optional ? 'Skipped: this optional check needs' : 'Blocked: this check needs'} \`${missing}\`, which is not available. ${recoveryFor(missing)}`;
   } else if (process.env.HARNESS_VERIFY === '1' && c.env) {
     status = 'skip';
     message = 'Depends on your machine (skipped in verify mode).';
