@@ -134,8 +134,8 @@ A request that loads two skills is right for one and wrong for the other. Check 
 ### M4
 <details><summary>Testing a runner that costs money</summary>
 
-`main(argv, { ask })` takes `ask` as a parameter, so the checks pass a fake one and never start Copilot (they block
-every process while `main()` runs, so a direct `askCopilot()` call fails the check). Keep both cap checks before the
+`main(argv, { ask })` takes `ask` as a parameter, so the checks pass a fake one and never start Copilot (free checks
+can't start a Copilot session at all, so a direct `askCopilot()` call fails the check). Keep both cap checks before the
 first `ask()`, and pass `{ credits, cwd: root }` on every call.
 
 </details>

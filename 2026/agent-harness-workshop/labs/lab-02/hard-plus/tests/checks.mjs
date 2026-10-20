@@ -2,7 +2,7 @@
 // time, and the vendor samples are only read: nothing a check touches ever runs.
 import fs from 'node:fs';
 import path from 'node:path';
-import { VET, SKILL_DIRS, VENDOR, makeSkill, skillMd, CLEAN, rules, where, readTree, withoutProcesses } from './helpers.mjs';
+import { VET, SKILL_DIRS, VENDOR, makeSkill, skillMd, CLEAN, rules, where, readTree } from './helpers.mjs';
 
 const GOOD_DESC = 'description: Export StudyBuddy grades to a CSV file. Use when the user asks to export grades as CSV.';
 const vet = (t) => t.import(VET);
@@ -211,8 +211,7 @@ export default (t) => [
     });
     t.node([t.path(VET), dir, '--json']);
     const { vetSkill } = await vet(t);
-    const inProcess = await withoutProcesses(t, () => vetSkill(dir));
-    if (inProcess.started.length) return `vetSkill() tried to start a process (${[...new Set(inProcess.started)].join(', ')}). A vetter only reads files: it never runs, installs or asks anything.`;
+    vetSkill(dir);
     return !fs.existsSync(marker) || 'Vetting the skill ran its code! The vetter must only read files (never import, require or run them).';
   }, { milestone: 'M4' }),
 

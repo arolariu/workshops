@@ -1,37 +1,8 @@
 // Helpers for Lab 02 · hard++ checks: the checks' own copy of the lexical pre-check (the rules in todo.md), so your
 // descriptions are graded the same way whatever your route() does, and a reader for the six skills.
-import cp from 'node:child_process';
+// (The kit keeps every free check from starting Copilot with a prompt: see labs/_harness/no-copilot.mjs.)
 import fs from 'node:fs';
-import { syncBuiltinESMExports } from 'node:module';
 import path from 'node:path';
-
-export const COPILOT_ITSELF = 'main() called Copilot itself; use the `ask` it\'s given (the checks pass a fake one, so they never spend credits).';
-const STARTERS = ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork'];
-/**
- * Run `fn` with no way to start a process: every child_process function throws instead (and its named imports in
- * your modules follow, via syncBuiltinESMExports), HARNESS_COPILOT points at a missing file, and PATH at an empty
- * folder. A check's timeout can't stop a synchronous spawnSync, so nothing may start at all. Returns
- * { value, error, started: [commands it tried] }; everything is restored afterwards.
- */
-export async function withoutProcesses(t, fn) {
-  const saved = Object.fromEntries(STARTERS.map((n) => [n, cp[n]]));
-  const env = { HARNESS_COPILOT: process.env.HARNESS_COPILOT, PATH: process.env.PATH };
-  const empty = t.tmp();
-  const started = [];
-  for (const n of STARTERS) cp[n] = (cmd) => { started.push(String(cmd).endsWith('no-copilot-here') ? 'copilot' : String(cmd)); throw new Error(`blocked: tried to start ${cmd}`); };
-  syncBuiltinESMExports();
-  process.env.HARNESS_COPILOT = path.join(empty, 'no-copilot-here');
-  process.env.PATH = empty;
-  try {
-    return { value: await fn(), started };
-  } catch (error) {
-    return { error, started };
-  } finally {
-    Object.assign(cp, saved);
-    syncBuiltinESMExports();
-    for (const [k, v] of Object.entries(env)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
-  }
-}
 
 export const SIX = ['csv-export', 'explain-error', 'new-module', 'release-notes', 'write-docs', 'write-tests'];
 export const WHEN = /\buse (it |this )?when\b|\bwhen (the user|you|asked|someone)\b|\buse (it )?(after|before|to|for)\b/i;

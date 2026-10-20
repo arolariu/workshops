@@ -1,34 +1,6 @@
 // Helpers for Lab 02 · hard+ checks: build small skills in temp folders, so no hostile file is ever committed twice.
-import cp from 'node:child_process';
 import fs from 'node:fs';
-import { syncBuiltinESMExports } from 'node:module';
 import path from 'node:path';
-
-const STARTERS = ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork'];
-/**
- * Run `fn` (your code, in this process) with no way to start a process: every child_process function throws instead
- * (your module's named imports follow, via syncBuiltinESMExports), and PATH and HARNESS_COPILOT point nowhere.
- * Returns { value, error, started: [commands it tried] }; everything is restored afterwards.
- */
-export async function withoutProcesses(t, fn) {
-  const saved = Object.fromEntries(STARTERS.map((n) => [n, cp[n]]));
-  const env = { HARNESS_COPILOT: process.env.HARNESS_COPILOT, PATH: process.env.PATH };
-  const empty = t.tmp();
-  const started = [];
-  for (const n of STARTERS) cp[n] = (cmd) => { started.push(String(cmd).endsWith('no-copilot-here') ? 'copilot' : String(cmd)); throw new Error(`blocked: tried to start ${cmd}`); };
-  syncBuiltinESMExports();
-  process.env.HARNESS_COPILOT = path.join(empty, 'no-copilot-here');
-  process.env.PATH = empty;
-  try {
-    return { value: await fn(), started };
-  } catch (error) {
-    return { error, started };
-  } finally {
-    Object.assign(cp, saved);
-    syncBuiltinESMExports();
-    for (const [k, v] of Object.entries(env)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
-  }
-}
 
 export const VET = 'scripts/vet-skill.mjs';
 export const SKILL_DIRS = ['.github/skills', '.agents/skills', '.claude/skills'];
