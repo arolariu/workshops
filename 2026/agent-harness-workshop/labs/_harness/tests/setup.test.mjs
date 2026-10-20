@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import { prepare, main, parseArgs, selectedLab, platformKey } from '../../../setup.mjs';
+import { prepare, main, parseArgs, selectedLab, platformKey, renameRetrying } from '../../../setup.mjs';
 import { tmpdir, writeTree } from './helpers.mjs';
 
 // Unpaid, offline-safe fixtures: fake tools packed as real archives, served from a local mirror. Nothing real is installed.
@@ -139,6 +139,30 @@ test('what the setup starts keeps its state and cache out of the home, in a scra
     assert.equal(r.env.XDG_CACHE_HOME, m.env.XDG_CACHE_HOME);
   }
   assert.equal(fs.existsSync(m.toolsDir), false, '--check and a run with nothing to install still write nothing');
+});
+
+test('the prepared folder is moved into place even while Windows still holds the program that just ran', async () => {
+  const busy = (code) => Object.assign(new Error(`${code}: rename`), { code });
+  const calls = [];
+  const flaky = (fails, code = 'EPERM') => (from, to) => { calls.push([from, to]); if (calls.length <= fails) throw busy(code); };
+  const noWait = async () => {};
+  await renameRetrying('stage', 'final', { rename: flaky(2), wait: noWait });
+  assert.equal(calls.length, 3, 'retried after two "busy" answers, then moved');
+  for (const code of ['EACCES', 'EBUSY']) {
+    calls.length = 0;
+    await renameRetrying('stage', 'final', { rename: flaky(1, code), wait: noWait });
+    assert.equal(calls.length, 2, code);
+  }
+  calls.length = 0;
+  await assert.rejects(renameRetrying('stage', 'final', { rename: flaky(99), wait: noWait, tries: 4 }), /EPERM/);
+  assert.equal(calls.length, 4, 'gives up after its tries');
+  calls.length = 0;
+  await assert.rejects(renameRetrying('stage', 'final', { rename: flaky(99, 'ENOENT'), wait: noWait }), /ENOENT/);
+  assert.equal(calls.length, 1, 'any other error is not retried');
+  const done = tmpdir('renamed ');
+  calls.length = 0;
+  await assert.rejects(renameRetrying('stage', done, { rename: flaky(99), wait: noWait }), /EPERM/);
+  assert.equal(calls.length, 1, 'a folder already in place (a parallel run) is not waited for');
 });
 
 test('a checksum mismatch installs nothing and the lab app is not launched', async () => {

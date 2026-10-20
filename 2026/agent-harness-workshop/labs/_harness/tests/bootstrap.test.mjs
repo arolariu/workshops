@@ -166,6 +166,20 @@ describe('start.cmd (native Windows cmd)', { skip: !WIN }, () => {
     assert.equal(hits, before, 'no request was made');
   });
 
+  test('the verified copy is moved into place even while something still holds the staged folder for a moment', async () => {
+    // Antivirus can hold the program that just ran, and Windows won't rename a folder something holds ("Access is
+    // denied"). A process working inside the staged folder holds it the same way: start one for a moment, right
+    // before the move, so that this happens every time.
+    const hold = (text) => withSha(sha256(goodZip))(text).replace(/^if not exist "%FINAL%\\" /m, (line) => `start "" /b /d "%STAGE%\\%NAME%" "%STAGE%\\%NAME%\\node.exe" -e "setTimeout(() => {}, 2500)"\r\n${line}`);
+    const dir = workshopCopy('start.cmd', hold);
+    assert.match(fs.readFileSync(path.join(dir, 'start.cmd'), 'utf8'), /start "" \/b/, 'the launcher was patched');
+    fs.mkdirSync(path.join(dir, '.workshop', 'cache'), { recursive: true });
+    fs.copyFileSync(goodZip, path.join(dir, '.workshop', 'cache', `${name}.zip`));
+    const r = await run(dir, '--offline list', { PATH: sys32 });
+    assert.equal(r.status, 7, r.out);
+    assert.equal(r.recorded.execPath.toLowerCase(), path.join(dir, '.workshop', 'node', name, 'node.exe').toLowerCase());
+  });
+
   test('an archive with paths outside the expected folder is not unpacked', async () => {
     files.set(`/${NODE_VERSION}/${name}.zip`, fs.readFileSync(evilZip));
     const dir = workshopCopy('start.cmd', withSha(sha256(evilZip)));

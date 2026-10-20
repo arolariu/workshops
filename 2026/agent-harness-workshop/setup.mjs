@@ -120,6 +120,20 @@ function checkLinks(root) {
   walk(root);
 }
 
+/**
+ * Rename a folder whose program has just run. On Windows, antivirus may hold that program a moment longer, and a folder
+ * with an open file can't be renamed (EPERM, EACCES, EBUSY): retry briefly. A destination already in place (a parallel
+ * run finished first) or any other error is not waited for.
+ */
+export async function renameRetrying(from, to, { rename = fs.renameSync, wait = (ms) => new Promise((r) => setTimeout(r, ms)), tries = 10, delayMs = 500 } = {}) {
+  for (let i = 1; ; i++) {
+    try { return rename(from, to); } catch (e) {
+      if (i >= tries || !['EPERM', 'EACCES', 'EBUSY'].includes(e.code) || fs.existsSync(to)) throw e;
+      await wait(delayMs);
+    }
+  }
+}
+
 /** Leftovers of interrupted runs (more than an hour old) are removed; fresh ones may belong to a parallel run. */
 function cleanLeftovers(toolsDir, cacheDir) {
   const old = (p) => { try { return Date.now() - fs.statSync(p).mtimeMs > 3600 * 1000; } catch { return false; } };
@@ -234,7 +248,7 @@ async function prepareWith({ key, pins, manual, platform, toolsDir, cacheDir, of
       // A parallel run may have finished first; anything else already in the way is not a working copy.
       if (fs.existsSync(finalDir(tool)) && !(fs.existsSync(exeAt(finalDir(tool))) && await probe(exeAt(finalDir(tool))))) fs.rmSync(finalDir(tool), { recursive: true, force: true });
       if (!fs.existsSync(finalDir(tool))) {
-        try { fs.renameSync(stage, finalDir(tool)); stage = null; } catch (e) { if (!fs.existsSync(finalDir(tool))) throw e; }
+        try { await renameRetrying(stage, finalDir(tool)); stage = null; } catch (e) { if (!fs.existsSync(finalDir(tool))) throw e; }
       }
       if (!fs.existsSync(exeAt(finalDir(tool)))) throw new Error(`could not finish preparing ${finalDir(tool)}`);
       installs.push(tool);

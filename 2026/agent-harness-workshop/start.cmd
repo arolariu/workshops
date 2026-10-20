@@ -104,7 +104,7 @@ tar -xf "%ARCHIVE%" -C "%STAGE%" || goto :unpack_failed
 call :node_ok "%STAGE%\%NAME%\node.exe" || goto :does_not_run
 rem An earlier copy that no longer runs (damaged, or node.exe deleted) is replaced by the verified one.
 if exist "%FINAL%\" call :node_ok "%FINAL%\node.exe" || rmdir /s /q "%FINAL%" >nul 2>&1
-if not exist "%FINAL%\" move "%STAGE%\%NAME%" "%FINAL%" >nul 2>&1
+if not exist "%FINAL%\" call :place
 rmdir /s /q "%STAGE%" >nul 2>&1
 call :node_ok "%FINAL%\node.exe" || goto :no_write
 set "NODE=%FINAL%\node.exe"
@@ -127,6 +127,16 @@ goto :scan
 if defined NODE exit /b 0
 call :node_ok "%~1" && set "NODE=%~1"
 exit /b 0
+
+rem The staged node.exe has just run, and antivirus may hold it a moment longer: Windows can't rename a folder while
+rem a file in it is open ("Access is denied"). Retry for a few seconds; a parallel run that finished first is fine.
+:place
+for /l %%N in (1,1,10) do (
+  if exist "%FINAL%\" exit /b 0
+  move "%STAGE%\%NAME%" "%FINAL%" >nul 2>&1 && exit /b 0
+  ping -n 2 127.0.0.1 >nul 2>&1
+)
+exit /b 1
 
 :node_ok
 "%~1" -e "process.exit(Number(process.versions.node.split('.')[0]) >= 22 ? 0 : 1)" >nul 2>&1
