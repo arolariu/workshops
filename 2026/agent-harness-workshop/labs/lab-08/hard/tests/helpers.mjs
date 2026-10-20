@@ -29,7 +29,7 @@ export function caseProblems(c, i, ids, layerIds) {
   if (c.agent !== undefined && (typeof c.agent !== 'string' || !c.agent.trim())) out.push(`${at}: agent must be the name of a custom agent.`);
   if (c.allow !== undefined && (!Array.isArray(c.allow) || c.allow.some((a) => typeof a !== 'string'))) out.push(`${at}: allow must be a list of tool permissions.`);
   else if ((c.allow ?? []).some((a) => WRITE_PERMISSION.test(a))) out.push(`${at}: an eval run is read-only, so allow can't grant ${c.allow.filter((a) => WRITE_PERMISSION.test(a)).join(', ')}.`);
-  if (c.credits !== undefined && !(Number.isInteger(c.credits) && c.credits >= 1 && c.credits <= 30)) out.push(`${at}: credits must be a whole number from 1 to 30.`);
+  if (c.credits !== undefined && !(Number.isInteger(c.credits) && c.credits >= 30 && c.credits <= 60)) out.push(`${at}: credits must be a whole number from 30 (the CLI's minimum, \`copilot help limits\`) to 60.`);
   if (!Array.isArray(c.expect) || !c.expect.length) return [...out, `${at}: expect needs at least one rule, like { "answerMatches": "…" }.`];
   for (const rule of c.expect) {
     const keys = rule && typeof rule === 'object' && !Array.isArray(rule) ? Object.keys(rule) : [];

@@ -26,15 +26,17 @@ No inherited file changes (nothing easy's `sol/` has is touched). Nothing under 
 ## Milestones and checks
 
 - **M1 · Cases** (generic, on the learner's `evals/cases.json`): schema (id, layer from the scorecard's layers,
-  prompt, `expect` rules from the vocabulary, valid regexes, optional `agent`, `allow` read-only, `credits` 1–30);
+  prompt, `expect` rules from the vocabulary, valid regexes, optional `agent`, `allow` read-only, `credits` 30–60);
   ≥ 8 cases and one per runtime layer the harness has (scanHarness); the five kinds name real things (a skill that
   exists, an agent with `noTool` on edits, a `<server>-<tool>` of a configured MCP server, `{ denied: true }`, an
   instructions case with `answerMatches`). src fails: 2 cases.
 - **M2 · Runner**: `passRate`/`passAtK`/`variance` on hand-picked inputs; `score()` on built events (each rule, an
-  incomplete run); `evalArgs()` like `leashArgs` (prompt, `-s`, `--no-ask-user`, JSON, cap = `credits` ?? 15,
-  `--deny-tool=write` + `--deny-tool=shell`, no `--allow-all`/`--yolo`, throws on a write/shell allow); `--dry-run`
-  worst case and `--budget` refusal (exit 2, nothing written); the report of the reference recordings (hand-checked);
-  the learner's own recordings parse and every case of their `cases.json` gets a row.
+  incomplete run); `evalArgs()` like `leashArgs` (prompt, `-s`, `--no-ask-user`, JSON, cap = `credits` ?? 30,
+  `--deny-tool=write` + `--deny-tool=shell`, no `--allow-all`/`--yolo`, throws on a write/shell allow and on a cap
+  outside 30–60); `--dry-run` worst case and `--budget` refusal (exit 2, nothing written); failed runs with a fake CLI
+  (`EVAL_COPILOT`: a run that never starts is a failed run with its stderr shown, exit 2 when no run starts); the
+  report of the reference recordings (hand-checked); the learner's own recordings parse and every case of their
+  `cases.json` gets a row.
 - **M3 · Baseline**: `compare()` (threshold is strict, unshared cases are listed, not judged); the CLI exits 1 naming
   the dropped cases, 0 when within the threshold; `evals/baseline.json` is a report of the learner's cases.
 - **M4 · Ablation**: `ablation()` on hand-picked reports; `--ablate skills` and `--ablate all` on the recordings
@@ -56,8 +58,9 @@ reviewer-read-only 4, mcp-deadlines 4, mcp-grades 2, hooks-denied-delete 4.
   .75 · .25 = **.1875**, skill-release **.1875**, mcp-grades **.25**. Synthetic: [3, 5, 7] → 8/3 = **2.6667**.
 - Tokens (mean per run): rules-footer in (18200+17800+18100+17900)/4 = **18000**, out (62+58+61+59)/4 = **60**;
   skill-ects in (24100+23900+18200+23800)/4 = **22500**, out (140+150+80+150)/4 = **130**.
-- Dry run (check's own 3 cases, `credits` 25 on one, `--runs 2`): 2 · (15 + 15 + 25) = **110** credits; `--budget 100`
-  refuses (exit 2), `--budget 110` accepts. `--case B --runs 3`: **45**.
+- Dry run (check's own 3 cases, `credits` 45 on one, `--runs 2`): 2 · (30 + 30 + 45) = **210** credits; `--budget 200`
+  refuses (exit 2), `--budget 210` accepts. `--case B --runs 3`: 3 · 30 = **90**. The cap is 30 at least: `copilot
+  help limits` says "Minimum: 30 AI credits" for `--max-ai-credits` (a cap of 15 made every real run fail at startup).
 
 Ablations, 2 runs per case (passes, in the order above):
 - `ablate-instructions`: 0, 0, 2, 1, 2, 2, 1, 2 → rates 0, 0, 1, .5, 1, 1, .5, 1 = 5 / 8 = **.625**; drop
@@ -85,18 +88,30 @@ Ablations, 2 runs per case (passes, in the order above):
 
 ## For hard+
 
-CI: `node scripts/eval.mjs --runs 3 --budget 400 --baseline evals/baseline.json --threshold 25 --report
-evals/reports` (exit 0 ok, 1 regression beyond the threshold, 2 refused: budget, invalid cases or arguments). Offline:
-`--from evals/runs/full`. Few runs are noisy: one run moves a 4-run case by 25 pp.
+CI, every pull request (free): `node scripts/eval.mjs --from evals/runs/full --baseline evals/baseline.json` (exit 0:
+the runner and the baseline agree). With the `run-evals` label or on `main` (real runs): `node scripts/eval.mjs --runs
+1 --budget 240 --baseline evals/baseline.json --threshold 75 --report evals/reports`: worst case 8 cases × 1 run × 30
+credits = **240**. With one run a case scores 0 or 1, so a 75 pp threshold flags only a case that always passed in the
+baseline and now fails (a 100 pp drop). `--runs 3 --budget 400` is refused (720 worst case). A subset with more runs
+is the alternative: `--case rules-footer,reviewer-read-only,mcp-deadlines,hooks-denied-delete --runs 2 --budget 240
+--threshold 50` (4 × 2 × 30 = 240; a regression is a stable case failing both runs). Exit codes: 0 ok, 1 regression
+beyond the threshold, 2 refused (budget, invalid cases or arguments) or nothing measured (no run started).
 
 ## Implementation notes
 
-- `verify 08`: hard src fails 15/15, sol passes 15/15. Sol maturity L4 Guarded (`governance-evals` green,
-  `governance-ci-gate` red until hard+). A mutation run of the reference (17 mutants: rule semantics, unfinished
-  runs, the read-only arguments, the cap, the plan, pass@k, sample variance, summed tokens, unrounded or `>=`
-  comparisons, unsorted ablation) is caught by at least one check each.
+- `verify 08`: hard src fails 16/16, sol passes 16/16. Sol maturity L4 Guarded (`governance-evals` green,
+  `governance-ci-gate` red until hard+). A mutation run of the reference (22 mutants: rule semantics, unfinished
+  runs, the read-only arguments, the cap and its minimum, the plan, pass@k, sample variance, summed tokens, unrounded
+  or `>=` comparisons, unsorted ablation, a failed start that is hidden, unrecorded or exits 0) is caught by at least
+  one check each.
 - The recordings come from a deterministic generator (kept outside the repo, in the session's files); they total
   ≈ 140 KB per copy (32 files, 2–10 KB each).
-- The real-run path was exercised with a fake `copilot.cmd` on a PATH without the real CLI: N runs append to one
-  file, a run without a `result` event gets a marked one (exit code 1) so runs stay split, and the report keeps each
-  case's arguments. On Windows, `copilot.cmd` needs the shell fallback; the command is quoted for cmd.exe.
+- Fix after validation: the first version capped runs at 15 credits; the CLI's minimum is 30 (`copilot help limits`),
+  so every real run failed at startup, and the runner hid it (exit 0, a report of failed runs). Now `MIN_CAP = 30`
+  (cases may set 30–60), a run that exits non-zero or never reaches its `result` event is recorded as failed with the
+  CLI's stderr printed, and `eval.mjs` exits 2 when no run of the plan started. `EVAL_COPILOT=<program>` runs a fake
+  CLI instead of `copilot` (a `.mjs` runs with node); the free check uses it, so it never needs PATH tricks.
+- Real-run plumbing: N runs append to one file per case; a run without a `result` event gets a marked one (exit code
+  ≥ 1) so runs stay split, and a result that says 0 while the process exited non-zero takes the process's code. The
+  report keeps each case's arguments. On Windows, `copilot.cmd` needs the shell fallback; the command is quoted for
+  cmd.exe. `--case` takes a comma list.

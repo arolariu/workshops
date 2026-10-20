@@ -13,14 +13,16 @@ without spending a credit.
 ## 📋 Requirements
 1. `evals/cases.json` has at least 8 golden cases. Every layer of your harness that a prompt can exercise
    (instructions, skills, agents, MCP, hooks) has one, and every case is scored by deterministic `expect` rules.
-2. `scripts/eval.mjs` runs each case N times, read-only, quiet and credit-capped, and refuses a plan whose worst case
-   is over the budget: `--dry-run`, `--runs <n>`, `--budget <credits>`.
+2. `scripts/eval.mjs` runs each case N times, read-only, quiet and credit-capped (every run at least 30 credits, the
+   CLI's minimum), and refuses a plan whose worst case is over the budget: `--dry-run`, `--runs <n>`,
+   `--budget <credits>`.
 3. It scores each run from its JSON events, computes the pass rate, pass@k, variance and tokens of each case, and
    writes `report.json` and `report.md` (`--report <dir>`, by default `evals/reports`).
 4. `--baseline <file> [--threshold <pp>]` exits 1 when a case drops by more than the threshold, and names it.
    `evals/baseline.json` is saved.
 5. `--ablate <layer|all>` compares the recorded "layer removed" suites with the full one: the layer-value report.
-6. Exit codes: 0 done, 1 a regression, 2 refused (arguments, cases, budget). Nothing free ever starts Copilot.
+6. Exit codes: 0 done, 1 a regression, 2 refused (arguments, cases, budget) or nothing measured (no run started).
+   A run that fails is recorded as failed and its error is shown. Nothing free ever starts Copilot.
 
 A case, and the rules `expect` can use (one key per rule; a run passes when it finished and every rule holds):
 
@@ -39,7 +41,7 @@ A case, and the rules `expect` can use (one key per rule; a run passes when it f
 { "answerMatches": "VERDICT: \\w+" }    the final answer matches (no case)
 { "answerNotMatches": "deleted" }       ...and doesn't match this one
 Optional: "agent": "reviewer", "allow": ["studybuddy(get_grades)"],
-"credits": 20 (the run's cap; 15 when it's left out, at most 30)
+"credits": 45 (the run's cap: 30 when it's left out, from 30 to 60)
 ```
 
 ## 🧭 Milestones
@@ -55,13 +57,15 @@ Optional: "agent": "reviewer", "allow": ["studybuddy(get_grades)"],
 ### M2 · Runner
 - In `scripts/eval/score.mjs`: `score(events, expect)` returns `{ pass, failed }`; `evalArgs(c)` builds one run's
   arguments (`--agent` when the case has one, the prompt, `-s`, `--no-ask-user`, `--output-format json`,
-  `--max-ai-credits` = the case's `credits` or 15, the `allow` list, `--deny-tool=write` and `--deny-tool=shell`; it
-  throws when `allow` asks for write or shell); `plan()` gives the worst case: every run spends its whole cap
+  `--max-ai-credits` = the case's `credits` or 30, the `allow` list, `--deny-tool=write` and `--deny-tool=shell`; it
+  throws when `allow` asks for write or shell, or when the cap is under 30 or over 60); `plan()` gives the worst
+  case: every run spends its whole cap
 - In `scripts/eval/stats.mjs`: `passRate`, `passAtK(n, c, k)` (the unbiased estimator), `variance` (the population
   variance) and `caseReport` (runs, passed, pass rate, pass@k for every k, variance, mean tokens per run)
 - `node scripts/eval.mjs --from evals/runs/full` scores the recordings with your cases, and every case gets a row
   (scored with the reference cases, the suite comes out at **78.1%**); `--dry-run` prints the worst case and runs
-  nothing
+  nothing; a run that fails to start is recorded as a failed run with its error shown, and when no run starts at
+  all, the runner exits 2 (the plumbing does this; a check proves it with a fake CLI)
 
 ### M3 · Baseline
 - `compare(baseline, current, { threshold })` works case by case: a drop of **more than** `threshold` percentage
@@ -78,16 +82,17 @@ Optional: "agent": "reviewer", "allow": ["studybuddy(get_grades)"],
 ```bash
 cd labs/lab-08/hard/src
 node scripts/eval.mjs --from evals/runs/full          # score recordings
-node scripts/eval.mjs --dry-run --runs 3 --budget 400 # plan, run nothing
+node scripts/eval.mjs --dry-run --runs 1 --budget 240 # plan, run nothing
 node scripts/eval.mjs --from evals/runs/ablate-skills \
   --baseline evals/baseline.json                      # a regression?
 node scripts/eval.mjs --ablate all                    # layer value
 ```
 
 The recordings are `evals/runs/<suite>/<case-id>.jsonl`: four runs per case in `full/`, two in each `ablate-*/`,
-appended one after another (each run ends with its `result` event). Real runs (`--runs 3 --budget 400`, no
-`--from`) cost credits and go to `evals/runs/run-<stamp>/`. The plumbing in `scripts/eval.mjs` (arguments, files,
-Markdown, spawning Copilot) is done; your work is in `scripts/eval/` and `evals/`.
+appended one after another (each run ends with its `result` event). Real runs (`--runs 1 --budget 240`, no
+`--from`) cost credits and go to `evals/runs/run-<stamp>/`; `--case` takes one id or a comma list. The plumbing in
+`scripts/eval.mjs` (arguments, files, Markdown, spawning Copilot, failed starts) is done; your work is in
+`scripts/eval/` and `evals/`.
 
 ## 💡 Hints
 ### M1
@@ -132,8 +137,9 @@ Check it by hand: 4 runs, 1 passed, k = 2 → 1 − C(3,2)/C(4,2) = 1 − 3/6 = 
 <details><summary>The budget is the worst case, not the average</summary>
 
 A run usually spends far less than its cap, but nothing stops it from spending all of it. So the plan multiplies:
-runs × the case's cap, summed over the cases. With 8 cases, `--runs 3` and a cap of 15 that's 360 credits, which
-the default `--budget 100` refuses.
+runs × the case's cap, summed over the cases. The CLI refuses a cap under 30 (`copilot help limits`), so every run
+counts 30 at least: 8 cases with `--runs 3` is 720 credits, which the default `--budget 100` refuses; `--runs 1`
+is 240.
 
 </details>
 
@@ -188,8 +194,14 @@ impression this level replaces: with enough runs, a drop is a fact.
 </details>
 
 ## 🚀 Going further
-- Record a real suite: `node scripts/eval.mjs --runs 3 --budget 400`, then score it with `--from` and compare it
-  with the recordings. Which cases are flakier on your machine?
+- Record a real suite: `node scripts/eval.mjs --runs 1 --budget 240` (worst case 8 × 30), then score it with
+  `--from` and compare it with the recordings. Which cases fail on your machine?
+- Gate a pull request on it (hard+ does): on every pull request, for free,
+  `node scripts/eval.mjs --from evals/runs/full --baseline evals/baseline.json` (the runner and the baseline still
+  agree); with the `run-evals` label or on `main`,
+  `node scripts/eval.mjs --runs 1 --budget 240 --baseline evals/baseline.json --threshold 75 --report evals/reports`
+  (worst case 8 × 1 × 30 = 240 credits). With one run a case scores 0% or 100%, so a 75 pp threshold flags only a
+  case that always passed and now fails; for finer gates, run a subset more often (`--case a,b --runs 2`).
 - Record an ablation for real: copy the project into a folder Copilot trusts (inside the workshop folder), remove a
   layer there (say `.github/agents/`), run the suite in the copy, and save its run folder as `evals/runs/ablate-agents/`.
 - Add a rule of your own to the vocabulary (`maxTools`, `maxTokens`…) and a case that needs it.

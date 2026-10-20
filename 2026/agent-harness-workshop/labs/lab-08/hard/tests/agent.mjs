@@ -24,13 +24,16 @@ export default [
     prompts: 1, // one copilot -p run; its own --max-ai-credits caps it
     timeout: 400000,
     expect: (t, { output, code }) => {
-      if (code !== 0) return `eval.mjs exited ${code}: ${output.trim().slice(-300)}`;
+      // The exit code and the runner's own words first: a run that never started reads as one, not as a format problem.
+      const said = `exit code ${code}; the output ends with: ${output.trim().slice(-400) || '(nothing)'}`;
+      if (code !== 0) return `eval.mjs failed (${said})`;
       const files = t.files('evals/runs').filter((f) => /\/run-[^/]+\/eval-smoke\.jsonl$/.test(f)).sort();
-      if (!files.length) return 'Expected an evals/runs/run-<stamp>/eval-smoke.jsonl: the run was not recorded.';
+      if (!files.length) return `No evals/runs/run-<stamp>/eval-smoke.jsonl was recorded (${said}).`;
       const events = (t.read(files.at(-1)) ?? '').split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l); } catch { return null; } });
       const results = events.filter((e) => e?.type === 'result');
-      if (results.length !== 1) return `The recording should hold one run (one result event); it has ${results.length}.`;
-      if (!events.some((e) => e?.type === 'user.message' && e.data?.content === CASE.prompt)) return 'The recording has no user.message with the case\'s prompt: is --output-format json in evalArgs()?';
+      if (results.length !== 1) return `The recording should hold one run (one result event); it has ${results.length} (${said}).`;
+      if (results[0].note || results[0].exitCode !== 0) return `The run failed: Copilot exited with code ${results[0].exitCode}${results[0].note ? ' before its result event (it never started)' : ''} (${said}).`;
+      if (!events.some((e) => e?.type === 'user.message' && e.data?.content === CASE.prompt)) return `The run finished, but its recording has no user.message with the case's prompt: is --output-format json in evalArgs()? (${said})`;
       let rep = null;
       try { rep = JSON.parse(t.read('evals/reports/report.json') ?? 'null'); } catch { /* reported below */ }
       const c = rep?.cases?.[CASE.id];

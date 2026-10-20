@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // 🧪 eval: run the harness's golden cases N times (read-only, quiet, credit-capped) and measure them: pass rate,
 // pass@k, variance and tokens per case, a baseline gate, and the value of each layer.
-//   node scripts/eval.mjs --dry-run [--runs 3] [--budget 100] [--case <id>]   the plan and its worst case; runs nothing
-//   node scripts/eval.mjs --runs 3 --budget 400 [--case <id>]                 real runs → evals/runs/run-<stamp>/
+//   node scripts/eval.mjs --dry-run [--runs 3] [--budget 100] [--case <id,…>]  the plan and its worst case; runs nothing
+//   node scripts/eval.mjs --runs 1 --budget 240 [--case <id,…>]               real runs → evals/runs/run-<stamp>/
 //   node scripts/eval.mjs --from evals/runs/full                              score recorded runs (free)
 //   node scripts/eval.mjs … --baseline evals/baseline.json [--threshold 10]   exit 1 on a regression
 //   node scripts/eval.mjs --ablate <layer|all> [--from evals/runs/full]       the layer-value report (free)
 // Reports: report.json and report.md (layer-value.json and .md for --ablate) in --report (default evals/reports).
-// Exit codes: 0 done · 1 a regression beyond the threshold · 2 refused (arguments, cases, budget, missing runs).
+// Every run is capped at 30 credits or more (the CLI's minimum), so the worst case is runs × cases × 30 at least.
+// Exit codes: 0 done · 1 a regression beyond the threshold · 2 refused (arguments, cases, budget, missing runs) or
+// nothing measured (no run started: Copilot's error is printed).
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -125,6 +127,9 @@ function write(dir, name, json, md) {
 
 function runCopilot(args) {
   const opts = { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 300000 };
+  // EVAL_COPILOT runs another program instead (a .mjs or .js file runs with node): the free checks use a fake one.
+  const fake = process.env.EVAL_COPILOT;
+  if (fake) return /\.[cm]?js$/i.test(fake) ? spawnSync(process.execPath, [fake, ...args], opts) : spawnSync(fake, args, opts);
   let r = spawnSync('copilot', args, opts);
   if (r.error?.code === 'ENOENT' && process.platform === 'win32') {
     // copilot.cmd (an npm install) only starts through a shell, so quote every argument for cmd.exe.
@@ -135,29 +140,49 @@ function runCopilot(args) {
   return r;
 }
 
-/** Real runs: every case, N times, appended to evals/runs/run-<stamp>/<case>.jsonl. */
+const isResult = (line) => { try { return JSON.parse(line)?.type === 'result'; } catch { return false; } };
+const errorTail = (r) => `${(r.stderr ?? '').trim() || (r.error?.message ?? '')}`.slice(-300) || 'no error output';
+
+/**
+ * Real runs: every case, N times, appended to evals/runs/run-<stamp>/<case>.jsonl. A run that failed (Copilot exited
+ * with another code than 0) or never started (no result event of its own) is recorded as a failed run, and its error
+ * is printed. `started` counts the runs that got as far as Copilot's own result event.
+ */
 function record(cases, runs) {
+  const args = Object.fromEntries(cases.map((c) => [c.id, evalArgs(c)]));
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*$/, '').replace('T', '-');
-  const dir = path.join('evals', 'runs', `run-${stamp}`);
+  let dir = path.join('evals', 'runs', `run-${stamp}`);
+  for (let n = 2; fs.existsSync(dir); n++) dir = path.join('evals', 'runs', `run-${stamp}-${n}`);
   fs.mkdirSync(dir, { recursive: true });
-  const args = {};
+  let started = 0;
+  let total = 0;
+  let lastError = null;
   for (const c of cases) {
-    args[c.id] = evalArgs(c);
     const file = path.join(dir, `${c.id}.jsonl`);
     for (let i = 1; i <= runs; i++) {
       console.log(`▶ ${c.id} · run ${i}/${runs}`);
+      total++;
       const r = runCopilot(args[c.id]);
-      let out = r.stdout ?? '';
-      if (out && !out.endsWith('\n')) out += '\n';
-      // A run that ended without its result event still ends here, as a failed run.
-      if (!/"type"\s*:\s*"result"/.test(out)) {
-        console.log(`   ⚠ the run ended without a result event (exit ${r.status ?? r.signal}): ${(r.stderr ?? '').trim().slice(-200) || 'no error output'}`);
-        out += `${JSON.stringify({ type: 'result', exitCode: r.status ?? 1, note: 'added by eval.mjs: the run ended without a result event' })}\n`;
+      const code = r.status ?? 1;
+      const lines = String(r.stdout ?? '').split(/\r?\n/).filter((l) => l.trim());
+      const at = lines.findLastIndex(isResult);
+      if (at < 0) {
+        lastError = `exit ${r.status ?? r.signal}: ${errorTail(r)}`;
+        console.log(`   ⚠ Copilot never got to its result event (${lastError}). Recorded as a failed run.`);
+        lines.push(JSON.stringify({ type: 'result', exitCode: code || 1, note: 'added by eval.mjs: the run never got to its result event' }));
+      } else {
+        started++;
+        if (code !== 0) {
+          lastError = `exit ${code}: ${errorTail(r)}`;
+          console.log(`   ⚠ Copilot exited with code ${code} (${errorTail(r)}). Recorded as a failed run.`);
+          const e = JSON.parse(lines[at]);
+          if (e.exitCode === 0) lines[at] = JSON.stringify({ ...e, exitCode: code, note: 'eval.mjs: the process exited with this code' });
+        }
       }
-      fs.appendFileSync(file, out);
+      fs.appendFileSync(file, `${lines.join('\n')}\n`);
     }
   }
-  return { dir, args };
+  return { dir, args, started, total, lastError };
 }
 
 export function main(argv) {
@@ -167,8 +192,10 @@ export function main(argv) {
   if (problems.length) throw new Refused(`${o.cases} has problems:\n  - ${problems.join('\n  - ')}`);
   let cases = Array.isArray(cfg) ? cfg : cfg.cases;
   if (o.case) {
-    cases = cases.filter((c) => c.id === o.case);
-    if (!cases.length) throw new Refused(`No case with the id "${o.case}" in ${o.cases}.`);
+    const wanted = String(o.case).split(',').map((s) => s.trim()).filter(Boolean);
+    const unknown = wanted.filter((id) => !cases.some((c) => c.id === id));
+    if (unknown.length || !wanted.length) throw new Refused(`No case with the id "${unknown[0] ?? o.case}" in ${o.cases}.`);
+    cases = cases.filter((c) => wanted.includes(c.id));
   }
 
   if (o.ablate) {
@@ -211,7 +238,10 @@ export function main(argv) {
       console.log('🧪 Dry run: nothing ran.');
       return 0;
     }
-    ({ dir: suite, args } = record(cases, o.runs));
+    const rec = record(cases, o.runs);
+    if (rec.started === 0) throw new Refused(`${rec.total === 1 ? 'The run never started' : `None of the ${rec.total} runs started`}, so nothing was measured (the failed runs are in ${slash(rec.dir)}). Copilot's last error: ${rec.lastError}`);
+    if (rec.started < rec.total) console.log(`⚠ ${rec.total - rec.started} of ${rec.total} runs never started: they count as failed runs.`);
+    ({ dir: suite, args } = rec);
     recorded = readSuite(suite, cases);
   }
 

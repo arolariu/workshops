@@ -160,7 +160,7 @@ export default (t) => [
     if (!n.includes('--no-ask-user')) return 'Unattended: add --no-ask-user, or a run can wait for an answer nobody gives.';
     if (flag(a, '--output-format') !== 'json') return 'The runner scores JSON events: --output-format json.';
     const cap = flags(a, '--max-ai-credits');
-    if (cap.length !== 1 || Number(cap[0]) !== 15) return `Cap every run with one --max-ai-credits: 15 when the case sets no credits (got ${cap.join(', ') || 'none'}).`;
+    if (cap.length !== 1 || Number(cap[0]) !== 30) return `Cap every run with one --max-ai-credits: 30 when the case sets no credits, the smallest cap the CLI accepts (got ${cap.join(', ') || 'none'}).`;
     if (n.some((x) => /^--(allow-all|yolo)/.test(x))) return 'An eval run never gets --allow-all, --allow-all-tools or --yolo.';
     const allowed = flags(a, '--allow-tool');
     const wide = allowed.find((x) => /^(write|shell|bash|powershell)\b/i.test(x) || x === '*');
@@ -169,9 +169,14 @@ export default (t) => [
     const deny = flags(a, '--deny-tool');
     if (!deny.includes('write') || !deny.includes('shell')) return 'Read-only whatever the prompt says: --deny-tool=write and --deny-tool=shell.';
     let own;
-    try { own = evalArgs({ ...base, allow: [], credits: 25, agent: 'reviewer' }); } catch (e) { return `evalArgs() throws on a case with credits and an agent: ${e.message}`; }
-    if (Number(flag(own, '--max-ai-credits')) !== 25) return 'A case\'s credits replace the default cap: { "credits": 25 } → --max-ai-credits=25.';
+    try { own = evalArgs({ ...base, allow: [], credits: 45, agent: 'reviewer' }); } catch (e) { return `evalArgs() throws on a case with credits and an agent: ${e.message}`; }
+    if (Number(flag(own, '--max-ai-credits')) !== 45) return 'A case\'s credits replace the default cap: { "credits": 45 } → --max-ai-credits=45.';
     if (flag(own, '--agent') !== 'reviewer') return 'A case\'s agent runs it: { "agent": "reviewer" } → --agent reviewer.';
+    for (const [credits, why] of [[15, 'under 30, the smallest cap the CLI accepts (`copilot help limits`): the run would fail before it starts'], [90, 'over 60, the most one eval run may spend']]) {
+      let threw = false;
+      try { evalArgs({ ...base, credits }); } catch { threw = true; }
+      if (!threw) return `evalArgs() must refuse (throw) { "credits": ${credits} }: ${why}.`;
+    }
     for (const bad of ['shell(rm)', 'write', 'shell(npm:*)']) {
       let threw = false;
       try { evalArgs({ ...base, allow: [bad] }); } catch { threw = true; }
@@ -185,17 +190,49 @@ export default (t) => [
     fs.writeFileSync(file, JSON.stringify({ cases: [
       { id: 'case-a', layer: 'instructions', prompt: 'A', expect: [{ answerMatches: 'a' }] },
       { id: 'case-b', layer: 'skills', prompt: 'B', expect: [{ skill: 'b' }] },
-      { id: 'case-c', layer: 'mcp', prompt: 'C', credits: 25, expect: [{ tool: 'studybuddy-c' }] },
+      { id: 'case-c', layer: 'mcp', prompt: 'C', credits: 45, expect: [{ tool: 'studybuddy-c' }] },
     ] }));
     const before = treeOf(path.join(dir, 'evals'));
-    const ok = evalCli(t, ['--dry-run', '--cases', file, '--runs', '2', '--budget', '110'], { cwd: dir });
-    if (ok.code !== 0) return `--dry-run --runs 2 --budget 110 on 3 cases (one with "credits": 25) should exit 0; it exited ${ok.code}: ${tail(ok.out)}`;
-    if (!/\b110\b/.test(ok.out)) return `Print the worst case: 2 runs × (15 + 15 + 25) = 110 credits. The dry run printed: ${tail(ok.out)}`;
-    const over = evalCli(t, ['--dry-run', '--cases', file, '--runs', '2', '--budget', '100'], { cwd: dir });
-    if (over.code !== 2) return `A plan whose worst case (110) is over --budget 100 is refused with exit code 2; it exited ${over.code}.`;
-    const one = evalCli(t, ['--dry-run', '--cases', file, '--runs', '3', '--case', 'case-b', '--budget', '45'], { cwd: dir });
-    if (one.code !== 0 || !/\b45\b/.test(one.out)) return `--case case-b --runs 3 plans one case: 3 × 15 = 45 credits (exit ${one.code}): ${tail(one.out)}`;
+    const ok = evalCli(t, ['--dry-run', '--cases', file, '--runs', '2', '--budget', '210'], { cwd: dir });
+    if (ok.code !== 0) return `--dry-run --runs 2 --budget 210 on 3 cases (one with "credits": 45) should exit 0; it exited ${ok.code}: ${tail(ok.out)}`;
+    if (!/\b210\b/.test(ok.out)) return `Print the worst case: 2 runs × (30 + 30 + 45) = 210 credits. The dry run printed: ${tail(ok.out)}`;
+    const over = evalCli(t, ['--dry-run', '--cases', file, '--runs', '2', '--budget', '200'], { cwd: dir });
+    if (over.code !== 2) return `A plan whose worst case (210) is over --budget 200 is refused with exit code 2; it exited ${over.code}.`;
+    const one = evalCli(t, ['--dry-run', '--cases', file, '--runs', '3', '--case', 'case-b', '--budget', '90'], { cwd: dir });
+    if (one.code !== 0 || !/\b90\b/.test(one.out)) return `--case case-b --runs 3 plans one case: 3 × 30 = 90 credits (exit ${one.code}): ${tail(one.out)}`;
     return treeOf(path.join(dir, 'evals')) === before || 'A dry run must not write anything, but evals/ changed.';
+  }, { milestone: 'M2' }),
+  t.check('A run that fails is recorded and shown, and a plan where no run starts exits 2 (a fake CLI, no Copilot)', () => {
+    const fakes = t.tmp();
+    const broken = path.join(fakes, 'broken-cli.mjs');
+    fs.writeFileSync(broken, "process.stderr.write('error: --max-ai-credits is below the minimum (fake CLI)\\n');\nprocess.exit(1);\n");
+    const mixed = path.join(fakes, 'mixed-cli.mjs');
+    const events = runEvents({ prompt: 'A', answers: ['All fine.'] }).map((e) => JSON.stringify(e)).join('\n');
+    fs.writeFileSync(mixed, `const prompt = process.argv[process.argv.indexOf('-p') + 1];\nif (prompt === 'B') { process.stderr.write('error: the session did not start (fake CLI)\\n'); process.exit(1); }\nconsole.log(${JSON.stringify(events)});\n`);
+    const cases = (dir) => {
+      const file = path.join(dir, 'fake-cases.json');
+      fs.writeFileSync(file, JSON.stringify({ cases: ['a', 'b'].map((x) => ({ id: `case-${x}`, layer: 'instructions', prompt: x.toUpperCase(), expect: [{ answerMatches: 'fine' }] })) }));
+      return file;
+    };
+    // EVAL_COPILOT points the runner at the fake (the plumbing of scripts/eval.mjs reads it).
+    const some = t.copy(t.tmp());
+    const out = t.tmp();
+    const r = evalCli(t, ['--cases', cases(some), '--runs', '2', '--budget', '120', '--report', out], { cwd: some, env: { EVAL_COPILOT: mixed } });
+    if (r.code !== 0) return `2 cases × 2 runs with a fake CLI where case-b never starts: the runs of case-a still count, so exit 0 (got ${r.code}): ${tail(r.out)}`;
+    if (!/the session did not start \(fake CLI\)/.test(r.out)) return `Print the CLI's error (its stderr) for a run that failed. The output was: ${tail(r.out)}`;
+    const rep = readJson(path.join(out, 'report.json'));
+    const a = rep?.cases?.['case-a'];
+    const b = rep?.cases?.['case-b'];
+    if (a?.runs !== 2 || a?.passed !== 2) return `case-a ran fine twice: runs 2, passed 2 (got ${JSON.stringify(a ?? null).slice(0, 120)}).`;
+    if (b?.runs !== 2 || b?.passed !== 0) return `A run that never started is a failed run, not a missing one: case-b should show runs 2, passed 0 (got ${JSON.stringify(b ?? null).slice(0, 120)}).`;
+    const none = t.copy(t.tmp());
+    const n = evalCli(t, ['--cases', cases(none), '--runs', '2', '--budget', '120'], { cwd: none, env: { EVAL_COPILOT: broken } });
+    if (n.code !== 2) return `When no run starts (the CLI fails at once, every time), nothing was measured: exit 2, not ${n.code}. ${tail(n.out, 200)}`;
+    if (!/below the minimum \(fake CLI\)/.test(n.out)) return `Say why nothing started: print the CLI's error. The output was: ${tail(n.out, 200)}`;
+    const recorded = fs.existsSync(path.join(none, 'evals', 'runs')) ? fs.readdirSync(path.join(none, 'evals', 'runs'), { recursive: true }).map(String).filter((f) => /run-[^\\/]+[\\/]case-a\.jsonl$/.test(f)) : [];
+    if (recorded.length !== 1) return 'Record the failed runs too (evals/runs/run-<stamp>/case-a.jsonl), so the attempt leaves a trace.';
+    const results = fs.readFileSync(path.join(none, 'evals', 'runs', recorded[0]), 'utf8').split('\n').filter((l) => /"type"\s*:\s*"result"/.test(l));
+    return (results.length === 2 && results.every((l) => !/"exitCode"\s*:\s*0\b/.test(l))) || `case-a.jsonl should end each of its 2 failed runs with a result event whose exitCode isn't 0; it has ${results.length}.`;
   }, { milestone: 'M2' }),
   t.check('The report of the recorded runs: pass rate, pass@k, variance and tokens per case', () => {
     const ref = reference(t);

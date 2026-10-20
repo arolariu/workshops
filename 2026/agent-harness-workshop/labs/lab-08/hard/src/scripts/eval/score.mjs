@@ -2,10 +2,12 @@
 // (evalArgs, plan). The events are the JSON lines of `copilot -p … --output-format json`, the same ones Lab 00's
 // run-stats read.
 
+/** The smallest --max-ai-credits a session accepts (`copilot help limits`: "Minimum: 30 AI credits"). */
+export const MIN_CAP = 30;
 /** The credit cap of one run when a case doesn't set its own `credits`. */
-export const CAP = 15;
+export const CAP = MIN_CAP;
 /** The most one run of a case may be allowed to spend. */
-export const MAX_CAP = 30;
+export const MAX_CAP = 60;
 /** The layers a case can belong to (the X-ray's layers). */
 export const LAYERS = ['instructions', 'skills', 'agents', 'mcp', 'hooks', 'distribution', 'workflows', 'governance'];
 /** The rules a case's `expect` can use, and the type of their value. */
@@ -111,7 +113,7 @@ export function checkCases(cfg) {
     if (typeof c.prompt !== 'string' || !c.prompt.trim()) problems.push(`${at}: prompt is missing.`);
     if (c.agent !== undefined && (typeof c.agent !== 'string' || !c.agent.trim())) problems.push(`${at}: agent must be a name.`);
     if (c.allow !== undefined && (!Array.isArray(c.allow) || c.allow.some((a) => typeof a !== 'string' || WRITE_PERMISSION.test(a)))) problems.push(`${at}: allow is a list of read-only tools (never write or shell).`);
-    if (c.credits !== undefined && !(Number.isInteger(c.credits) && c.credits >= 1 && c.credits <= MAX_CAP)) problems.push(`${at}: credits must be a whole number from 1 to ${MAX_CAP}.`);
+    if (c.credits !== undefined && !(Number.isInteger(c.credits) && c.credits >= MIN_CAP && c.credits <= MAX_CAP)) problems.push(`${at}: credits must be a whole number from ${MIN_CAP} (the CLI's minimum) to ${MAX_CAP}.`);
     if (!Array.isArray(c.expect) || !c.expect.length) return problems.push(`${at}: expect needs at least one rule.`);
     for (const rule of c.expect) {
       const keys = rule && typeof rule === 'object' ? Object.keys(rule) : [];
@@ -145,7 +147,8 @@ export function score(events, expect) {
  * @returns {string[]}
  */
 export function evalArgs(c) {
-  // TODO(M2): like Lab 05's leashArgs(), but read-only: throw when c.allow grants anything WRITE_PERMISSION matches.
+  // TODO(M2): like Lab 05's leashArgs(), but read-only: throw when c.allow grants anything WRITE_PERMISSION matches,
+  // and when the cap (c.credits, else CAP) is outside MIN_CAP..MAX_CAP: the CLI refuses a cap under 30.
   return [];
 }
 
