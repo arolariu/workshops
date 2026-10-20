@@ -67,11 +67,7 @@ function machine({ copilotHelp = HELP } = {}) {
   });
   if (!WIN) for (const f of ['copilot']) fs.chmodSync(path.join(userBin, f), 0o755);
   const sys = WIN ? [path.join(process.env.SystemRoot, 'System32')] : ['/usr/bin', '/bin'];
-  // Tools the doctor probes from the system (gh, git …) keep their own state under the XDG folders (~/.local/state/gh
-  // on a Linux runner): send that elsewhere, so the fake home shows only what the setup itself writes.
-  const xdg = tmpdir('setup xdg ');
-  const xdgEnv = Object.fromEntries(['CONFIG', 'DATA', 'STATE', 'CACHE'].map((k) => [`XDG_${k}_HOME`, path.join(xdg, k.toLowerCase())]));
-  const env = { PATH: [userBin, ...sys].join(WIN ? ';' : ':'), PATHEXT: process.env.PATHEXT, SystemRoot: process.env.SystemRoot, ComSpec: process.env.ComSpec, HOME: root, USERPROFILE: root, ...xdgEnv };
+  const env = { PATH: [userBin, ...sys].join(WIN ? ';' : ':'), PATHEXT: process.env.PATHEXT, SystemRoot: process.env.SystemRoot, ComSpec: process.env.ComSpec, HOME: root, USERPROFILE: root };
   return { root, userBin, env, toolsDir: path.join(root, 'workshop tools'), cacheDir: path.join(root, 'workshop tools', 'cache') };
 }
 const run = (m, opts) => prepare({ toolsDir: m.toolsDir, cacheDir: m.cacheDir, env: m.env, readTrust: () => null, ...opts });
@@ -116,6 +112,33 @@ test('a requested tool is prepared privately, verified, probed, and reused on th
   const stray = fs.readdirSync(m.root).filter((n) => !['user tools', 'workshop tools'].includes(n));
   const where = stray.flatMap((n) => { const p = path.join(m.root, n); return fs.statSync(p).isDirectory() ? fs.readdirSync(p, { recursive: true }).slice(0, 8).map((f) => `${n}/${f}`) : [n]; });
   assert.deepEqual(stray, [], `nothing written outside the tools folder: ${where.join(', ')}`);
+});
+
+// The first CI run on Linux: a system tool the doctor probes (gh, git …) wrote ~/.local into the user's home. What the
+// setup starts keeps its state and cache in a scratch folder; config and data stay the user's (gh's login and its
+// extensions must be seen). The env for the lab app is the user's own.
+test('what the setup starts keeps its state and cache out of the home, in a scratch folder it removes', async () => {
+  const m = machine();
+  const seen = [];
+  const inspect = async ({ env }) => { seen.push(env); if (env.XDG_STATE_HOME) fs.mkdirSync(path.join(env.XDG_STATE_HOME, 'gh'), { recursive: true }); return { ready: true, coreReady: true, items: [] }; };
+  for (const check of [true, false]) {
+    seen.length = 0;
+    const r = await run(m, { check, inspect });
+    assert.ok(seen.length > 0);
+    for (const e of seen) {
+      for (const k of ['XDG_STATE_HOME', 'XDG_CACHE_HOME']) {
+        assert.ok(e[k], `${k} is set for the probes`);
+        const rel = (p) => path.relative(p, e[k]);
+        assert.ok(rel(m.root).startsWith('..') || path.isAbsolute(rel(m.root)), `${k} is outside the home`);
+        assert.ok(!fs.existsSync(e[k]), `${k} is removed afterwards`);
+      }
+      assert.equal(e.XDG_CONFIG_HOME, m.env.XDG_CONFIG_HOME, 'config stays the user\'s');
+      assert.equal(e.XDG_DATA_HOME, m.env.XDG_DATA_HOME, 'data stays the user\'s (gh extensions)');
+    }
+    assert.equal(r.env.XDG_STATE_HOME, m.env.XDG_STATE_HOME, 'the lab app gets the user\'s own env');
+    assert.equal(r.env.XDG_CACHE_HOME, m.env.XDG_CACHE_HOME);
+  }
+  assert.equal(fs.existsSync(m.toolsDir), false, '--check and a run with nothing to install still write nothing');
 });
 
 test('a checksum mismatch installs nothing and the lab app is not launched', async () => {

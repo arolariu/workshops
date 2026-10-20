@@ -13,6 +13,7 @@
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { TOOLS as PINS, MANUAL, PLATFORM_ONLY } from './setup-tools.mjs';
@@ -149,9 +150,22 @@ export async function prepare({
   const binOf = (tool) => path.join(finalDir(tool), ...pins[tool].assets[key].bin.split('/'));
   const privateDirs = () => Object.keys(pins).filter((t) => pins[t].assets?.[key] && fs.existsSync(path.join(binOf(t), pins[t].assets[key].exe))).map(binOf);
   const envWith = () => ({ ...env, [pk]: [...privateDirs(), env[pk] ?? ''].filter(Boolean).join(sep(platform)) });
-  const look = (e) => inspect({ rootDir, full, requirements: install, lab, env: e, platform, arch, ...(readTrust ? { readTrust } : {}) });
+  // What the setup starts (the doctor's probes: gh, git, apm …; a download, tar, a tool's --version) may keep state or a
+  // cache under the XDG folders (~/.local/state, ~/.cache on Linux). Those go to a scratch folder removed at the end, so
+  // preparing writes nothing outside the tools folder. Config and data stay the user's: gh's login and its extensions
+  // (gh aw) must be seen. The env handed to the lab app (`env` in the result) is the user's own.
+  const scratch = path.join(os.tmpdir(), `workshop-setup-${process.pid}-${crypto.randomBytes(3).toString('hex')}`);
+  const startEnv = () => ({ ...envWith(), XDG_STATE_HOME: path.join(scratch, 'state'), XDG_CACHE_HOME: path.join(scratch, 'cache') });
+  const look = () => inspect({ rootDir, full, requirements: install, lab, env: startEnv(), platform, arch, ...(readTrust ? { readTrust } : {}) });
+  try {
+    return await prepareWith({ key, pins, manual, platform, toolsDir, cacheDir, offline, check, install, download, log, finalDir, binOf, envWith, startEnv, look, installs, downloads, reused, failures, manualSteps });
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+}
 
-  let report = await look(envWith());
+async function prepareWith({ key, pins, manual, platform, toolsDir, cacheDir, offline, check, install, download, log, finalDir, binOf, envWith, startEnv, look, installs, downloads, reused, failures, manualSteps }) {
+  let report = await look();
   const wanted = report.items.filter((it) => KNOWN.includes(it.id) && (it.required || install.includes(it.id)) && it.status !== 'ready');
   const plan = [];
   for (const it of wanted) {
@@ -179,7 +193,7 @@ export async function prepare({
     try {
       const exeAt = (dir) => path.join(dir, ...asset.bin.split('/'), asset.exe);
       const probe = async (exe) => {
-        const r = await runProcess(exe, ['--version'], { env: envWith(), timeout: 60000 });
+        const r = await runProcess(exe, ['--version'], { env: startEnv(), timeout: 60000 });
         return r.code === 0 && pin.expect.test(`${r.stdout}\n${r.stderr}`);
       };
       if (fs.existsSync(exeAt(finalDir(tool)))) {
@@ -198,7 +212,7 @@ export async function prepare({
         log(`  ⬇️  Downloading ${label} (${Math.round(asset.size / 1048576)} MB) from ${new URL(asset.url).host} …`);
         const part = `${archive}.${process.pid}.${crypto.randomBytes(3).toString('hex')}.part`;
         try {
-          await download(asset.url, part, { maxBytes: Math.ceil(asset.size * 1.05) + 1048576, env: envWith() });
+          await download(asset.url, part, { maxBytes: Math.ceil(asset.size * 1.05) + 1048576, env: startEnv() });
           const got = await sha256File(part);
           if (got !== asset.sha256) throw new Error(`the download of ${label} does not match its pinned SHA-256 checksum, so it was deleted and not run (expected ${asset.sha256}, got ${got})`);
           fs.renameSync(part, archive);
@@ -207,10 +221,10 @@ export async function prepare({
         }
         downloads.push(tool);
       }
-      await safeListing(archive, envWith());
+      await safeListing(archive, startEnv());
       stage = path.join(toolsDir, tool, `.staging-${process.pid}-${crypto.randomBytes(3).toString('hex')}`);
       fs.mkdirSync(stage, { recursive: true });
-      const x = await runProcess('tar', ['-xf', archive, '-C', stage], { env: envWith(), timeout: 600000 });
+      const x = await runProcess('tar', ['-xf', archive, '-C', stage], { env: startEnv(), timeout: 600000 });
       if (x.code !== 0) throw new Error(`could not unpack ${path.basename(archive)}: ${(x.stderr || '').trim().slice(0, 200)}`);
       checkLinks(stage);
       const exe = exeAt(stage);
@@ -231,7 +245,7 @@ export async function prepare({
       if (stage) fs.rmSync(stage, { recursive: true, force: true });
     }
   }
-  if (plan.length) report = await look(envWith());
+  if (plan.length) report = await look();
   return { key, plan, installs, downloads, reused, manual: manualSteps, failures, env: envWith(), report };
 }
 
