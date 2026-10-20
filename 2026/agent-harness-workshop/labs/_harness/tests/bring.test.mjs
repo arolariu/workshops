@@ -115,6 +115,11 @@ test('the perfect learner brings every earlier solution delta under the harness 
   assert.equal(fs.readFileSync(path.join(sim.src, 'AGENTS.md'), 'utf8'), 'ref\n');
   assert.equal(fs.readFileSync(path.join(sim.sol, 'AGENTS.md'), 'utf8'), 'easy ref\n', "this level's own solution file is kept");
   assert.ok(!fs.existsSync(path.join(sim.src, 'notes.md')));
+  // Two verify --bring runs at once (two terminals, or subagents) must not delete each other's copies.
+  const other = simulateBring({ labsDir, ...c, target: c.node('lab-01/easy') });
+  assert.notEqual(other.base, sim.base, 'each simulation gets its own folder');
+  fs.rmSync(other.base, { recursive: true, force: true });
+  assert.equal(fs.readFileSync(path.join(sim.src, 'AGENTS.md'), 'utf8'), 'ref\n', 'cleaning one up leaves the other');
 });
 
 test('bring never pre-fills a file the target level drops, nor a source level\'s local files', async () => {

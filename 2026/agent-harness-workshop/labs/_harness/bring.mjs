@@ -126,13 +126,15 @@ export function perfectLearnerPlan({ catalog, course, manifest, target }) {
 }
 
 /**
- * Copies of src/ and sol/ in labs/.runs/verify-bring/<lab>-<level>/ with the perfect learner's work brought in. On the
- * sol/ copy, the level's own solution files are not overwritten. Returns { plan, base, src, sol }.
+ * Copies of src/ and sol/ in a fresh labs/.runs/verify-bring/<lab>-<level>-XXXXXX/ with the perfect learner's work
+ * brought in (its own folder, so two verify --bring runs at once never delete each other's copies). On the sol/ copy,
+ * the level's own solution files are not overwritten. Returns { plan, base, src, sol }; the caller removes base.
  */
 export function simulateBring({ labsDir, catalog, course, manifest, target }) {
   const plan = perfectLearnerPlan({ catalog, course, manifest, target });
-  const base = path.join(labsDir, '.runs', 'verify-bring', target.key.replace('/', '-'));
-  fs.rmSync(base, { recursive: true, force: true });
+  const root = path.join(labsDir, '.runs', 'verify-bring');
+  fs.mkdirSync(root, { recursive: true });
+  const base = fs.mkdtempSync(path.join(root, `${target.key.replace('/', '-')}-`));
   const put = (root, rel, buf) => {
     const abs = path.join(root, ...rel.split('/'));
     fs.mkdirSync(path.dirname(abs), { recursive: true });

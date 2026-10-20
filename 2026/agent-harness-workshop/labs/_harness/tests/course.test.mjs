@@ -62,7 +62,7 @@ test('the real course.json is valid and uses the spec harness paths', () => {
   const labsDir = path.resolve(import.meta.dirname, '..', '..');
   const c = loadCourse(labsDir);
   assert.equal(c.capstone, 'lab-08');
-  for (const p of ['AGENTS.md', '.github/**', 'HARNESS.md']) assert.ok(c.harnessPaths.includes(p), p);
+  for (const p of ['AGENTS.md', '.github/**', 'HARNESS.md', 'attacks/**', '/attacks.local.json']) assert.ok(c.harnessPaths.includes(p), p);
 });
 
 test('a broken course.json does not stop the learner app, but maintainers are told', () => {

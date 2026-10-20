@@ -11,6 +11,8 @@
     "/apm.lock.yaml",
     "scripts/**",
     "evals/**",
+    "attacks/**",
+    "/attacks.local.json",
     "HARNESS.md"
   ],
   "levels": {
