@@ -99,7 +99,7 @@ jobs:
         with:
           node-version: 24
       - name: Install the Copilot CLI (a pinned version)
-        run: npm install --global @github/copilot@1.0.101
+        run: npm install --global @github/copilot@1.0.100
       - name: Evals (worst case 8 cases x 1 run x 30 credits = 240)
         run: node scripts/eval.mjs --runs 1 --budget 240 --baseline evals/baseline.json --threshold 75 --report evals/reports
         env:
