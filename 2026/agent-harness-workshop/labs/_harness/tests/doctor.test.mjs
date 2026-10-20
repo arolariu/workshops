@@ -161,3 +161,12 @@ test('real probes: shims in folders with spaces work, a hung tool is stopped, an
   assert.equal(JSON.stringify(process.env), before);
   assert.equal(listing(), filesBefore);
 });
+
+test('gh aw: the labs are tested with v0.92.0; another version is a note, never a failure', async () => {
+  const other = await inspectEnvironment({ ...base, platform: 'linux', arch: 'x64', probe: probeFrom({ ...all, 'gh aw version': 'gh aw version v0.93.1\n' }) });
+  const it = item(other, 'gh-aw');
+  assert.equal(it.status, 'ready');
+  assert.match(it.note ?? '', /tested with v0\.92\.0.*you have v0\.93\.1.*gh extension install github\/gh-aw --pin v0\.92\.0/s);
+  const tested = await inspectEnvironment({ ...base, platform: 'linux', arch: 'x64', probe: probeFrom({ ...all, 'gh aw version': 'gh aw version v0.92.0\n' }) });
+  assert.equal(item(tested, 'gh-aw').note ?? null, null);
+});

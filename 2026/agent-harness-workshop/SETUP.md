@@ -62,7 +62,7 @@ When you open a lab that needs a tool (for example `open lab-06 easy` needs APM)
   tools exist, so it never opens that installer behind your back.
 - **git on Linux**: install it with your package manager (`sudo apt install git`, `sudo dnf install git`, …).
 - **`gh aw`** is a GitHub CLI extension. Installing it changes your GitHub CLI's own extension list, so run
-  `gh extension install github/gh-aw` yourself if you want Lab 07's optional `gh aw` checks.
+  `gh extension install github/gh-aw --pin v0.92.0` yourself if you want Lab 07's optional `gh aw` checks. The labs are tested with v0.92.0; with another version the doctor shows a note (a warning, not a failure).
 - Platforms without an official build (for example APM on Windows arm64 or musl Linux, Node.js on musl arm64) are
   reported as such, with what to install yourself.
 

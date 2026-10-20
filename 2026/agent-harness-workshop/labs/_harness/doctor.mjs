@@ -47,6 +47,9 @@ export const TOOLS = {
 /** One sentence telling a student how to get `tool`. */
 export const recoveryFor = (tool) => TOOLS[tool]?.recovery ?? `Install \`${tool}\` and try again.`;
 
+/** The versions the labs are tested with: another one works, but gets a note (a warning, never a failure). */
+export const TESTED = { 'gh-aw': { version: '0.92.0', pin: 'gh extension install github/gh-aw --pin v0.92.0' } };
+
 /** Reviewed minimums. Copilot is validated by the capabilities the labs use rather than by a version number. */
 export const MINIMUMS = { node: '22.0.0', git: '2.20.0', pwsh: '6.0.0' };
 export const COPILOT_CAPABILITIES = ['--max-ai-credits', '--plugin-dir', '--allow-tool', '--deny-tool', '--no-ask-user', '--agent', '--output-format', 'instruction'];
@@ -161,7 +164,9 @@ export async function inspectEnvironment({
     ? await check('gh-aw', 'gh', ['aw', 'version'])
     : { status: required.has('gh-aw') ? 'missing' : 'optional', version: null, required: required.has('gh-aw'), message: '`gh aw` needs the GitHub CLI first.' };
   if (ghaw.status === 'incompatible' && /unknown command|not a gh command/i.test(ghaw.message)) Object.assign(ghaw, { status: ghaw.required ? 'missing' : 'optional', message: 'The `gh aw` extension is not installed.' });
-  add('gh-aw', ghaw.status, ghaw.message, { version: ghaw.version, required: ghaw.required });
+  const awItem = add('gh-aw', ghaw.status, ghaw.message, { version: ghaw.version, required: ghaw.required });
+  const tested = TESTED['gh-aw'];
+  if (ghaw.status === 'ready' && ghaw.version && versionOf(ghaw.version) !== tested.version) awItem.note = `The labs are tested with v${tested.version}; you have v${ghaw.version}. If a Lab 07 check disagrees, run: ${tested.pin}`;
 
   // Things only you (or your organization) can confirm.
   add('copilot-auth', 'manual', 'Not verified: the doctor never reads your credentials. Run `copilot` and use /login if it asks.', { label: 'Copilot sign-in', category: 'manual', why: 'Agent checks and Copilot sessions need you to be signed in.', recovery: 'Run `copilot`, type /login and follow the steps.' });
@@ -183,6 +188,7 @@ export function reportLines(report, { icons = true } = {}) {
     const note = it.category === 'manual' ? (it.status === 'ready' ? '' : ' (check yourself)') : it.required ? '' : ' (optional)';
     lines.push(`${ICON[it.status]} ${it.label}${it.version ? ` ${it.version}` : ''}${note}: ${it.message}`);
     if (it.status !== 'ready' && it.recovery) lines.push(`    → ${it.recovery}`);
+    if (it.note) lines.push(`    ⚠️  ${it.note}`);
   }
   return lines;
 }

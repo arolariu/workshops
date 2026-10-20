@@ -1195,6 +1195,7 @@ export async function startTui({
       for (const it of items) {
         L.push(...para(`${icon[it.status]} ${it.status === 'ready' ? green(it.label) : white(it.label)}${it.version ? dim(` ${it.version}`) : ''}${it.required || cat === 'manual' ? '' : dim(' (optional)')}  ${dim(it.message)}`, '   ', '      '));
         if (it.status !== 'ready' && it.recovery) L.push(...para(`→ ${it.recovery}`, '      ', '        '));
+      if (it.note) L.push(...para(`⚠️  ${it.note}`, '      ', '        '));
       }
     }
     L.push('', ...para(dim('To prepare missing tools in a private folder (no admin rights, no global changes): run start.cmd (Windows) or ./start.sh (macOS/Linux) from the workshop folder. See SETUP.md.')));
