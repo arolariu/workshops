@@ -1,5 +1,4 @@
 // Free checks for Lab 06 · hard+: the supply chain. Everything runs offline, on projects built in temp folders.
-import { guard } from './no-copilot.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,7 +26,7 @@ const DRIFT = [
   ['no-lock', 'deleted apm.lock.yaml', (r) => fs.rmSync(path.join(r, 'apm.lock.yaml'))],
 ];
 
-export default (t) => guard(t, [
+export default (t) => [
   // M1 · Pin everything
   t.check('pinProblems() flags 9 loose dependencies and lets 7 pinned ones through', async () => {
     const { pinProblems } = await t.import(PINS);
@@ -216,4 +215,4 @@ export default (t) => guard(t, [
     if (h.code !== 1 || snapshotDiff(snap, snapshot(project)).length) return `A release that wants to write outside the project must be refused (exit 1) with nothing changed (exit ${h.code}).`;
     return h.all.includes('../escaped.txt') || 'Say which path of the release you refused (../escaped.txt).';
   }, { milestone: 'M4' }),
-]);
+];

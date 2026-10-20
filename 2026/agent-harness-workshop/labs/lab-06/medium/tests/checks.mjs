@@ -11,9 +11,8 @@ async function run(ext, name, args) {
 const isError = (r) => r.levels.includes('error');
 const show = (s) => JSON.stringify(s.slice(0, 220));
 
-import { guard } from './no-copilot.mjs';
 
-export default (t) => guard(t, [
+export default (t) => [
   // M1 · /grades does the maths
   t.check('/grades is registered with a description', async () => {
     const cmd = (await load(t)).command('grades');
@@ -110,4 +109,4 @@ export default (t) => guard(t, [
     const unknown = (await run(ext, 'due', '--course XYZ999')).out;
     return /SE201/.test(unknown) || 'For an unknown course, list the course codes.';
   }, { milestone: 'M3' }),
-]);
+];

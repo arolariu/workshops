@@ -1,6 +1,5 @@
 // Free checks for Lab 06 · hard: ship the harness as one plugin. The CLI checks run Copilot with a scratch
 // COPILOT_HOME, so your own plugins and settings neither help nor get touched; they never send a prompt.
-import { guard } from './no-copilot.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -35,7 +34,7 @@ function runGuard(t, toolName, command) {
   return { ...r, copy, project };
 }
 
-export default (t) => guard(t, [
+export default (t) => [
   // M1 · The manifest
   t.check('plugin.json: name, description, version, author', () => {
     const p = manifest(t);
@@ -220,4 +219,4 @@ export default (t) => guard(t, [
     if (!/--plugin-dir/.test(s)) return 'Show how to try it without installing (copilot --plugin-dir …).';
     return s.includes(version) || `Say which version this is (plugin.json says ${version}).`;
   }, { milestone: 'M5' }),
-]);
+];

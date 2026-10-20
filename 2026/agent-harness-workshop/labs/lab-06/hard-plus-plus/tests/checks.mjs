@@ -1,6 +1,5 @@
 // Free checks for Lab 06 · hard++: an internal marketplace. The Copilot check uses a scratch COPILOT_HOME (your own
 // marketplaces and plugins stay out of it and untouched); the release checks run in scratch Git repositories.
-import { guard } from './no-copilot.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -41,7 +40,7 @@ const SE201 = { grades: [{ grade: 8, weight: 30 }, { grade: 9, weight: 30 }], ex
 const releaseIn = (t, dir, ...args) => t.node([RELEASE, ...args], { cwd: dir, env: GIT_ENV });
 const tags = (dir) => gitRun(dir, ['tag', '-l']).out.split('\n').filter(Boolean);
 
-export default (t) => guard(t, [
+export default (t) => [
   // M1 · The marketplace
   t.check('marketplace.json: a kebab-case name, an owner, a description and two plugins', () => {
     const m = t.json(MJSON, `Create ${MJSON}.`);
@@ -81,7 +80,8 @@ export default (t) => guard(t, [
   }, { milestone: 'M1' }),
   t.check('Copilot adds it, lists both plugins, and installs them at their versions', () => {
     const m = t.json(MJSON);
-    // Names from your JSON become command-line arguments: only kebab-case ones (never something like "-p") reach Copilot.
+    // Names from your JSON become command-line arguments: check them first, so a bad one gets a clear message
+    // (which field to fix) before five CLI calls. The kit already refuses anything that would start a session.
     const unsafe = [m.name, ...(m.plugins ?? []).map((p) => p.name)].filter((n) => !KEBAB.test(String(n ?? '')));
     if (unsafe.length) return `Fix these names in marketplace.json first (kebab-case): ${unsafe.map(show).join(', ')}.`;
     const copy = copyMarket(t);
@@ -314,4 +314,4 @@ export default (t) => guard(t, [
     if (!new RegExp(`^## ${pj.version.replace(/\./g, '\\.')}\\b`, 'm').test(log)) return `CHANGELOG.md has no "## ${pj.version}" section.`;
     return changeKind(log) === null || 'Its Unreleased section still has entries: they were released, so they belong under the version.';
   }, { milestone: 'M4' }),
-]);
+];
