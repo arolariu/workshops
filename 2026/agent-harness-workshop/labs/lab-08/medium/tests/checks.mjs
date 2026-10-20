@@ -3,13 +3,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { scanHarness, scorecard, maturity } from '../../../_harness/scorecard.mjs';
-import { contextBudget, measureMcp } from '../../../_harness/xray.mjs';
-import { blocked, familiesFor, familyRe, missed, packProblems, replayer, sameCall, shipped, shippedFile, some } from './pack.mjs';
+import { contextBudget, measureMcp, tokens } from '../../../_harness/xray.mjs';
+import { blocked, familiesFor, familyRe, hidden, missed, packProblems, replayer, sameCall, shipped, shippedFile, some } from './pack.mjs';
 
 const SCRIPT = 'scripts/attack.mjs';
 const GUARD = '.github/hooks/scripts/guard.mjs';
 const LOCAL = 'attacks.local.json';
 const BUDGET = 2500;
+const CATCH_ALL = new Set(['*', '**', '**/*', '**/*.*']);
 const LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
 
 const FAMILIES = [
@@ -133,9 +134,17 @@ export default (t) => [
     const open = missed(decide, chains);
     return !open.length || `The portal's text asked for these, and they got through: ${some(open, 3)}`;
   }, { milestone: 'M1', timeout: 120000 }),
-  t.check('The 12 everyday calls stay allowed: no false positives', () => {
-    const shut = blocked(replayer(t), shipped(t).allowed);
-    return !shut.length || `These are fine but were blocked (${shut.length}): ${some(shut, 3)}. Look at the path or the flag, not the word.`;
+  t.check('Everyday calls stay allowed: the pack\'s 12, and the checks\' own that only look like attacks', () => {
+    const decide = replayer(t);
+    const shut = blocked(decide, shipped(t).allowed);
+    if (shut.length) return `These are fine but were blocked (${shut.length}): ${some(shut, 3)}. Look at the path or the flag, not the word.`;
+    const more = blocked(decide, hidden(t).allowed);
+    return !more.length || `These everyday calls only look like attacks, but were blocked (${more.length}): ${some(more, 3)}. Quoted text (an echo, a commit message) is data, not a command; reading a file is not writing it.`;
+  }, { milestone: 'M1', timeout: 120000 }),
+  t.check('Other spellings of the same attacks are denied too: the checks keep their own, outside the pack', () => {
+    const list = hidden(t).attacks;
+    const open = missed(replayer(t), list);
+    return !open.length || `The pack is a sample, not the list: protect the outcome, not the spelling. Not denied yet (${open.length} of ${list.length}): ${some(open, 4)}. Read a command like a shell does: line continuations, quotes, wrappers like bash -c, full paths, prefixes like env, and global options like git -C.`;
   }, { milestone: 'M1', timeout: 120000 }),
   t.check('Every denial says what to do instead (or to ask the human)', () => {
     const decide = replayer(t);
@@ -227,6 +236,9 @@ export default (t) => [
     const { scan, mcpTools, level } = await audit(t.dir);
     if (LEVELS.indexOf(level.level) < LEVELS.indexOf('L4')) return `The harness is at ${level.level} ${level.name}. ${level.next ?? ''}`.trim();
     const { total } = contextBudget(scan, mcpTools);
-    return total <= BUDGET || `The always-on context is ≈${total.toLocaleString('en-US')} tokens per turn (the budget is ${BUDGET.toLocaleString('en-US')}): the threat model belongs in HARNESS.md, which costs nothing per turn.`;
+    // Scoped instructions that apply to every file are always on, whatever the X-ray's file list says (as easy's M4).
+    const catchAll = scan.instructions.filter((i) => i.applyTo && String(i.applyTo).split(',').some((g) => CATCH_ALL.has(g.trim())));
+    const all = total + catchAll.reduce((n, i) => n + tokens(i.text), 0);
+    return all <= BUDGET || `The always-on context is ≈${all.toLocaleString('en-US')} tokens per turn (the budget is ${BUDGET.toLocaleString('en-US')})${catchAll.length ? `, counting ${catchAll.map((i) => i.path).join(', ')}, whose applyTo matches every file` : ''}: the threat model belongs in HARNESS.md, which costs nothing per turn.`;
   }, { milestone: 'M3' }),
 ];

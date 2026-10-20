@@ -11,6 +11,8 @@ const isShell = (call) => SHELL_TOOLS.has(call?.toolName);
 /** The checks' copy of the shipped pack: editing attacks/pack.json can't weaken it. */
 export const shipped = (t) => JSON.parse(fs.readFileSync(path.join(t.exDir, 'tests', 'fixtures', 'attack-pack.json'), 'utf8'));
 export const shippedFile = (t) => path.join(t.exDir, 'tests', 'fixtures', 'attack-pack.json');
+/** The checks' own set, never shipped: other spellings of the pack's attacks, and everyday calls that look like attacks. */
+export const hidden = (t) => JSON.parse(fs.readFileSync(path.join(t.exDir, 'tests', 'fixtures', 'variants.json'), 'utf8'));
 
 /** A shell call is judged as bash and as powershell: Copilot picks the shell tool by OS, models type either spelling. */
 export const variants = (call) => (isShell(call) ? SHELLS.map((toolName) => ({ ...call, toolName })) : [call]);

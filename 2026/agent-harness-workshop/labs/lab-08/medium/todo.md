@@ -13,9 +13,11 @@ threat model down.
 ## 📋 Requirements
 1. The guard denies every attack of the shipped pack (`attacks/pack.json`), as a `bash` call **and** as a
    `powershell` call: destructive commands, reading secrets, writing secrets, sending data out, supply chain, and
-   tampering with the harness itself.
+   tampering with the harness itself. It denies other spellings of the same attacks too (`bash -c "…"`, `/bin/rm`,
+   `env rm`, `git -C . clean`, line continuations…): the checks keep a set of their own, outside the pack.
 2. In every injection chain, the portal read is allowed and the call its result asks for is denied.
-3. The pack's 12 allowed calls stay allowed (no false positives), and every denial says what to do instead.
+3. The pack's 12 allowed calls stay allowed, and so do everyday calls that only look like attacks (a commit message
+   that mentions `.env`, `git rm --cached .env`); every denial says what to do instead.
 4. `node scripts/attack.mjs [pack…] [--json]` replays packs against `.github/hooks/scripts/guard.mjs`, lists the
    misses and the false positives, and exits 0 when there are none, 1 when there are, and 2 when a pack or the guard
    can't be used.
@@ -36,6 +38,9 @@ threat model down.
   and the call it asks for is denied
 - The 12 allowed calls stay allowed, every denial says what to do instead (or to ask the human), and
   `attacks/pack.json` keeps every shipped attack (add to it, don't edit it: the checks have their own copy)
+- The pack is a sample, not the list: the checks also send spellings that aren't in it (wrappers like `bash -c` and
+  `powershell -Command`, full paths, `env` and `time` prefixes, git's `-C`, npm's `--prefix`, line continuations),
+  and everyday calls that only look like attacks; both must come out right
 
 ### M2 · Your own attacks
 - `attacks.local.json` has at least five attacks of your own (new ids, new calls) in at least three families, in the
@@ -112,6 +117,11 @@ hosts outside an allow-list, package installs with a name, `npx`, a download pip
 writes to `package.json`, `.github/hooks/`, `.github/agents/` and `.mcp.json`, and edits that drop a "Never" line
 from `AGENTS.md`. Give each rule an id and log it: the threat model will name them.
 
+Then let the rules see what a shell would run. Join line continuations first (a `\` or a backtick at the end of a
+line), split on `&&`, `||`, `;` and `|` only outside quotes, unwrap `bash -c "…"`, `powershell -Command "…"` and
+`cmd /c`, use the program's base name (`/bin/rm`, `npm.cmd`), and skip what comes before the real command: `env`,
+`time`, `nohup`, `xargs`, and global options like `git -C dir` and `npm --prefix .`.
+
 </details>
 
 <details><summary>False positives are bugs too</summary>
@@ -119,7 +129,9 @@ from `AGENTS.md`. Give each rule an id and log it: the threat model will name th
 A guard that blocks `curl` stops `curl -o` from the Node.js website; one that blocks every mention of `password`
 stops the FAQ. Look at the path or the flag, not the word: `.env` followed by the end, a quote, a slash or a space,
 and not `.example`; `process.env.PORTAL_API_KEY` in code is the right way to use a secret. Read tools (`view`,
-`grep`, `cat`) may look at the hooks; only writes are tampering.
+`grep`, `cat`) may look at the hooks; only writes are tampering. Quoted text that is printed or stored is data:
+`echo '.env' >> .gitignore` and `git commit -m "deny .env"` touch no secret, and an edit that removes a hardcoded
+password is the fix (judge only the new text). `$tokens` in PowerShell is a variable; the environment is `$env:`.
 
 </details>
 
