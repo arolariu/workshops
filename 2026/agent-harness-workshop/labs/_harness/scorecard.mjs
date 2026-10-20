@@ -70,12 +70,13 @@ export function scanHarness(dir) {
     art('instructions', f);
     return { path: f, text, applyTo: fm?.data?.applyTo ?? null };
   });
-  scan.skills = files.filter((f) => /^\.github\/skills\/[^/]+\/SKILL\.md$/.test(f)).map((f) => {
+  // .github/skills/ and .agents/skills/ (where APM installs them): Copilot CLI loads project skills from both.
+  scan.skills = files.filter((f) => /^\.(github|agents)\/skills\/[^/]+\/SKILL\.md$/.test(f)).map((f) => {
     const folder = f.split('/')[2];
     const fm = front(f);
     return { path: f, folder, name: String(fm?.data?.name ?? ''), description: String(fm?.data?.description ?? ''), size: (read(f) ?? '').length };
   });
-  for (const f of files) if (/^\.github\/skills\//.test(f)) art('skills', f);
+  for (const f of files) if (/^\.(github|agents)\/skills\//.test(f)) art('skills', f);
   scan.agents = files.filter((f) => /^\.github\/agents\/[^/]+\.agent\.md$/.test(f)).map((f) => {
     const fm = front(f);
     art('agents', f);
@@ -253,7 +254,8 @@ export function scorecard(scan, { mcpTools } = {}) {
   // Distribution
   if (!scan.apm) none('distribution', 'apm.yml')('apm-pinned');
   else {
-    const loose = scan.apm.deps.filter((d) => !PINNED.test(d));
+    // A local path (../dist/apm, ./packages/x) is pinned by the repository's own history.
+    const loose = scan.apm.deps.filter((d) => !PINNED.test(d) && !/^\.{1,2}[\\/]/.test(d));
     add('apm-pinned', 'distribution', !loose.length, loose.length ? `Pin these to a tag (owner/repo#v1.0.0): ${loose.join(', ')}` : `Every dependency is pinned (${scan.apm.deps.length}).`, ['apm.yml']);
   }
   if (!scan.plugins.length) none('distribution', 'plugin.json')('plugin-manifest');

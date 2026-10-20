@@ -47,6 +47,18 @@ test('skills: a good description reaches L2; a name that is not the folder name 
   assert.equal(bad.m.level, 'L1');
   const vague = run({ 'AGENTS.md': AGENTS, '.github/skills/x/SKILL.md': SKILL('x', 'Helps with modules.') });
   assert.equal(vague.rule('skill-description').ok, false);
+  // APM installs skills into .agents/skills/, and Copilot CLI loads project skills from there too (`copilot skill list`).
+  const apm = run({ 'AGENTS.md': AGENTS, '.agents/skills/new-module/SKILL.md': GOOD_SKILL });
+  assert.equal(apm.m.level, 'L2', 'a skill in .agents/skills/ counts');
+  assert.ok(apm.scan.artifacts.some((a) => a.layer === 'skills' && a.path === '.agents/skills/new-module/SKILL.md'));
+});
+
+test('distribution: a local APM dependency is pinned by the repository itself; a remote one needs a tag or a commit', () => {
+  const deps = (list) => run({ 'apm.yml': `name: x\ndependencies:\n  apm:\n${list.map((d) => `    - ${d}\n`).join('')}` }).rule('apm-pinned');
+  assert.equal(deps(['../dist/apm', './packages/harness', 'microsoft/apm-sample-package#v1.0.0', 'org/repo#0a1b2c3']).ok, true);
+  const loose = deps(['microsoft/apm-sample-package', 'https://example.com/pkg', '../dist/apm']);
+  assert.equal(loose.ok, false);
+  assert.match(loose.message, /microsoft\/apm-sample-package, https:\/\/example\.com\/pkg$/);
 });
 
 test('agents: an explicit tool list reaches L3; a reviewer that can edit does not; a fixer may edit', () => {

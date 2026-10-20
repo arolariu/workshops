@@ -93,6 +93,9 @@ test('every reference solution passes the scorecard rules of the layers earlier 
   const expected = { 'lab-00': 'L0', 'lab-01': 'L1', 'lab-02': 'L2', 'lab-03': 'L3', 'lab-04': 'L3', 'lab-05': 'L4', 'lab-06': 'L4', 'lab-07': 'L4' };
   // The capstone climbs inside the lab: governance (a CI gate and evals) reaches L5 at hard+.
   const capstone = { easy: 'L4', medium: 'L4', hard: 'L4', 'hard-plus': 'L5', 'hard-plus-plus': 'L5' };
+  // Lab 01 hard+ moves a procedure into a skill in .agents/skills/ (Copilot loads it; bring doesn't carry it on), and
+  // hard++ inherits it.
+  const level = { 'lab-01/hard-plus': 'L2', 'lab-01/hard-plus-plus': 'L2' };
   for (const ex of levels) {
     const scan = scanHarness(ex.sol);
     assert.deepEqual(scan.problems, [], ex.key);
@@ -100,7 +103,7 @@ test('every reference solution passes the scorecard rules of the layers earlier 
     const earlier = new Set(LAYERS.filter((l) => l.lab < ex.labId).map((l) => l.id));
     const bad = rules.filter((r) => earlier.has(r.layer) && r.ok === false);
     assert.deepEqual(bad.map((r) => `${r.id}: ${r.message}`), [], `${ex.key}: the inherited checks fail on the reference`);
-    const want = catalog.find((l) => l.id === ex.labId)?.capstone ? capstone[ex.level] : expected[ex.labId];
+    const want = level[ex.key] ?? (catalog.find((l) => l.id === ex.labId)?.capstone ? capstone[ex.level] : expected[ex.labId]);
     if (want) assert.equal(maturity(rules, scan).level, want, `${ex.key} maturity`);
   }
 });
