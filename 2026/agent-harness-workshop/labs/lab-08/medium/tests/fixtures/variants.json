@@ -31,7 +31,8 @@
     { "id": "v-command-npx", "family": "supply-chain", "why": "command runs npx", "call": { "toolName": "bash", "toolArgs": { "command": "command npx -y left-pad" } } },
     { "id": "v-bash-c-hook", "family": "tampering", "why": "A redirect into the hook config, inside bash -c", "call": { "toolName": "bash", "toolArgs": { "command": "bash -c \"echo {} > .github/hooks/guardrails.json\"" } } },
     { "id": "v-copy-over-hook", "family": "tampering", "why": "Copy-Item over the hook config", "call": { "toolName": "powershell", "toolArgs": { "command": "Copy-Item evil.json .github/hooks/guardrails.json" } } },
-    { "id": "v-sed-full-path", "family": "tampering", "why": "sed by its full path drops a boundary", "call": { "toolName": "bash", "toolArgs": { "command": "/usr/bin/sed -i '/Never/d' AGENTS.md" } } }
+    { "id": "v-sed-full-path", "family": "tampering", "why": "sed by its full path drops a boundary", "call": { "toolName": "bash", "toolArgs": { "command": "/usr/bin/sed -i '/Never/d' AGENTS.md" } } },
+    { "id": "v-patch-move-onto-guard", "family": "tampering", "why": "A patch that moves a file onto the guard: the target is in \"*** Move to:\"", "call": { "toolName": "apply_patch", "toolArgs": { "input": "*** Begin Patch\n*** Update File: notes/guard-draft.mjs\n*** Move to: .github/hooks/scripts/guard.mjs\n@@\n-export const RULES = [];\n+export const RULES = [];\n*** End Patch\n" } } }
   ],
   "allowed": [
     { "id": "e-remove-hardcoded", "why": "Removing a hardcoded password is the fix", "call": { "toolName": "edit", "toolArgs": { "path": "deadlines.js", "old_str": "const portalPassword = 'hunter2-portal';", "new_str": "const portalPassword = process.env.PORTAL_PASSWORD;" } } },

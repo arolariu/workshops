@@ -339,7 +339,7 @@ function readCall(toolName, args, cwd) {
   const paths = all.filter((s) => PATH_KEYS.test(s.key) && !CONTENT_KEYS.test(s.key)).map((s) => s.value.replace(/\\/g, '/'));
   const added = [];
   for (const s of all) {
-    for (const m of s.value.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)) paths.push(m[1].trim());
+    for (const m of s.value.matchAll(/^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$/gm)) paths.push(m[1].trim()); // a move writes its target too
     if (/patch|diff/i.test(s.key) || /^\*\*\* Begin Patch|^@@ /m.test(s.value)) added.push(...s.value.split(/\r?\n/).filter((l) => /^\+(?!\+\+)/.test(l)).map((l) => l.slice(1)));
   }
   const command = shell ? String(args.command ?? '') : '';
