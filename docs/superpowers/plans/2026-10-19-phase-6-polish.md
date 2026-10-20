@@ -169,3 +169,31 @@ step 6, §5.10 testing).
 - Names: `slidesFor`, `slideLines`, `howSection`, `MARKERS`, `asciiFold`, `setAscii`, `guardNodeOptions`.
 - Risk: the every-screen subprocess test needs states that normally need Copilot (the agent confirmation); it uses the
   same fake environment the existing TUI tests use (`deps.inspectEnvironment`), never the real CLI.
+
+## Implementation notes (as built, 20 Oct 2026)
+
+- **Task 1** (818a257): Lab 05 hard++'s `tests/secrets.mjs` (imported by nothing) is gone; Lab 04's four
+  `common.mjs` use the kit's `guardNodeOptions()`. A content test fails on a dead helper or a guard copy in any level.
+- **Task 2** (81bb6e5, plus the smoke-test fix after Task 6's first pass): `--plain` is accepted by every command;
+  `FOLD` gives meaning-carrying glyphs markers (`[live]`, `[hw]`, `[new]`, `[chg]`, `[brought]`, `[start]`, `[n/a]`,
+  `[edit]`, `[del]`, `[tool]`, `[stop]`, `[...]`, `[answer]`, `[manual]`, `~`, `total`, `.5`); ⛔ now folds to
+  `[stop]` (a denied tool is not a cancelled run). The smoke test found the home grid's column header drifting (markers
+  are wider than emoji) and a thread's 🔴 folding to the Hard badge's `H`: plain mode now writes words in the header
+  and drops a thread's icon.
+- **Task 3** (fd68584): `screens/present.mjs`. *How* choices: Lab 00 *How it works*, 01 *Where instructions live*,
+  02 *Anatomy of a skill*, 03 *Anatomy of an agent*, 04 *Local vs remote*, 05 *How a hook works*, 06 *Plugins*,
+  07 *Anatomy of a workflow*, 08 *The maturity ladder*. The whole deck is 53 slides. The splitter balances parts,
+  breaks before blank lines, list items or a new table row, never leaves a header alone at the bottom, and repeats the
+  cut table's whole header on the next part. Found on the way: the Capstone path lacked hard+ and hard++ (a Phase 5
+  slip; now about 11.5 h, spec 12 h), and `--plain` folded "8½" into "812".
+- **Task 4** (93fa3eb): the every-screen walk reaches all 27 key states; the audit found one gap (the lab guide in
+  linear mode: `guide [LAB]`), no colour-only state, no colour code outside a `noColor` check, and no clipped line.
+- **Task 5** (4899730): the readme checklist (three places, then `sync-seeds`) and `pins.test.mjs`.
+- **Task 6:** spec §9 (0aa887f). The final review (no Critical) found that `--plain` clipped the X-ray legend at 80
+  columns and that the `NO_COLOR` and 80-column tests could not fail as written (piped output had no colour and no
+  width anyway). Fixed: the legend wraps; the CLI reads `COLUMNS` and wraps wider lines (piped output without a width
+  is unchanged); the walks force colour on so `NO_COLOR` decides (with a control run); "more below" is matched on the
+  footer's last line; the pin scan also searches every file for the pinned commit.
+- **Verification:** 5 consecutive full unit runs (368/368 each); `verify --chain --bring`; the same with
+  `HARNESS_COPILOT` pointing at a missing binary; TUI smoke at 80 and 120 columns with `NO_COLOR=1`, without
+  animation, and with `--plain`. No prompts were spent in this phase.
