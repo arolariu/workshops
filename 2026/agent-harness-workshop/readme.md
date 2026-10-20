@@ -238,6 +238,7 @@ node labs/start.mjs sync-seeds --dry-run     # after changing a level: what the 
 node labs/start.mjs test lab-03 easy --sol --agent   # try a reference solution with the real agent
 node labs/start.mjs open lab-03 easy --no-intro      # jump straight to a level during the live demo
 node labs/start.mjs replay                           # Lab 00's under-the-hood demo: ←/→ step, tab compares with a harness
+node labs/start.mjs present lab-03                   # presenter mode: the lab's slides, ←/→ (no lab: the whole deck)
 node labs/start.mjs xray lab-05 easy --sol           # show a finished harness: its tree, context budget and maturity
 node labs/start.mjs --path=deeper --no-intro         # start everyone on a learning path
 node labs/start.mjs starters        # is labs/_harness/starters.json (the published starters) up to date?
@@ -245,7 +246,11 @@ start.cmd --full --setup-only       # prepare a classroom machine (see SETUP.md 
 ```
 Each lab's `readme.md` is the script for its 11-minute slot: *In one minute* is the idea, *🔬 Under the hood* shows
 what the layer does to the model's context or loop, then the 🟢 easy level together, and its takeaway and question
-to close. *🏛️ In the enterprise* is there for the questions. After changing a
+to close. *🏛️ In the enterprise* is there for the questions. **Presenter mode** (`node labs/start.mjs present
+[lab]`) turns those sections into full-screen slides laid out for 80×24: *In one minute*, how the layer works (the
+readme's *How …* section, or the first section after *Under the hood* that explains it), *Under the hood*, and at
+the end the Lab 08 closing demo and the homework map (tiers, times, paths). ←/→ move, Home and End jump, `b` leaves.
+Without a terminal (or with `--linear`) it prints the slides as text. After changing a
 level's `src/` or `sol/`, run `node labs/start.mjs sync-seeds`: it carries the change down the chain (every later
 level that starts from it), refuses to overwrite anything it can't merge safely, backs up what it replaces, and
 updates `labs/_harness/starters.json`. Commit everything together, so "restore the starter" keeps giving students

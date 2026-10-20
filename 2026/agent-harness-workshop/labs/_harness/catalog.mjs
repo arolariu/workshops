@@ -70,6 +70,16 @@ const pick = (secs, ...names) => {
   }
   return '';
 };
+/** A readme's `## ` sections in order: [{ title, body }] (the title as written, emoji included). */
+export function readmeSections(md) {
+  const out = [];
+  for (const line of String(md).replace(/\r\n/g, '\n').split('\n')) {
+    const h = line.match(/^##\s+(.*)$/);
+    if (h) { out.push({ title: h[1].trim(), body: '' }); continue; }
+    if (out.length) out.at(-1).body += `${line}\n`;
+  }
+  return out.map((s) => ({ ...s, body: s.body.trim() }));
+}
 
 // A milestone heading: "M2 · The engine" (also "M2: …", "M2 - …", or just "M2").
 const MILESTONE = /^(M\d+)\b\s*[·:.\-–—]?\s*(.*)$/i;

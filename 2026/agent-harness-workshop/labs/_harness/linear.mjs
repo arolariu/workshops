@@ -2,7 +2,7 @@
 // No alternate screen, raw input, cursor movement, colors or animation. It uses the same helpers as the app.
 import readline from 'node:readline';
 import path from 'node:path';
-import { loadCatalog, findExercise, levelChoices } from './catalog.mjs';
+import { loadCatalog, findExercise, levelChoices, normalizeLabId } from './catalog.mjs';
 import { progressStore, captureEvidence } from './progress.mjs';
 import { runChecks as realRunChecks } from './checks.mjs';
 import { runAgentChecks as realRunAgentChecks, loadAgentChecks as realLoadAgentChecks, listRuns as realListRuns, budgetPreview, specCommand } from './agent.mjs';
@@ -25,6 +25,7 @@ import { xrayReport, inheritedChecks } from './xray.mjs';
 import { xrayLines, inheritedLines } from './screens/xray.mjs';
 import { loadReplay, otherReplay } from './replay.mjs';
 import { replayLines } from './screens/replay.mjs';
+import { slidesFor, slidesText } from './screens/present.mjs';
 
 const HELP = `Commands (type one and press Enter):
   list [path=ID] [level=L] [status=S] [minutes=N] [bookmarked] [words…]   numbered exercises, filtered
@@ -43,6 +44,7 @@ const HELP = `Commands (type one and press Enter):
   changes           your changes since your latest commit, file by file (needs git)
   xray [sol]        X-ray your harness (or the reference): what it adds to every turn, and its maturity level
   replay [harnessed|FILE]  an agent run turn by turn, without (or with) a harness; no AI, no credits
+  present [LAB]     the facilitator's slides: each lab guide's key sections, the closing demo, the homework map
   glossary [WORD]   the words this workshop uses, in one line each
   recovery          the starter, your checkpoints and backups
   checkpoint NAME   save your current work as a checkpoint
@@ -408,6 +410,12 @@ export function runLinear({
         say(`The agent loop, ${rec.title}: ${rec.turns.length} turns. Each turn: the model reads its context, writes a tool call, the harness decides, the result joins the history.`);
         rec.turns.forEach((_, i) => replayLines(rec, i, { W: 100, fmt: { ...PLAIN, green: (s) => s, bold: (s) => s, cyan: (s) => s } }).forEach((l) => say(l)));
         if (rec.scripted) say(`Now compare it with the other run: replay ${otherReplay(rec.id)}`);
+        return;
+      }
+      case 'present': {
+        const lab = args[0] ? normalizeLabId(args[0]) : null;
+        if (args[0] && !catalog.some((l) => l.id === lab)) { say(`"${args[0]}" is not a lab. Try: present lab-01 (or present alone for the whole deck).`); return; }
+        slidesText(slidesFor(catalog, { lab })).forEach((l) => say(l));
         return;
       }
       case 'glossary': {

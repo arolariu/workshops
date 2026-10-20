@@ -34,6 +34,7 @@ test('--plain: every glyph that carries meaning folds to an ASCII marker, never 
       assert.notEqual(m, '?', `${group}: ${g} has no marker (unknown)`);
     }
   }
+  assert.equal(asciiFold('about 8½ h'), 'about 8.5 h', 'fractions read as decimals, not "812"');
   assert.notEqual(asciiFold('⛔'), asciiFold('❌'), 'denied and failed stay apart');
   assert.notEqual(asciiFold('🆕'), asciiFold('✏️'), 'new and changed stay apart');
 });

@@ -69,7 +69,7 @@ const color256 = (n, s) => (noColor ? s : `${ESC}38;5;${n}m${s}`);
  * Input/output and the side-effecting helpers can be replaced (tests drive the app with fake streams).
  */
 export async function startTui({
-  labsDir, open = null, replay = null, intro = true, anim = true, ascii = false, path: startPath = null,
+  labsDir, open = null, replay = null, present = null, intro = true, anim = true, ascii = false, path: startPath = null,
   input = process.stdin, output = process.stdout, deps: overrides = {}, onExit = (code) => process.exit(code),
 }) {
   const deps = {
@@ -130,6 +130,7 @@ export async function startTui({
     quizChoice: null,
     xray: null,
     replay: null,
+    present: null,
     tip: Math.floor(Math.random() * TIPS.length),
   };
 
@@ -150,6 +151,11 @@ export async function startTui({
     // A recording (loaded and checked by the caller) to start on; b goes to the home screen.
     S.replay = { rec: replay, idx: 0 };
     S.screen = 'replay';
+  }
+  if (present?.length) {
+    // Presenter mode (`node labs/start.mjs present`): the slides, laid out by screens/present.mjs; b goes home.
+    S.present = { slides: present, idx: 0 };
+    S.screen = 'present';
   }
 
   // ---------- terminal plumbing ----------
@@ -1060,6 +1066,22 @@ export async function startTui({
     return { lines: L, footer: footer([['←→', 'turn'], ['tab', other], ['↑↓', 'scroll'], ['b', 'back'], ['q', 'quit']]) };
   }
 
+  function presentScreen() {
+    const { slides, idx } = S.present;
+    const s = slides[idx];
+    const L = [''];
+    L.push(...header(`🎤 ${bold(bright(s.title))}`, dim(s.kicker), dim(`${idx + 1}/${slides.length}`)));
+    L.push('');
+    L.push(...s.lines.map((l) => `  ${l}`));
+    return { lines: L, footer: footer([['←→', 'slide'], ['home end', 'first, last'], ['b', 'back'], ['q', 'quit']]) };
+  }
+  const stepSlide = (to) => {
+    const P = S.present;
+    const idx = Math.max(0, Math.min(P.slides.length - 1, to));
+    if (idx !== P.idx) { P.idx = idx; S.scroll = 0; }
+    render();
+  };
+
   function learnScreen() {
     const lab = labObj();
     const ex = exObj();
@@ -1261,6 +1283,7 @@ ${levelKeyRows()}
 ## Good to know
 - 🔐 **Trust the workshop folder once**: run \`copilot\` in the workshop root and choose "Yes, and remember this folder".
 - 💻 **Without this app**: \`node labs/start.mjs test lab-01 easy\` runs the checks; \`node labs/start.mjs help\` lists every command; \`node labs/start.mjs glossary\` prints the glossary below.
+- 🎤 Presenting? \`node labs/start.mjs present [lab]\` shows the lab guides as slides (**←** **→**), then the closing demo and the homework map.
 - 🎬 Calmer screen? \`--no-anim\` (no animations), \`--no-intro\` (no welcome screen), \`--plain\` (ASCII markers instead of emoji) or \`--linear\` (one line at a time, for screen readers).
 
 ## About
@@ -1280,7 +1303,7 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
     checks: checksScreen, checkDetail: checkDetailScreen, output: outputScreen, agent: agentScreen, history: historyScreen,
     solution: solutionScreen, confirmSolution: confirmSolutionScreen, menu: menuScreen, recovery: recoveryScreen,
     doctor: doctorScreen, export: exportScreen, help: helpScreen, bring: bringScreen, changes: changesScreen, learn: learnScreen, xray: xrayScreen,
-    replay: replayScreen,
+    replay: replayScreen, present: presentScreen,
   };
   function render() {
     if (S.suspended || quitting) return;
@@ -1922,6 +1945,13 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
       scroll,
       back: () => { S.replay = null; go('home'); },
     },
+    present: {
+      nextSlide: () => stepSlide(S.present.idx + 1),
+      prevSlide: () => stepSlide(S.present.idx - 1),
+      first: () => stepSlide(0),
+      last: () => stepSlide(S.present.slides.length - 1),
+      back: () => { S.present = null; go('home'); },
+    },
   };
   /** Bindings in keys.mjs without a handler here ([] when complete). */
   const unhandled = () => Object.entries(KEYMAP).flatMap(([state, list]) => list.filter((b) => typeof HANDLERS[state]?.[b.id] !== 'function').map((b) => `${state}.${b.id}`));
@@ -1990,8 +2020,8 @@ ${glossary.map((e) => `- **${e.term}**: ${e.text}${e.lab ? ` (Lab ${e.lab.slice(
     S.changes = gitChanges(exObj().src);
     firstVisit();
     tickClock();
-  } else if (S.screen === 'replay') {
-    // Straight into the replay (`node labs/start.mjs replay`): no welcome screen.
+  } else if (S.screen === 'replay' || S.screen === 'present') {
+    // Straight into the replay or the slides (`node labs/start.mjs replay`, `present`): no welcome screen.
   } else if (intro && ANIM && !isAscii()) {
     S.screen = 'splash';
     S.t.splash = longAgo ? now() : now() - 2400;

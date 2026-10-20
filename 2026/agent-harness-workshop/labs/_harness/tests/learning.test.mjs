@@ -164,4 +164,6 @@ test('the homework paths only name levels that exist (Phases 4 and 5 add the dee
   const order = (id) => PATHS.find((p) => p.id === id).keys.map((k) => k.split('/')[0]);
   assert.deepEqual([...new Set(order('security'))], ['lab-05', 'lab-04', 'lab-07', 'lab-08'], 'Security: guardrails first, then the attacks, then red-teaming your own harness (spec §5.1)');
   assert.deepEqual([...new Set(order('capstone'))], ['lab-08'], 'Capstone: Lab 08 only');
+  const cap = real.find((l) => l.capstone);
+  assert.deepEqual(PATHS.find((p) => p.id === 'capstone').keys, cap.levels.map((e) => e.key), 'Capstone: every tier of Lab 08, in order (spec §5.1)');
 });

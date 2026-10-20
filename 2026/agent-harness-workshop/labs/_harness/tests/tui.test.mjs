@@ -42,7 +42,7 @@ async function app(opts = {}) {
   };
   const catalog = loadCatalog(labsDir);
   const open = opts.open ? exerciseByKey(catalog, opts.open) : null;
-  const a = await startTui({ labsDir, input: term.input, output: term.output, anim: false, intro: false, ascii: Boolean(opts.ascii), path: opts.path, open, replay: opts.replay ?? null, deps, onExit: (c) => exits.push(c) });
+  const a = await startTui({ labsDir, input: term.input, output: term.output, anim: false, intro: false, ascii: Boolean(opts.ascii), path: opts.path, open, replay: opts.replay ?? null, present: opts.present ?? null, deps, onExit: (c) => exits.push(c) });
   await waitFor(() => a.state.env);
   return { ...a, ...term, labsDir, catalog, exits };
 }
@@ -479,6 +479,33 @@ test('NO_COLOR and --no-anim: plain frames that fit 80 columns', () => {
 test('every key in the table reaches a handler, and the more menu lists exactly its keys', async () => {
   const t = await app({ open: 'lab-00/easy' });
   assert.deepEqual(t.unhandled(), [], 'bindings without a handler');
+  t.quit();
+});
+
+test('presenter mode: ←/→ move through the slides, Home and End jump, and every slide fits 80x24', async () => {
+  const { slidesFor } = await import('../screens/present.mjs');
+  const real = path.resolve(import.meta.dirname, '..', '..');
+  const slides = slidesFor(loadCatalog(real), { lab: 'lab-08' });
+  const t = await app({ present: slides, size: { columns: 80, rows: 24 } });
+  assert.equal(t.state.screen, 'present');
+  for (let i = 0; i < slides.length; i++) {
+    const f = frame(t.output);
+    assert.ok(f.length <= 24, `slide ${i + 1}: ${f.length} rows`);
+    for (const line of f) assert.ok(width(line) <= 80, line);
+    const s = f.join('\n');
+    assert.match(s, new RegExp(`${i + 1}/${slides.length}`));
+    assert.doesNotMatch(s, /more below/, `slide ${i + 1} fits without scrolling`);
+    press(t.input, '', 'right');
+  }
+  assert.equal(t.state.present.idx, slides.length - 1, 'the last slide stays put');
+  press(t.input, '', 'home');
+  assert.equal(t.state.present.idx, 0);
+  press(t.input, '', 'left');
+  assert.equal(t.state.present.idx, 0, 'the first slide stays put');
+  press(t.input, '', 'end');
+  assert.equal(t.state.present.idx, slides.length - 1);
+  press(t.input, 'b');
+  assert.equal(t.state.screen, 'home');
   t.quit();
 });
 

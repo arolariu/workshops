@@ -22,7 +22,7 @@ const labsDir = process.env.WORKSHOP_LABS_DIR ? path.resolve(process.env.WORKSHO
 const rootDir = path.dirname(labsDir);
 const ui = await import('./_harness/ui.mjs');
 const { green, bright, dim, white, yellow, red, cyan, bold, wrap, inline, bar, style, C, statusIcon, statusWord, asciiFold, setAscii } = ui;
-const { loadCatalog, findExercise, levelChoices, DIFFICULTIES } = await import('./_harness/catalog.mjs');
+const { loadCatalog, findExercise, levelChoices, DIFFICULTIES, normalizeLabId } = await import('./_harness/catalog.mjs');
 const { progressStore, captureEvidence } = await import('./_harness/progress.mjs');
 const { BRAND, creditLine } = await import('./_harness/brand.mjs');
 
@@ -47,6 +47,7 @@ const COMMANDS = {
   glossary: { args: [0, 1], opts: { ascii: 'flag' } },
   xray: { args: [2, 2], opts: { sol: 'flag', json: 'flag', ascii: 'flag' } },
   replay: { args: [0, 1], opts: { 'no-anim': 'flag', ascii: 'flag', linear: 'flag' } },
+  present: { args: [0, 1], opts: { 'no-anim': 'flag', ascii: 'flag', linear: 'flag' } },
   export: { args: [0, 0], opts: { format: 'value', name: 'value', dir: 'value', path: 'value', ascii: 'flag' } },
   doctor: { args: [0, 0], opts: { full: 'flag', lab: 'value', json: 'flag', ascii: 'flag' } },
   verify: { args: [0, 1], opts: { chain: 'flag', bring: 'flag', verbose: 'flag', ascii: 'flag' } },
@@ -126,6 +127,7 @@ function usage() {
   row('node labs/start.mjs glossary [word]', 'the words this workshop uses, in one line each');
   row('node labs/start.mjs xray lab-04 easy [--sol]', 'X-ray a harness: what it adds to every turn, its maturity');
   row('node labs/start.mjs replay [harnessed|FILE.jsonl]', 'step through an agent run, turn by turn (no AI, no credits)');
+  row('node labs/start.mjs present [lab]', 'presenter mode: slides from the lab guides, the closing demo and the homework map (←/→)');
   say();
   say(`  ${white('Start over (your current files are always backed up first)')}`);
   row('node labs/start.mjs recovery lab-01 easy', 'the starter, your checkpoints and backups');
@@ -371,6 +373,19 @@ if (cmd === '' || cmd === 'open') {
     rec.turns.forEach((_, i) => { say(); for (const l of replayLines(rec, i, { W, fmt: { green, bright, dim, white, yellow, bold, cyan } })) say(l); });
     say();
     say(`  ${dim(rec.scripted ? 'Now compare it with the other run:' : 'Compare it with a scripted run:')} ${cyan(`node labs/start.mjs replay ${rec.scripted ? otherReplay(rec.id) : 'bare'}`)}`);
+    say();
+  }
+} else if (cmd === 'present') {
+  const { slidesFor, slidesText } = await import('./_harness/screens/present.mjs');
+  const lab = pos[1] ? normalizeLabId(pos[1]) : null;
+  if (pos[1] && !catalog.some((l) => l.id === lab)) fail(`"${pos[1]}" is not a lab. Try: node labs/start.mjs present lab-01 (or no lab for the whole deck).`);
+  const slides = slidesFor(catalog, { lab });
+  if (interactive && !opt.linear) {
+    const { startTui } = await import('./_harness/tui.mjs');
+    const app = await startTui({ labsDir, present: slides, intro: false, anim: !opt['no-anim'], ascii: Boolean(opt.ascii) });
+    await app.closed;
+  } else {
+    for (const l of slidesText(slides)) say(l);
     say();
   }
 } else if (cmd === 'glossary') {

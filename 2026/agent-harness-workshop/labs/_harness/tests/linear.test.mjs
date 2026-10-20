@@ -233,3 +233,12 @@ test('linear checks print the inherited group after the result, and it changes n
   assert.match(text, /All 1 checks passed\.[\s\S]*YOUR HARNESS SO FAR · advisory[\s\S]*Skills name "wrong"/);
   assert.equal(progressStore(labsDir).get('lab-05/easy').checks, 'pass', 'a failing inherited rule never turns the pass into a fail');
 });
+test('present works in linear mode too: the slides as text', async () => {
+  const { labsDir } = fixtureWorkshop();
+  fs.writeFileSync(path.join(labsDir, 'lab-02', 'readme.md'), '# Lab 02 · 🧩 Skills — Know-how on demand\n\n## In one minute\nA skill is a recipe.\n\n## 🔬 Under the hood\nOnly the description is always on.\n\n## Anatomy of a skill\nA folder with SKILL.md.\n');
+  const { text } = await session(['present lab-02', 'present lab-42', 'quit'], { labsDir });
+  assert.match(text, /1\/\d+ · Lab 02[^\n]*In one minute/);
+  assert.match(text, /Anatomy of a skill/);
+  assert.match(text, /"lab-42" is not a lab/);
+  assert.doesNotMatch(text, /\x1b\[/);
+});

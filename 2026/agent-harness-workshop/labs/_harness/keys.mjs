@@ -151,6 +151,14 @@ export const KEYMAP = {
     b(SCROLL, 'scroll', 'scroll'),
     b(['b', 'escape', 'backspace', 'u'], 'back', 'back'),
   ],
+  // Presenter mode (`node labs/start.mjs present`): one slide per screen, laid out for 80×24.
+  present: [
+    b(['right', 'space', 'pagedown', 'n'], 'nextSlide', 'the next slide'),
+    b(['left', 'pageup', 'p'], 'prevSlide', 'the previous slide'),
+    b('home', 'first', 'the first slide'),
+    b('end', 'last', 'the last slide'),
+    b(['b', 'escape', 'backspace'], 'back', 'back'),
+  ],
   recovery: [
     b(PREV, 'prev', 'choose'),
     b(NEXT, 'nextItem', 'choose'),
