@@ -41,6 +41,9 @@ function split(s, dialect, nest, quotes) {
     if (ch === esc && quote !== "'" && i + 1 < s.length && s[i + 1] !== '\n') { cur += ch + s[i + 1]; i++; continue; }
     if (quote) { cur += ch; if (ch === quote) quote = null; continue; }
     if (quotes && (ch === '"' || ch === "'")) { quote = ch; cur += ch; continue; }
+    // A comment hides nothing: `# it's quick` must not open a quote that swallows the next line.
+    if (dialect === 'powershell' && ch === '<' && s[i + 1] === '#') { const end = s.indexOf('#>', i + 2); i = end < 0 ? s.length : end + 1; cur += ' '; continue; }
+    if (dialect !== 'cmd' && ch === '#' && /(^|[\s;&|(])$/.test(cur)) { while (i + 1 < s.length && s[i + 1] !== '\n') i++; continue; }
     if (nest && (ch === '(' || ch === '{')) depth++;
     if (nest && (ch === ')' || ch === '}') && depth > 0) depth--;
     const redirect = ch === '&' && (/[<>]$/.test(cur) || s[i + 1] === '>');
@@ -75,6 +78,9 @@ export function tokens(segment, dialect = 'bash') {
       if (ch === '"') quote = null; else word += ch;
       continue;
     }
+    // Outside quotes an escape keeps the next character as it is: bash `r\m` is rm, PowerShell ``Re`move-Item`` is
+    // Remove-Item (cmd has no such escape: a backslash there is a path separator).
+    if (ch === esc && dialect !== 'cmd' && i + 1 < s.length && !/\s/.test(s[i + 1])) { word += s[i + 1]; has = true; i++; continue; }
     if (ch === esc && (s[i + 1] === '"' || s[i + 1] === "'")) { word += s[i + 1]; has = true; i++; continue; }
     if (ch === '"' || ch === "'") { quote = ch; has = true; continue; }
     if (/\s/.test(ch)) { if (has) out.push(word); word = ''; has = false; continue; }
@@ -275,7 +281,7 @@ export function unwrap(words, dialect = 'bash') {
 
 const MAX_DEPTH = 5;
 function commandsOf(command, dialect, depth) {
-  return segments(command, dialect).flatMap((segment) => {
+  return segments(dialect === 'powershell' ? psText(command) : command, dialect).flatMap((segment) => {
     const words = tokens(segment, dialect);
     const inner = depth < MAX_DEPTH ? unwrap(words, dialect) : null;
     // Code inside a command runs too: `echo $(rm -rf x)`, `A=$(rm -rf x) ls`, bash backticks, and the script blocks of
@@ -290,15 +296,16 @@ function commandsOf(command, dialect, depth) {
   });
 }
 
-/** A tool call, ready for the rules: { tool, kind, commands, commandLine, paths, text }. */
-// What the shell reads: CRLF as LF and no NUL (bash drops it). A bash \-newline joins the lines with nothing between
-// them (`r\<newline>m` is rm); a PowerShell backtick-newline goes on with a space. PowerShell also reads typographic
-// quotes and dashes as plain ones (“x” is "x", –Force is -Force).
+// PowerShell reads typographic quotes and dashes as plain ones (“x” is "x", –Force is -Force).
+const psText = (s) => s.replace(/[\u2018-\u201B]/g, "'").replace(/[\u201C-\u201E]/g, '"').replace(/[\u2013-\u2015]/g, '-');
+// What the shell reads: CRLF as LF and no NUL (bash drops it). An escape character that isn't itself escaped (an odd
+// run of them) before a newline continues the line: bash joins the lines with nothing between them (`r\<newline>m` is
+// rm), PowerShell with a space. `echo \\<newline>rm` is two commands.
 function shellText(command, dialect) {
   const s = String(command ?? '').replace(/\r\n?/g, '\n').replace(/\0/g, '');
-  if (dialect !== 'powershell') return s.replace(/\\\n/g, '');
-  return s.replace(/`\n/g, ' ').replace(/[\u2018-\u201B]/g, "'").replace(/[\u201C-\u201E]/g, '"').replace(/[\u2013-\u2015]/g, '-');
+  return dialect === 'powershell' ? psText(s).replace(/(?<!`)((?:``)*)`\n/g, '$1 ') : s.replace(/(?<!\\)((?:\\\\)*)\\\n/g, '$1');
 }
+/** A tool call, ready for the rules: { tool, kind, commands, commandLine, paths, text }. */
 export function normalize(toolName, args = {}) {
   const tool = String(toolName ?? '');
   const a = args && typeof args === 'object' ? args : {};

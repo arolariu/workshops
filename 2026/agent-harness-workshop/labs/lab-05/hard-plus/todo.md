@@ -200,7 +200,8 @@ the guard decides in a worker with its own, shorter deadline, and denies when th
 
 ## 🚀 Going further
 - **Know the limits.** A denylist never sees every spelling: `eval "$CMD"`, `echo … | sh`, a script the agent writes
-  and then runs, an alias, a symlink, `git clean -fdx`. That's why this is one layer, not the whole defence: keep the permission flags tight
+  and then runs, an alias, a symlink, `git clean -fdx`, bash brace expansion (`{rm,-rf,build}`), or quoting the engine
+  reads differently from the shell (cmd's `"…'…"`, an even number of bash `$'\''` quotes). That's why this is one layer, not the whole defence: keep the permission flags tight
   (`--deny-tool`), run unattended work in `/sandbox`, and keep tests on the outcome (the folder is still there).
 - Add `"decision": "ask"` (Copilot supports `permissionDecision: "ask"` in interactive sessions) for medium-severity
   rules, and keep `deny` for the rest.

@@ -60,7 +60,17 @@
     ["bash", "r\u0000m -rf build"],
     ["powershell", "Write-Output “hi\"; Remove-Item -Recurse -Force build"],
     ["powershell", "Write-Output ‘hi'; Remove-Item -Recurse -Force build"],
-    ["powershell", "Remove-Item –Recurse –Force build"]
+    ["powershell", "Remove-Item –Recurse –Force build"],
+    ["bash", "# Clean the project's build output\nrm -rf build\n# Rebuild (it's quick)\nnpm run build"],
+    ["powershell", "# Clean the project's build output\nRemove-Item -Recurse -Force build\n# it's quick"],
+    ["powershell", "<# \" #> ; Remove-Item -Recurse -Force build ; <# \" #>"],
+    ["bash", "echo \\\\\nrm -rf build"],
+    ["powershell", "Write-Host x``\nRemove-Item -Recurse -Force build"],
+    ["bash", "pwsh -c 'Remove-Item –Recurse –Force build'"],
+    ["bash", "pwsh -c 'Write-Output “a\"; Remove-Item -Recurse -Force build; Write-Output \"b”'"],
+    ["bash", "r\\m -rf build"],
+    ["bash", "rm -r\\f build"],
+    ["powershell", "Re`move-Item -Recurse -Force build"]
   ],
   "allow": [
     ["bash", "rm notes.txt"],
@@ -83,6 +93,9 @@
     ["bash", "npm test 2>&1"],
     ["bash", "echo ${HOME}/build"],
     ["powershell", "Get-ChildItem build | ForEach-Object { Write-Host $_.Name }"],
-    ["powershell", "Remove-Item -LiteralPath notes.txt -Force -ErrorAction SilentlyContinue"]
+    ["powershell", "Remove-Item -LiteralPath notes.txt -Force -ErrorAction SilentlyContinue"],
+    ["bash", "echo a#b"],
+    ["bash", "npm test # it's fine"],
+    ["bash", "git commit -m \"fix #12: don't crash\""]
   ]
 }
