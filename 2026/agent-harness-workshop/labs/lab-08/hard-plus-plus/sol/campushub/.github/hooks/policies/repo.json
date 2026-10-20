@@ -77,7 +77,7 @@
       "reason": "Tickets change only through the ticket tools, where a human approves every write. Don't edit tickets/tickets.json directly.",
       "match": {
         "tool": "write",
-        "path": "(^|[\\\\/])tickets[\\\\/]tickets\\.json$"
+        "path": "(^|[\\\\/])tickets([\\\\/]+\\.(?=[\\\\/]))*[\\\\/]+tickets\\.json$"
       }
     },
     {
@@ -87,27 +87,27 @@
       "reason": "Tickets change only through the ticket tools, where a human approves every write. Don't change, move, restore or delete tickets/tickets.json from the shell.",
       "match": {
         "tool": "shell",
-        "command": "^(delete|tee|sed|truncate|mv|cp|set-content|add-content|out-file|clear-content|new-item|move-item|copy-item|rename-item)\\b.*tickets[\\\\/]tickets\\.json|^git (checkout|restore|rm|mv)\\b.*tickets[\\\\/]tickets\\.json|>>?\\s*\\S*tickets[\\\\/]tickets\\.json"
+        "command": "^(delete|tee|tee-object|sed|perl|awk|truncate|dd|install|ln|mv|cp|rsync|copy|xcopy|robocopy|cpi|cpp|move|mi|ren|rni|rename|set-content|sc|add-content|ac|out-file|clear-content|clc|new-item|ni|set-item|si|move-item|copy-item|rename-item|replace)\\b.*tickets([\\\\/]+\\.(?=[\\\\/]))*[\\\\/]+tickets\\.json|^git (checkout|restore|rm|mv|apply|stash|reset)\\b.*tickets([\\\\/]+\\.(?=[\\\\/]))*[\\\\/]+tickets\\.json|>>?\\s*\\S*tickets([\\\\/]+\\.(?=[\\\\/]))*[\\\\/]+tickets\\.json"
       }
     },
     {
       "id": "campushub-no-npm-start",
       "decision": "deny",
       "severity": "high",
-      "reason": "npm start loads .env.campushub (the real API key) into the server, out of the guard's sight. Run node api/server.mjs instead (read-only, no key), or ask the human to start the API with the key.",
+      "reason": "npm start (and restart) loads .env.campushub (the real API key) into the server, out of the guard's sight. Run node api/server.mjs instead (read-only, no key), or ask the human to start the API with the key.",
       "match": {
         "tool": "shell",
-        "command": "^(npm|pnpm|yarn|bun)\\s+(start|run\\s+start|run-script\\s+start)\\b"
+        "command": "^(npm|pnpm|yarn|bun)\\b.*\\s(run(-script)?\\s+)?(re)?start\\b"
       }
     },
     {
       "id": "campushub-no-inline-script-writes",
       "decision": "deny",
       "severity": "high",
-      "reason": "An inline script (node -e, python -c …) must not touch tickets/tickets.json or .approvals/: tickets change only through the ticket tools, after a human approves.",
+      "reason": "An inline script (node -e, node -pe, python -c …) must not touch tickets/tickets.json, .approvals/ or tickets/approve.mjs: tickets change only through the ticket tools, after a human approves.",
       "match": {
         "tool": "shell",
-        "commandLine": "\\b(node|bun|deno|python3?|perl|ruby)\\b[^|;&]*\\s(-e|--eval|-p|--print|-c)\\b.*(tickets[\\\\/]tickets\\.json|\\.approvals\\b)"
+        "commandLine": "\\b(node|bun|deno|python3?|perl|ruby)\\b[^|;&]*\\s(-\\w*[epc]\\b|--(eval|print)\\b).*(tickets([\\\\/]+\\.(?=[\\\\/]))*[\\\\/]+tickets\\.json|\\.approvals\\b|approve\\.mjs\\b)"
       }
     },
     {

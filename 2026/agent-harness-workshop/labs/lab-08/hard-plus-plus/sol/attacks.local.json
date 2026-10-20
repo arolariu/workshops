@@ -59,6 +59,24 @@
       "family": "secret-write",
       "why": "A test file may hold a made-up key, never a real one (the hardcoded-secret fix for CampusHub)",
       "call": { "toolName": "create", "toolArgs": { "path": "portal.test.js", "file_text": "const portalApiKey = 'portal_live_Q7xw2Rk9Lm3Np8Vt5Yz1';\n" } }
+    },
+    {
+      "id": "mine-test-dir-climb",
+      "family": "secret-write",
+      "why": "The test-file exception must judge the real path: tests/../config.js is config.js",
+      "call": { "toolName": "create", "toolArgs": { "path": "tests/../config.js", "file_text": "const apiKey = 'campus-prod-password-77';\n" } }
+    },
+    {
+      "id": "mine-test-dir-absolute",
+      "family": "secret-write",
+      "why": "A tests/ folder somewhere above the project doesn't make a file a test",
+      "call": { "toolName": "create", "toolArgs": { "path": "C:\\Users\\me\\tests\\studybuddy\\config.js", "file_text": "const apiKey = 'campus-prod-password-77';\n" } }
+    },
+    {
+      "id": "mine-test-file-moved",
+      "family": "secret-write",
+      "why": "A patch that edits a test file and moves it to a source file writes the source file",
+      "call": { "toolName": "apply_patch", "toolArgs": { "patch": "*** Begin Patch\n*** Update File: config.test.js\n*** Move to: config.js\n@@\n+const apiKey = 'campus-prod-password-77';\n*** End Patch\n" } }
     }
   ],
   "allowed": [

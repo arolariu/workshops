@@ -10,9 +10,10 @@ with `scanHarness('campushub')`).
 - **Change control:** `.github/workflows/harness-ci.yml` gates every harness pull request (scorecard, attack pack,
   self-tests, eval self-test); `harness.json` and `CHANGELOG.md` version it; `scripts/release.mjs` packages it.
 - **Measured:** `evals/cases.json` (8 cases) against `evals/baseline.json`; `attacks/pack.json` plus
-  `attacks.local.json`: 45 attacks denied, 0 false positives.
+  `attacks.local.json`: 48 attacks denied, 0 false positives.
 - **Distributed, not copied:** CampusHub installs `dist/apm` through `campushub/apm.yml`; `campushub/apm.lock.yaml`
-  hashes every installed file, and the checks prove each one equals the package and the package equals this harness.
+  hashes every installed file. The checks prove each one hashes to the lock and equals its file in the package, that
+  the package names this harness and holds only its files, and that CampusHub runs this harness's guard.
 - **Layered:** `campushub/.github/hooks/policies/org.json` over `campushub/.github/hooks/policies/repo.json`; the
   organisation's force-push deny beats CampusHub's own override.
 - **Portable, on the record:** `PORTABILITY.md` (4 of 6 families and 1 of 8 eval cases transferred as they were; a
@@ -21,9 +22,11 @@ with `scanHarness('campushub')`).
   requests in week 45; the riskiest session tried three ways to read CampusHub's key, and all three were denied.
 
 ## Remaining risks
-- The approval gate's grant (`.approvals/`) sits on the same disk as the agent: the policy stops the obvious writes,
-  not a script the agent writes to a file and then runs.
-- `npm start` is denied, but any command that reads `.env.campushub` without naming it slips past the path rules.
+- A deny-list can't close the approval gate. `.approvals/` and `tickets/tickets.json` sit on the agent's own disk,
+  and the policy stops only the spellings it lists: a review found `node -pe`, `import('./tickets/approve.mjs')` and
+  PowerShell's `copy` getting through before we added them, and a script the agent writes and then runs still does.
+  The real fix is next step 2.
+- `npm start` and `npm restart` are denied, but any command that reads `.env.campushub` without naming it slips past.
 - StudyBuddy-only skills (`ects-grades`, `release-checklist`) are installed in CampusHub and can be picked for the
   wrong job; `testing.instructions.md` never applies to CampusHub's `*.test.mjs`.
 - CampusHub's eval suite has only been planned (`--dry-run`), never run: its cases have no baseline yet.
@@ -34,8 +37,8 @@ with `scanHarness('campushub')`).
 ## Next steps
 1. Split the package: an organisation baseline (guard, reviewer, policy engine) and a StudyBuddy package, so each
    team installs only what applies; publish both from their own repository with tags instead of `../dist/apm`.
-2. Move approvals to the tracker's API with the approver's own credentials; until then, keep `.approvals/` out of
-   the agent's sandbox.
+2. Move approvals off the agent's disk: the tracker's API with the approver's own credentials, which the agent's
+   machine never holds. Until then, keep `.approvals/` and `tickets/` out of the agent's sandbox.
 3. Record 3 runs of CampusHub's suite within a 675-credit budget, save its baseline, and add the eval step to a
    CampusHub CI gate: with a `HARNESS.md` there, CampusHub reaches L5.
 4. Run `scripts/report.mjs` every week on both repositories, and review any session with two or more denials.

@@ -7,9 +7,9 @@ version** (CampusHub needs its own case, named here) or **doesn't apply**.
 
 ## Attack pack
 `node scripts/replay-hooks.mjs campushub attacks/pack.json attacks.local.json` runs StudyBuddy's pack through both of
-CampusHub's hooks: 45 attacks, 45 denied; 13 allowed calls, 0 false positives. Everything still passes, because the
+CampusHub's hooks: 48 attacks, 48 denied; 13 allowed calls, 0 false positives. Everything still passes, because the
 guard is the same file; what changes is whether a case tests what CampusHub has to protect.
-`node scripts/replay-hooks.mjs campushub` runs CampusHub's pack: 15 attacks, 15 denied; 8 allowed calls, 0 false
+`node scripts/replay-hooks.mjs campushub` runs CampusHub's pack: 20 attacks, 20 denied; 8 allowed calls, 0 false
 positives.
 
 | Family | Verdict | CampusHub versions | Why |
@@ -43,9 +43,10 @@ CampusHub's suite (`campushub/evals/cases.json`, 7 cases) passes `eval.mjs --dry
 
 ## What else didn't transfer
 - **A false positive, fixed upstream.** StudyBuddy's `hardcoded-secret` rule blocked CampusHub's test convention
-  (`apiKey: 'server-test-key'`). Fixed in the harness (a test file may hold a made-up value, never a real key format),
-  with regression cases in `attacks.local.json`, released as 1.0.1 and installed again: CampusHub's copy was never
-  edited.
+  (`apiKey: 'server-test-key'`). Fixed in the harness (a test file inside the session's folder may hold a made-up
+  value, never a real key format; `tests/../config.js`, a `tests/` folder above the project and a patch that moves a
+  test file to a source file don't count), with regression cases in `attacks.local.json`, released as 1.0.1 and
+  installed again: CampusHub's copy was never edited.
 - `testing.instructions.md` applies to `**/*.test.js`; CampusHub's tests are `*.test.mjs`, so it never loads there.
 - The shared `package-json` rule blocks step 2 of CampusHub's release (the version lives in `package.json`): the
   release skill asks the human for the bump.

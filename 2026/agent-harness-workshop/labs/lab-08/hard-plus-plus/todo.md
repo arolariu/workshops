@@ -13,8 +13,8 @@ repositories, and sign off with a one-page review.
 ## 📋 Requirements
 1. `campushub/apm.yml` depends on your package, `../dist/apm` (built by `node scripts/release.mjs patch --dry-run`),
    and `apm install --target copilot` installed it: `campushub/apm.lock.yaml` lists every installed file with its
-   hash. Every installed file matches the lock and the package, the package matches this harness, and no package
-   file sits in CampusHub outside the lock. CampusHub reaches **L4 Guarded** or better.
+   hash. Every installed file matches the lock and its file in the package, the package names this harness and holds
+   only its files, and no package file sits in CampusHub outside the lock. CampusHub reaches **L4 Guarded** or better.
 2. `campushub/.github/hooks/scripts/policy-guard.mjs` layers the organisation's policy (`policies/org.json`, or the
    file in `HARNESS_ORG_POLICY`) over CampusHub's (`policies/repo.json`) with the given engine, fails closed, logs
    the layer, and runs before every tool call in both shells. An organisation deny beats every repository override
@@ -64,11 +64,12 @@ node campushub/.github/skills/campushub-release/scope.mjs <ticket>
 - `git push --force origin preview` is denied by `org-no-force-push` (layer `org`), although `repo.json` allows it
   with an override; a repository override for `curl … | sh` can't beat the organisation either
 - CampusHub's own rules still decide (layer `repo`): `echo $CAMPUSHUB_API_KEY`, `cat .env.campushub`, `npm run deploy`
-  and edits of `tickets/tickets.json` are denied; `./deploy.sh --dry-run`, `npm test` and reading
-  `.env.campushub.example` are allowed
-- `repo.json` closes two gaps the CampusHub team left: `npm start` (it loads `.env.campushub` into the server, and the
-  guard never sees the file) and inline scripts (`node -e "…"`) that write `tickets/tickets.json` or `.approvals/`;
-  the agent can't approve its own ticket closes (`tickets/approve.mjs` and `.approvals/`, from tools and the shell)
+  and changes to `tickets/tickets.json` are denied, however they're spelled (`tickets/./tickets.json`, PowerShell's
+  `copy`, `cpi` and `move`); `./deploy.sh --dry-run`, `npm test` and reading `.env.campushub.example` are allowed
+- `repo.json` closes two gaps the CampusHub team left: `npm start` (with npm's options, and `npm restart`: it loads
+  `.env.campushub` into the server, and the guard never sees the file) and inline scripts (`node -e "…"`,
+  `node -pe "…"`) that touch `tickets/tickets.json`, `.approvals/` or `tickets/approve.mjs`; the agent can't approve
+  its own ticket closes (`tickets/approve.mjs` and `.approvals/`, from tools and the shell)
 
 ### M3 · The repo layer
 - `campushub/AGENTS.md` passes the scorecard's rules (commands, boundaries, a definition of done, under 100 lines)
@@ -92,17 +93,19 @@ node campushub/.github/skills/campushub-release/scope.mjs <ticket>
   CampusHub runs (one deny blocks the call); the CampusHub pack (`campushub/attacks/pack.json`: at least 6 attacks
   and 3 allowed calls, on the deploy, the key, `.env.campushub`, tickets and approvals) passes with no miss and no
   false positive
-- The shared guard's false positive on CampusHub's test convention is fixed upstream: a test file (`*.test.mjs`) may
-  hold a made-up key (`apiKey: 'server-test-key'`), a source file may not, no file may hold a real key format (an
-  `AKIA…` key), StudyBuddy's pack still passes, and the fix reached CampusHub through `release.mjs` and
-  `apm install` (CampusHub's installed guard is this one)
+- The shared guard's false positive on CampusHub's test convention is fixed upstream: a test file (`*.test.mjs`)
+  inside the session's folder may hold a made-up key (`apiKey: 'server-test-key'`); a source file may not, nor
+  `tests/../api/config.mjs`, nor a file under a `tests/` folder above the project, nor a patch that moves a test file
+  to a source file; no file may hold a real key format (an `AKIA…` key); StudyBuddy's pack still passes; and the fix
+  reached CampusHub through `release.mjs` and `apm install` (CampusHub's installed guard is this one)
 - `node ../scripts/eval.mjs --cases ../evals/cases.json --from evals/runs/studybuddy` (in `campushub/`) scores the
   shipped runs of StudyBuddy's suite in CampusHub; `campushub/evals/cases.json` holds the cases that transferred and
   the repository's own versions, and `eval.mjs --dry-run` accepts it
 - `PORTABILITY.md` has a row for each of the pack's six families, one for its allowed calls, and one per eval case,
-  each with a verdict: `transferred`, `repo version` (naming the CampusHub case ids) or `doesn't apply`. A
-  "transferred" family is denied in full on CampusHub, "transferred" allowed calls all pass, a "transferred" eval case
-  passed at least half of its recorded runs and is in CampusHub's suite, and every repo version named exists
+  each with a verdict: `transferred`, `repo version` (naming the CampusHub case ids) or `doesn't apply` (saying why
+  in the row). A "transferred" family is denied in full on CampusHub, "transferred" allowed calls all pass, a
+  "transferred" eval case passed at least half of its recorded runs and is in CampusHub's suite, every repo version
+  named exists, and in each table at least one row transferred or has a repo version
 
 ### M5 · Governance report
 - `summarize(logs)` and `render(summary)` in `scripts/report.mjs` turn `audit/2026-w45.jsonl` (StudyBuddy) and
@@ -192,9 +195,13 @@ without knowing about the other, and nothing in `repo.json` can switch StudyBudd
 <details><summary>The two gaps</summary>
 
 `npm start` runs `node --env-file=.env.campushub api/server.mjs`: the guard sees `npm start`, never the file. Deny
-it with a reason that offers `node api/server.mjs` (read-only, no key). An inline script names its target in the
-command line, so a `commandLine` rule can catch `node -e "…tickets/tickets.json…"`. A script the agent writes to a
-file and then runs still slips past: write that down for M6.
+it (`npm -s start`, `npm --prefix . start` and `npm restart` too) with a reason that offers `node api/server.mjs`
+(read-only, no key). An inline script names its target in the command line, so a `commandLine` rule can catch
+`node -e "…tickets/tickets.json…"`, if it also knows `-pe`, `--eval` and `import('./tickets/approve.mjs')`.
+
+Be plain about the limit: a deny-list can't fully close this. The ticket file and `.approvals/` are on the agent's
+own disk, and a rule stops only the spellings it lists; a script the agent writes to a file and then runs still gets
+through. Write that down for M6: the real fix is moving approvals off the agent's disk.
 
 </details>
 
@@ -213,8 +220,10 @@ says where the package rules are, and each package file stays short and specific
 The tool can't ask the human itself, so the human leaves a one-time grant where the server finds it:
 `node tickets/approve.mjs CH-107 --as mara.ionescu` writes `.approvals/CH-107.json`, valid 15 minutes. The server
 checks the ticket, the action and the time, closes the ticket with `updateTicket()`, and deletes the grant. The guard
-(M2) keeps the agent away from `approve.mjs` and `.approvals/`. Read-only hints only inform the client: the gate is
-the refusal in your own code.
+(M2) keeps the agent away from `approve.mjs` and `.approvals/` as far as a deny-list can, which isn't all the way:
+the grant sits on the agent's disk. In production the approval lives where the agent's machine can't write (the
+tracker's API, with the approver's own credentials). Read-only hints only inform the client: the gate is the
+refusal in your own code.
 
 </details>
 
@@ -243,6 +252,10 @@ Replay an allowed call that writes `api/rate-limit.test.mjs` with `apiKey: 'test
 next install would undo it. Fix `.github/hooks/scripts/guard.mjs` here (a test file may hold a made-up value, never one
 in a real key format such as `AKIA…` or `ghp_…`), add the case to `attacks.local.json`, run
 `node scripts/attack.mjs`, release, install.
+
+Decide "is it a test?" on the path inside the session's folder, not on the text: normalise
+`path.relative(cwd, p)` and refuse anything absolute or with `..` in it. Otherwise `tests/../api/config.mjs`, or any
+file of a learner who cloned into `~/tests/`, counts as a test.
 
 </details>
 

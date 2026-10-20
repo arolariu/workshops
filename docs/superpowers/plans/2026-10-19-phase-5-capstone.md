@@ -434,3 +434,36 @@ tier's folder") and writes `docs/superpowers/plans/2026-10-19-phase-5-lab-08-<ti
 - **CampusHub** (871c942): 1,448 lines of code and tests (55 tests), 391 of data and docs; room availability and a
   porters' board were added to reach the size with real features. It has no `todo.md`, so the catalog ignores it until
   hard++ lands.
+
+### Implementation notes, part 2 (Lab 08 and the reviews)
+
+- **Lab 08 tiers** (plans `2026-10-19-phase-5-lab-08-{easy,medium,hard,hard-plus,hard-plus-plus,campushub}.md`): easy
+  *Assemble and own it* (e81f9de), medium *Red-team it* (4240f6c), hard *Measure it* (b660fe1), hard+ *Change control*,
+  hard++ *Roll it out* on CampusHub (871c942 asset). Overrides with a `_why`: lab-08/easy `AGENTS.md` and the hook
+  config (the brought-in mess); lab-08/hard-plus-plus `REVIEW.md` (the harness review replaces Lab 03's code review).
+- **Central harness changes after Task 8:** `simulateBring` gets a fresh folder per call (parallel `verify --bring` runs
+  deleted each other's copies); `harnessPaths` gains `attacks/**`, `/attacks.local.json`, `/harness.json`,
+  `/CHANGELOG.md`; the scorecard counts `.agents/skills/` (Copilot CLI loads project skills there; APM installs them
+  there) and treats a relative APM dependency inside the repository as pinned; the lab map wraps long threads lines.
+- **Integration:** tiers written in parallel or fixed after review were moved onto their predecessors' new results
+  with a restack script (inherited files take the new upstream; a file the level's `sol/` also changed is 3-way
+  merged with `git merge-file`, base = the level's old `src/` copy). One conflict (hard++'s root guard) was resolved by
+  porting hard++'s test-file exception onto medium's rewritten guard; hard++'s package and CampusHub install were
+  rebuilt (`release.mjs patch --dry-run`, `apm install --target copilot`).
+
+### Deviations (part 2)
+- **Copilot CLI facts found on the way, with evidence:** `copilot help limits` says `--max-ai-credits` has a
+  **minimum of 30** and is a soft cap, so hard's runner caps runs at 30–60 and says "about N credits"; `copilot --help`
+  has `--trust-folder` (trust one prompt-mode session), which the eval runner and hard++'s launcher use, because a CI
+  runner or a subfolder isn't trusted and the harness would not load; `gh release list -R github/copilot-cli` shows
+  1.0.101 only as the prerelease 1.0.101-0, so hard+'s CI pins `@github/copilot@1.0.100`.
+- **APM 0.33.0:** installs skills into `.agents/skills/`, hooks as `.github/hooks/apm-<name>.json`, and hashes text
+  with LF line endings in `apm.lock.yaml` (hard++'s checks hash the same way). Hard++ uses APM only: a plugin installs
+  per user, so there is nothing in the repository to lock or check.
+- **gh-aw v0.92.0:** custom `steps:` replace gh-aw's own checkout, so hard+'s review workflow checks out first.
+- **Lab 01 hard+ and hard++ now read L2** in the scorecard (their skill in `.agents/skills/` is real); the content test
+  records the exception.
+- **Reviews:** five independent reviews (central harness + Phase 4 fixes; easy+medium; hard+hard+; the first round's
+  fixes; hard++ and the integration). Two reviewers overflowed or failed on the backend and were re-run in narrower
+  scopes. Every Important finding was fixed and re-verified; the Lab 05 policy engine and Lab 08 medium's guard were
+  hardened twice (continuations, comments, quotes, typographic characters, shell wrappers, patch move targets).

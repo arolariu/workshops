@@ -65,3 +65,20 @@ pack (15 attacks, 8 allowed) and suite (7 cases), `PORTABILITY.md`, `report.mjs`
   `session.usage_checkpoint`), as Lab 00's run stats do; "riskiest" = the sessions with the most denials.
 - The agent check needs Copilot to start inside `campushub/`, which the runner can't do (it runs in the copy's root),
   so it's a `command` check (`tests/in-campushub.mjs`, 1 prompt, `--max-ai-credits=30`, `--allow-tool=tickets`).
+
+**Review fixes (20 Oct 2026, after the commit).**
+- The test-file exception judged raw paths: `tests/../api/config.mjs`, a `tests/` folder above the clone and (with the
+  upstream `*** Move to:` fix) a patch moving a test file to a source file all passed. `isTestFile(p, cwd)` now
+  normalises `path.relative(cwd, p)` and refuses absolute results and `..`. Three regression attacks in
+  `attacks.local.json`; the M4 check runs the guard from a session folder that sits under `tests/` and probes all
+  three.
+- One-line bypasses of the approval gate and the M2 gaps (`node -pe`, `import('./tickets/approve.mjs')`, PowerShell's
+  `copy`/`cpi`/`move`/`cmd /c copy`, `tickets/./tickets.json`, `npm -s start`, `npm restart`): the inline-script rule
+  also matches `approve.mjs` and combined flags, the ticket rules know the aliases and tolerate `./` and `//` in the
+  path, and `npm start` tolerates npm's options. The M2 checks probe each spelling; the CampusHub pack has five new
+  attacks (20 in all). The hints and `REVIEW.md` now say plainly that a deny-list can't close this: the real fix is
+  approvals off the agent's disk.
+- "doesn't apply" needs a reason in its row, and each table needs at least one transferred or repo-version row.
+- Claims match the checks: Requirement 1 and `REVIEW.md` say the package names this harness and holds only its files,
+  not that it equals the harness.
+- Rebuilt: `release.mjs patch --dry-run`, `apm install --target copilot` in `campushub/`, `apm_modules` removed.

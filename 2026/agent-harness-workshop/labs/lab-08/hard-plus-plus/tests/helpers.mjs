@@ -126,6 +126,8 @@ export const VERDICT = /\b(transferred|repo version|doesn'?t apply|does not appl
 export const verdictOf = (cell) => ((String(cell).match(VERDICT) ?? [])[1] ?? '').toLowerCase().replace("doesnt", "doesn't").replace('does not', "doesn't");
 /** The table row that starts with `name` (bare or in backticks). */
 export const rowOf = (rows, name) => rows.find((r) => r[0]?.replace(/`/g, '').trim().toLowerCase() === name.toLowerCase());
+/** The reason a row gives: its words once the name, the verdict, run counts (2/2) and ids in backticks are gone. */
+export const whyOf = (row) => (row ?? []).slice(1).join(' ').replace(VERDICT, ' ').replace(/`[^`]*`/g, ' ').replace(/\b\d+\/\d+\b/g, ' ').match(/[A-Za-z][\w'’-]*/g) ?? [];
 
 /** A Markdown file's `## ` sections: { heading (lower case): body }. */
 export function sections(md) {

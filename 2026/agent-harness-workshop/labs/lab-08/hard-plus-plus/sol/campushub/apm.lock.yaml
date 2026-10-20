@@ -26,7 +26,7 @@ dependencies:
     .agents/skills/release-checklist/SKILL.md: sha256:d013c7a04ec453560ea3540b1b0661d2ba095b4dbfc924a181ab1bd64fbc1796
     .github/agents/reviewer.agent.md: sha256:1bf8a79dc3acbc11864c641e8e9b42321b84fadf7659afd02dd1a8fa8acbafce
     .github/hooks/apm-guardrails.json: sha256:b457d3451d1aefaccafecb669cf9cdcc5bb915e87dd641e98d3f5ac59e4fb71d
-    .github/hooks/scripts/apm/scripts/guard.mjs: sha256:59b466cd8a065be9ab3268a39acf6b9e557beee9b34991d1e44db90e81540411
+    .github/hooks/scripts/apm/scripts/guard.mjs: sha256:d70bea0d5cc0995ed973f9ad707c683f088586d276b9aaa5cabfbae71848faf8
     .github/instructions/testing.instructions.md: sha256:bd0b0eb7582e7777e7a4cf0444de1d3c5f0c0ca46b357799f84882230a678efe
   source: local
   local_path: ../dist/apm
@@ -130,7 +130,7 @@ deployments:
   owners:
   - ../dist/apm
   active_owner: ../dist/apm
-  content_hash: sha256:59b466cd8a065be9ab3268a39acf6b9e557beee9b34991d1e44db90e81540411
+  content_hash: sha256:d70bea0d5cc0995ed973f9ad707c683f088586d276b9aaa5cabfbae71848faf8
 - kind: project-relative
   target: copilot
   value: .github/instructions/testing.instructions.md

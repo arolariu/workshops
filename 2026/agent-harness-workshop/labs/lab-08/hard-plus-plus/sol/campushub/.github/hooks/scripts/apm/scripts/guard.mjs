@@ -289,8 +289,17 @@ const SECRET_FILE = [
 const SECRET_NAME = /token|secret|passw(or)?d|api_?key|private_?key|credential|_key$|^key$/i;
 const HARDCODED = /[\w$]*(?:api[_-]?key|secret|token|passw(?:or)?d|credential)[\w$]*["']?\s*[:=]\s*(["'`])(?!\s*\$\{)[^"'`\n]{4,}\1/i;
 // Tests inject made-up keys (CampusHub's convention: apiKey: 'server-test-key'), so a test file may hold a literal,
-// but never one in a real key format.
-const isTestFile = (p) => /(^|\/)(tests?|__tests__)\/|\.(test|spec)\.[cm]?[jt]sx?$/i.test(p);
+// but never one in a real key format. A test file is judged by its path inside the session's folder: a path that
+// leaves it (tests/../api/x.mjs, an absolute path elsewhere) or a parent folder named tests/ above it doesn't count.
+const TEST_FILE = /(^|\/)(tests?|__tests__)\/|\.(test|spec)\.[cm]?[jt]sx?$/i;
+const isTestFile = (p, cwd) => {
+  const raw = String(p ?? '').replace(/\\/g, '/');
+  if (/^~/.test(raw) || (process.platform !== 'win32' && /^([a-z]:\/|\/\/)/i.test(raw))) return false; // a Windows path elsewhere
+  const root = path.resolve(cwd ?? '.');
+  const rel = path.posix.normalize(path.relative(root, path.resolve(root, raw)).replace(/\\/g, '/'));
+  if (!rel || rel === '.' || path.posix.isAbsolute(rel) || /^[a-z]:/i.test(rel) || rel.split('/').includes('..')) return false;
+  return TEST_FILE.test(rel);
+};
 const REAL_KEY = /\bghp_[A-Za-z0-9]{36}\b|\bgithub_pat_[A-Za-z0-9_]{22,}|\bAKIA[0-9A-Z]{16}\b|\bsk-[A-Za-z0-9]{32,}\b|-----BEGIN [A-Z ]*PRIVATE KEY-----|\b[a-z]{2,8}_live_[A-Za-z0-9]{16,}/;
 /** Only an existence check or the index: Test-Path .env, ls, git rm --cached .env (unless the output goes on to a pipe). */
 const metadataOnly = (c) => !c.pipedOut && (METADATA.has(c.cmd)
@@ -343,7 +352,7 @@ function readCall(toolName, args, cwd) {
   const paths = all.filter((s) => PATH_KEYS.test(s.key) && !CONTENT_KEYS.test(s.key)).map((s) => s.value.replace(/\\/g, '/'));
   const added = [];
   for (const s of all) {
-    for (const m of s.value.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)) paths.push(m[1].trim());
+    for (const m of s.value.matchAll(/^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$/gm)) paths.push(m[1].trim()); // a move writes its target too
     if (/patch|diff/i.test(s.key) || /^\*\*\* Begin Patch|^@@ /m.test(s.value)) added.push(...s.value.split(/\r?\n/).filter((l) => /^\+(?!\+\+)/.test(l)).map((l) => l.slice(1)));
   }
   const command = shell ? String(args.command ?? '') : '';
@@ -402,7 +411,7 @@ export const RULES = [
     test: (call) => (call.shell
       ? call.cmds.some((c) => c.args.some((a, n) => !(c.cmd === 'git' && c.data.has(n)) && HARDCODED.test(a.text)))
       : call.writes && call.newTexts.some((t) => HARDCODED.test(t))
-        && (!(call.paths.length > 0 && call.paths.every(isTestFile)) || call.newTexts.some((t) => REAL_KEY.test(t)))),
+        && (!(call.paths.length > 0 && call.paths.every((p) => isTestFile(p, call.cwd))) || call.newTexts.some((t) => REAL_KEY.test(t)))),
   },
   {
     id: 'remote-code',
