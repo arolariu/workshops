@@ -66,28 +66,6 @@ export async function runScenario(t, name, overrides = {}) {
   return { s, result, calls: model.calls, runs, events };
 }
 
-/** A child's environment that can't reach the real Copilot (no credits, ever): an empty PATH, no HARNESS_COPILOT. */
-export function noCopilotEnv(t) {
-  const empty = t.tmp();
-  return { PATH: empty, Path: empty, HARNESS_COPILOT: path.join(empty, 'no-copilot') };
-}
-
-/** Run `fn` where nothing can start the real Copilot: PATH is an empty folder (Path on Windows) while it runs. */
-export async function withoutCopilot(t, fn) {
-  const saved = { PATH: process.env.PATH, HARNESS_COPILOT: process.env.HARNESS_COPILOT };
-  const env = noCopilotEnv(t);
-  process.env.PATH = env.PATH;
-  process.env.HARNESS_COPILOT = env.HARNESS_COPILOT;
-  try {
-    return await fn();
-  } finally {
-    for (const [k, v] of Object.entries(saved)) {
-      if (v === undefined) delete process.env[k];
-      else process.env[k] = v;
-    }
-  }
-}
-
 /** "[fake model] …" when the fake model complained: it says what the loop did wrong. */
 export const complaint = (answer) => (/^\[fake model\]/.test(String(answer ?? '')) ? ` The fake model said: ${answer}` : '');
 

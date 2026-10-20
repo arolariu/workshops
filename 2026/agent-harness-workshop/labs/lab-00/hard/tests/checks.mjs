@@ -49,27 +49,8 @@ function suiteWith(t, source) {
   return t.unitTests({ cwd: copy, files: [SUITE] });
 }
 
-/** Run `fn` where nothing can start the real Copilot (no credits, ever): PATH is an empty folder (Path on Windows). */
-async function withoutCopilot(t, fn) {
-  const saved = { PATH: process.env.PATH, HARNESS_COPILOT: process.env.HARNESS_COPILOT };
-  const empty = t.tmp();
-  process.env.PATH = empty;
-  process.env.HARNESS_COPILOT = path.join(empty, 'no-copilot');
-  try {
-    return await fn();
-  } finally {
-    for (const [k, v] of Object.entries(saved)) {
-      if (v === undefined) delete process.env[k];
-      else process.env[k] = v;
-    }
-  }
-}
-
-export default (t) => {
-  // Every check runs where nothing can start the real Copilot, whatever the code under test (or its tests) does.
-  const check = (name, fn, opts) => t.check(name, () => withoutCopilot(t, fn), opts);
-  return [
-  check('summarize() reads every event of a real run', async () => {
+export default (t) => [
+  t.check('summarize() reads every event of a real run', async () => {
     const s = await run(t, 'ok');
     if (s.events !== 22) return `summarize() counted ${s.events ?? 0} events; fixtures/ok.jsonl has 22 (one per line, streaming pieces included).`;
     if (s.skipped !== 0) return `fixtures/ok.jsonl has no broken lines, but skipped is ${s.skipped}.`;
@@ -77,7 +58,7 @@ export default (t) => {
     if (by['assistant.turn_start'] !== 3 || by['tool.execution_start'] !== 3 || by['assistant.message_delta'] !== 2 || by.result !== 1) return `byType looks off: ${show(by).slice(0, 220)}`;
     return s.model === 'gpt-6.1-sol' || `model should be the first data.model in the stream ("gpt-6.1-sol"), got ${show(s.model)}.`;
   }, { milestone: 'M1' }),
-  check('summarize() survives odd input', async () => {
+  t.check('summarize() survives odd input', async () => {
     const { summarize } = await load(t);
     const a = summarize([]);
     const b = summarize(['', '   ', 'not json', '{"type":"ping"}', '[1, 2]', '{"type":"user.message","data":{"content":"hi"}}']);
@@ -86,7 +67,7 @@ export default (t) => {
     return b.byType?.ping === 1 || 'byType should count the "ping" event.';
   }, { milestone: 'M1' }),
 
-  check('Tools and their outcomes: ok, denied and failed', async () => {
+  t.check('Tools and their outcomes: ok, denied and failed', async () => {
     const want = {
       ok: { skill: { calls: 1, ok: 1, failed: 0, denied: 0 }, view: { calls: 2, ok: 2, failed: 0, denied: 0 } },
       denied: { skill: { calls: 1, ok: 1, failed: 0, denied: 0 }, powershell: { calls: 1, ok: 0, failed: 0, denied: 1 } },
@@ -98,7 +79,7 @@ export default (t) => {
     }
     return true;
   }, { milestone: 'M2' }),
-  check('A call is matched to its result by toolCallId, not by order', async () => {
+  t.check('A call is matched to its result by toolCallId, not by order', async () => {
     const { summarize } = await load(t);
     const ev = (type, data) => JSON.stringify({ type, data });
     const s = summarize([
@@ -110,7 +91,7 @@ export default (t) => {
     return (s.tools?.view?.ok === 1 && s.tools?.bash?.denied === 1) || `Two calls in one turn finish in the other order: view should be ok and bash denied, got ${show(s.tools)}.`;
   }, { milestone: 'M2' }),
 
-  check('Tokens come from the last usage checkpoint, summed over models', async () => {
+  t.check('Tokens come from the last usage checkpoint, summed over models', async () => {
     const { summarize } = await load(t);
     const ok = await run(t, 'ok');
     if (!same(tokensOf(ok), { input: 55924, output: 253, cacheRead: 36509 })) return `ok.jsonl: tokens should be {"input":55924,"output":253,"cacheRead":36509}, got ${show(ok.tokens)}. Look in session.usage_checkpoint → data.accountingSnapshot.modelMetrics.`;
@@ -120,7 +101,7 @@ export default (t) => {
     return same(tokensOf(s), { input: 1100, output: 110, cacheRead: 550 })
       || `With two checkpoints, the last one holds the totals (each is a running total, so don't add them up), and its models are summed: expected {"input":1100,"output":110,"cacheRead":550}, got ${show(s.tokens)}.`;
   }, { milestone: 'M3' }),
-  check('The outcome: a denial is not a failure; an error or a non-zero exit is; no result means incomplete', async () => {
+  t.check('The outcome: a denial is not a failure; an error or a non-zero exit is; no result means incomplete', async () => {
     const want = { ok: ['ok', 0, 0], denied: ['ok', 0, 0], failed: ['failed', 1, 1] };
     for (const [name, [outcome, exit, errors]] of Object.entries(want)) {
       const s = await run(t, name);
@@ -131,7 +112,7 @@ export default (t) => {
     const cut = summarize(lines(t, 'ok').filter((l) => !/"type":"result"/.test(l)));
     return (cut.outcome === 'incomplete' && cut.exitCode === null) || `A run without its result event (killed, or still running) is "incomplete" with exitCode null, got "${cut.outcome}" and ${cut.exitCode}.`;
   }, { milestone: 'M3' }),
-  check('A timeline per turn: which tools ran, how they ended, and when the model spoke', async () => {
+  t.check('A timeline per turn: which tools ran, how they ended, and when the model spoke', async () => {
     const want = {
       ok: ['0: skill ok', '1: view ok, view ok', '2: '],
       denied: ['0: skill ok', '1: powershell denied', '2: '],
@@ -144,24 +125,24 @@ export default (t) => {
     const s = await run(t, 'ok');
     return (s.turns[2].said === true && s.turns[0].said === false) || 'said is true for a turn whose assistant.message has text (turn 2 of ok.jsonl), false otherwise.';
   }, { milestone: 'M3' }),
-  check('The CLI prints the summary and the timeline', () => {
+  t.check('The CLI prints the summary and the timeline', () => {
     const r = t.node(['scripts/run-stats.mjs', path.join(t.solDir, 'fixtures', 'denied.jsonl')]);
     if (r.code !== 0) return `node scripts/run-stats.mjs fixtures/denied.jsonl failed: ${r.all.trim().slice(0, 200)}`;
     return (/powershell 0\/1 ok \(1 denied\)/.test(r.stdout) && /56853 in/.test(r.stdout) && /turn 1\s+⛔ powershell/.test(r.stdout)) || `The printout is missing the tools, the tokens or the timeline: ${r.stdout.slice(0, 300)}`;
   }, { milestone: 'M3' }),
 
-  check('Your suite tests all three fixtures', () => {
+  t.check('Your suite tests all three fixtures', () => {
     const s = t.read(SUITE);
     if (s == null) return `\`${SUITE}\` is missing: it ships with the level (start over with x if you deleted it).`;
     const missing = ['ok', 'denied', 'failed'].filter((n) => !new RegExp(`['"\`/]${n}(\\.jsonl)?['"\`]`).test(s));
     return !missing.length || `Your suite doesn't read ${missing.map((n) => `fixtures/${n}.jsonl`).join(', ')} yet.`;
   }, { milestone: 'M4' }),
-  check('Your suite passes on your run-stats.mjs', () => {
+  t.check('Your suite passes on your run-stats.mjs', () => {
     const r = t.unitTests({ files: [SUITE] });
     if (r.total < 3) return `node --test ${SUITE} ran ${r.total} test(s): write at least one per fixture.`;
     return r.fail === 0 || `${r.fail} test(s) fail: ${r.failing.slice(0, 3).join(' | ')}`;
   }, { milestone: 'M4' }),
-  check('Your suite agrees with the reference, and catches all five mutants', () => {
+  t.check('Your suite agrees with the reference, and catches all five mutants', () => {
     const reference = t.sol('scripts/run-stats.mjs');
     const control = suiteWith(t, reference);
     if (control.fail || !control.pass) return `Your suite fails on the reference run-stats.mjs (${control.failing.slice(0, 2).join(' | ')}): test the fields todo.md lists, not extras of your own.`;
@@ -169,7 +150,7 @@ export default (t) => {
     return !survivors.length || `These broken run-stats.mjs still pass your suite: ${survivors.join(', ')}. Add assertions that one of them gets wrong.`;
   }, { milestone: 'M4', timeout: 120000 }),
 
-  check('recordArgs(): prompt mode, JSON events, read-only, a credit cap', async () => {
+  t.check('recordArgs(): prompt mode, JSON events, read-only, a credit cap', async () => {
     const { recordArgs } = await load(t);
     if (typeof recordArgs !== 'function') return 'scripts/run-stats.mjs must export recordArgs().';
     const args = recordArgs('PROMPT');
@@ -185,11 +166,10 @@ export default (t) => {
     if (!n.includes('--deny-tool=write')) return 'Deny the file tools that write: --deny-tool=write.';
     return n.includes('--deny-tool=shell') || 'The shell can write files too (echo > file): --deny-tool=shell.';
   }, { milestone: 'M5' }),
-  check('recordArgs() picks a model only when asked', async () => {
+  t.check('recordArgs() picks a model only when asked', async () => {
     const { recordArgs } = await load(t);
     if (typeof recordArgs !== 'function') return 'scripts/run-stats.mjs must export recordArgs().';
     if (flag(recordArgs('P'), '--model') !== undefined) return 'Without a model, leave --model out (Copilot uses your default).';
     return flag(recordArgs('P', { model: 'gpt-x' }), '--model') === 'gpt-x' || "recordArgs('P', { model: 'gpt-x' }) should add --model gpt-x.";
   }, { milestone: 'M5' }),
 ];
-};

@@ -32,43 +32,24 @@ function usageTable(body) {
   return { head: head.map((h) => h.toLowerCase()), rows: rest.filter((r) => !r.every((c) => /^:?-+:?$/.test(c))) };
 }
 
-/** Run `fn` where nothing can start the real Copilot (no credits, ever): PATH is an empty folder (Path on Windows). */
-async function withoutCopilot(t, fn) {
-  const saved = { PATH: process.env.PATH, HARNESS_COPILOT: process.env.HARNESS_COPILOT };
-  const empty = t.tmp();
-  process.env.PATH = empty;
-  process.env.HARNESS_COPILOT = `${empty}/no-copilot`;
-  try {
-    return await fn();
-  } finally {
-    for (const [k, v] of Object.entries(saved)) {
-      if (v === undefined) delete process.env[k];
-      else process.env[k] = v;
-    }
-  }
-}
-
-export default (t) => {
-  // Every check runs where nothing can start the real Copilot, whatever the tests under check do.
-  const check = (name, fn, opts) => t.check(name, () => withoutCopilot(t, fn), opts);
-  return [
-  check('PLAN.md holds the plan: 3+ numbered steps', () => {
+export default (t) => [
+  t.check('PLAN.md holds the plan: 3+ numbered steps', () => {
     const body = need(t, 'Plan');
     const steps = body.split('\n').filter((l) => /^\s*\d+[.)]\s+\S/.test(l)).length;
     return steps >= 3 || `PLAN.md's Plan section has ${steps} numbered step(s) (it needs 3+): paste the plan /plan wrote, or write it with Copilot.`;
   }, { milestone: 'M1' }),
-  check('The plan names the function, its error handling and its tests', () => {
+  t.check('The plan names the function, its error handling and its tests', () => {
     const body = need(t, 'Plan');
     const missing = [[/\bgpa\b/i, 'the function (gpa)'], [/TypeError|RangeError|\berror|\bthrow|invalid/i, 'how bad input is handled'], [/\btests?\b/i, 'the tests']]
       .filter(([re]) => !re.test(body)).map(([, what]) => what);
     return !missing.length || `The plan doesn't mention ${missing.join(', ')}. A plan you can review says what, how it fails, and how you'll know it works.`;
   }, { milestone: 'M1' }),
 
-  check('grades.js exports gpa()', async () => {
+  t.check('grades.js exports gpa()', async () => {
     const m = await t.import('grades.js');
     return typeof m.gpa === 'function' || '`grades.js` has no exported `gpa` function yet.';
   }, { milestone: 'M2' }),
-  check('gpa() weights by credits and rounds to 2 decimals', async () => {
+  t.check('gpa() weights by credits and rounds to 2 decimals', async () => {
     const { gpa } = await t.import('grades.js');
     if (typeof gpa !== 'function') return 'No gpa() yet.';
     const cases = [
@@ -83,7 +64,7 @@ export default (t) => {
     }
     return true;
   }, { milestone: 'M2' }),
-  check('gpa() rejects bad input with the right error types', async () => {
+  t.check('gpa() rejects bad input with the right error types', async () => {
     const { gpa } = await t.import('grades.js');
     if (typeof gpa !== 'function') return 'No gpa() yet.';
     return expectError(() => gpa('nope'), TypeError, 'gpa("nope")')
@@ -94,29 +75,29 @@ export default (t) => {
       ?? expectError(() => gpa([{ credits: 2.5, finalGrade: 8 }]), RangeError, '2.5 credits')
       ?? true;
   }, { milestone: 'M2' }),
-  check('grades.test.js tests gpa(): the normal case and the errors', () => {
+  t.check('grades.test.js tests gpa(): the normal case and the errors', () => {
     const s = t.read('grades.test.js') ?? '';
     if (!/\bgpa\s*\(/.test(s)) return 'Add tests for gpa() in grades.test.js.';
     return /assert\.throws\(\s*(?:\(\)\s*=>|function\s*\(\))\s*\{?\s*gpa\s*\(/.test(s) || 'Test the errors too: assert.throws(() => gpa(...), RangeError).';
   }, { milestone: 'M2' }),
-  check('npm test is green', () => {
+  t.check('npm test is green', () => {
     const r = t.unitTests();
     return (r.fail === 0 && r.pass > 0) || `${r.fail} test(s) fail: ${r.failing.slice(0, 3).join(' | ')}`;
   }, { milestone: 'M2' }),
 
-  check('PLAN.md has your review: 2+ findings from /diff', () => {
+  t.check('PLAN.md has your review: 2+ findings from /diff', () => {
     const body = need(t, 'Review');
     const findings = body.split('\n').filter((l) => /^\s*([-*]|\d+[.)])\s+\S.{10,}/.test(l));
     if (findings.length < 2) return `The Review section has ${findings.length} finding(s): after /diff, write at least 2 (one bullet each: what you saw, and what you did about it).`;
     return findings.some((l) => /grades(\.test)?\.js/.test(l)) || 'Name the file in at least one finding (grades.js or grades.test.js), so a reader can find what you mean.';
   }, { milestone: 'M3' }),
-  check('PLAN.md says which turn you undid with /rewind', () => {
+  t.check('PLAN.md says which turn you undid with /rewind', () => {
     const body = need(t, 'Rewind');
     if (body.replace(/\s+/g, ' ').length < 40) return 'The Rewind section is empty: which request did you undo, and what did /rewind bring back?';
     return /\/rewind/.test(body) || 'Say that /rewind undid it (and what came back).';
   }, { milestone: 'M3' }),
 
-  check('PLAN.md compares /usage: plan-first versus direct', () => {
+  t.check('PLAN.md compares /usage: plan-first versus direct', () => {
     const body = need(t, 'Usage');
     const table = usageTable(body);
     if (!table) return 'The Usage section needs the table from the starter: | Run | AI credits | Input tokens | Output tokens |';
@@ -131,11 +112,10 @@ export default (t) => {
     }
     return true;
   }, { milestone: 'M4' }),
-  check('…and says which one cost more, and why', () => {
+  t.check('…and says which one cost more, and why', () => {
     const body = need(t, 'Usage');
     const prose = body.split('\n').filter((l) => !/^\s*\|/.test(l)).join(' ');
     return (/plan-first|direct/i.test(prose) && /\b(more|less|fewer|cheaper|same|twice|half)\b/i.test(prose))
       || 'Below the table, one or two sentences: which run cost more, and why (more turns? more context?).';
   }, { milestone: 'M4' }),
 ];
-};

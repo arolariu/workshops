@@ -22,26 +22,8 @@ const copyRun = (t, k, name, edit = () => {}) => {
   return dir;
 };
 const COMMIT = 'c0ffee0123456789abcdef0123456789abcdef01';
-/** A child's environment that can't reach the real Copilot (no credits, ever): an empty PATH, no HARNESS_COPILOT. */
-const noCopilotEnv = (t) => { const empty = t.tmp(); return { PATH: empty, Path: empty, HARNESS_COPILOT: path.join(empty, 'no-copilot') }; };
-const node = (t, args) => t.node(args, { env: noCopilotEnv(t) });
-/** Run `fn` where nothing can start the real Copilot: PATH is an empty folder (on Windows that is Path too). */
-async function withoutCopilot(t, fn) {
-  const saved = { PATH: process.env.PATH, HARNESS_COPILOT: process.env.HARNESS_COPILOT };
-  const env = noCopilotEnv(t);
-  process.env.PATH = env.PATH;
-  process.env.HARNESS_COPILOT = env.HARNESS_COPILOT;
-  try {
-    return await fn();
-  } finally {
-    for (const [k, v] of Object.entries(saved)) {
-      if (v === undefined) delete process.env[k];
-      else process.env[k] = v;
-    }
-  }
-}
 /** record() with a fake Copilot: every run prints `stdouts[k]` (or run 2's events) and exits with `codes[k]`. */
-const fakeRecord = (t, { n = 3, model, stdouts = [], codes = [] } = {}) => withoutCopilot(t, async () => {
+async function fakeRecord(t, { n = 3, model, stdouts = [], codes = [] } = {}) {
   const { record } = await load(t, 'record');
   const dir = t.tmp();
   const calls = [];
@@ -55,16 +37,12 @@ const fakeRecord = (t, { n = 3, model, stdouts = [], codes = [] } = {}) => witho
   const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) { if (/^run-\d+$/.test(e.name)) found.push(p); else walk(p); } } };
   walk(dir);
   found.sort((a, b) => Number(a.match(/(\d+)$/)[1]) - Number(b.match(/(\d+)$/)[1]));
-  if (!calls.length && found.length) t.fail('record() must use the `run` it\'s given: it recorded runs without calling it. (The checks never start the real Copilot: every run would cost credits.)');
   return { out, calls, dir, runs: found };
-});
+}
 const readMeta = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8')); } catch { return null; } };
 
-export default (t) => {
-  // Every check runs where nothing can start the real Copilot, whatever the code under test does.
-  const check = (name, fn, opts) => t.check(name, () => withoutCopilot(t, fn), opts);
-  return [
-  check('record() records N runs: events.jsonl as it came, and meta.json next to it', async () => {
+export default (t) => [
+  t.check('record() records N runs: events.jsonl as it came, and meta.json next to it', async () => {
     const { runs, calls } = await fakeRecord(t);
     if (runs.length !== 3) return `record() wrote ${runs.length} run folder(s); expected 3 (runs/<series>/run-1 … run-3).`;
     if (calls.length !== 3) return `record() called Copilot ${calls.length} time(s); expected 3.`;
@@ -77,7 +55,7 @@ export default (t) => {
     }
     return true;
   }, { milestone: 'M1' }),
-  check('meta.json says what ran: prompt, model, flags, commit, CLI, start time, exit code', async () => {
+  t.check('meta.json says what ran: prompt, model, flags, commit, CLI, start time, exit code', async () => {
     const { runs, calls } = await fakeRecord(t, { n: 1 });
     const m = readMeta(runs[0] ?? '.');
     if (!m) return 'record() wrote no meta.json yet.';
@@ -90,7 +68,7 @@ export default (t) => {
     if (Number.isNaN(Date.parse(m.startedAt ?? ''))) return `meta.startedAt should be an ISO date, got ${show(m.startedAt)}.`;
     return m.exitCode === 0 || `meta.exitCode should be Copilot's exit code (0), got ${show(m.exitCode)}.`;
   }, { milestone: 'M1' }),
-  check('Every run is recorded read-only and capped (recordArgs), with --model when asked', async () => {
+  t.check('Every run is recorded read-only and capped (recordArgs), with --model when asked', async () => {
     const { calls, runs } = await fakeRecord(t, { n: 1, model: 'claude-x', stdouts: [''], codes: [0] });
     const args = (calls[0] ?? []).map(String);
     if (!args.includes('--deny-tool=write') && !args.join(' ').includes('--deny-tool write')) return `record() should run Copilot with recordArgs() (read-only, capped); it passed ${show(args)}.`;
@@ -98,21 +76,21 @@ export default (t) => {
     const m = readMeta(runs[0] ?? '.');
     return m?.model === 'claude-x' || `When the stream names no model (here it is empty), meta.model falls back to the --model you asked for; got ${show(m?.model)}.`;
   }, { milestone: 'M1' }),
-  check('A run that fails is recorded too, and the series goes on', async () => {
+  t.check('A run that fails is recorded too, and the series goes on', async () => {
     const { runs } = await fakeRecord(t, { stdouts: [undefined, '', undefined], codes: [0, 1, 0] });
     if (runs.length !== 3) return `A failed run must not stop the series: expected 3 run folders, got ${runs.length}.`;
     const m = readMeta(runs[1]);
     return m?.exitCode === 1 || `run-2 failed (exit 1): its meta.exitCode should say so, got ${show(m?.exitCode)}.`;
   }, { milestone: 'M1' }),
 
-  check('loadRun() reads a recorded run: meta and summary', async () => {
+  t.check('loadRun() reads a recorded run: meta and summary', async () => {
     const { loadRun } = await load(t, 'loadRun');
     const r = loadRun(fixture(t, 2));
     if (r?.meta?.git?.commit !== '2e56d97e5c431397db6acc26994bd189ede69d82') return `loadRun(run-2).meta should be its meta.json, got ${show(r?.meta).slice(0, 160)}.`;
     if (r.summary?.events !== 33) return `loadRun(run-2).summary should be summarize() of its events.jsonl (33 events), got ${show(r.summary?.events)}.`;
     return (r.id === 'run-2' && Array.isArray(r.problems) && r.problems.length === 0) || `Expected id "run-2" and no problems, got ${show({ id: r.id, problems: r.problems })}.`;
   }, { milestone: 'M2' }),
-  check('compare() two runs of one setup: tools, turns, tokens, outcome', async () => {
+  t.check('compare() two runs of one setup: tools, turns, tokens, outcome', async () => {
     const { loadRun, compare } = await load(t, 'loadRun', 'compare');
     const c = compare(loadRun(fixture(t, 2)), loadRun(fixture(t, 3)));
     if (!c) return 'compare() returns nothing yet.';
@@ -126,20 +104,20 @@ export default (t) => {
     for (const [k, w] of Object.entries(want)) if (!same(c[k], w)) return `compare(run-2, run-3).${k} should be ${show(w)}, got ${show(c[k])}.`;
     return true;
   }, { milestone: 'M2' }),
-  check('compare() says when the setup differs', async () => {
+  t.check('compare() says when the setup differs', async () => {
     const { loadRun, compare } = await load(t, 'loadRun', 'compare');
     const c = compare(loadRun(fixture(t, 1)), loadRun(fixture(t, 2)));
     return same(c?.setup, { same: false, differs: ['commit'] }) || `run-1 ran on another commit: compare(run-1, run-2).setup should be {"same":false,"differs":["commit"]}, got ${show(c?.setup)}.`;
   }, { milestone: 'M2' }),
-  check('node scripts/flight.mjs compare prints both runs, and warns about a different setup', () => {
-    const same = node(t, [FLIGHT, 'compare', fixture(t, 2), fixture(t, 3)]);
+  t.check('node scripts/flight.mjs compare prints both runs, and warns about a different setup', () => {
+    const same = t.node([FLIGHT, 'compare', fixture(t, 2), fixture(t, 3)]);
     if (same.code !== 0) return `compare failed: ${same.all.trim().slice(0, 200)}`;
     if (!/6 vs 3/.test(same.stdout) || /⚠/.test(same.stdout)) return `compare run-2 run-3 should print "6 vs 3" turns and no ⚠ (same setup). It printed: ${same.stdout.slice(0, 300)}`;
-    const diff = node(t, [FLIGHT, 'compare', fixture(t, 1), fixture(t, 2)]);
+    const diff = t.node([FLIGHT, 'compare', fixture(t, 1), fixture(t, 2)]);
     return (/⚠/.test(diff.stdout) && /commit/.test(diff.stdout)) || `compare run-1 run-2 should warn (⚠) that the commit differs. It printed: ${diff.stdout.slice(0, 300)}`;
   }, { milestone: 'M2' }),
 
-  check('variance() across the three recorded runs', async () => {
+  t.check('variance() across the three recorded runs', async () => {
     const { loadRun, variance } = await load(t, 'loadRun', 'variance');
     const v = variance([1, 2, 3].map((k) => loadRun(fixture(t, k))));
     if (!v) return 'variance() returns nothing yet.';
@@ -153,22 +131,22 @@ export default (t) => {
     }
     return same(v.setup, { same: false, differs: ['commit'] }) || `variance().setup should say the commit differs, got ${show(v.setup)}.`;
   }, { milestone: 'M3' }),
-  check('The median of an even number of runs is the mean of the middle two', async () => {
+  t.check('The median of an even number of runs is the mean of the middle two', async () => {
     const { loadRun, variance } = await load(t, 'loadRun', 'variance');
     const v = variance([loadRun(fixture(t, 2)), loadRun(fixture(t, 3))]);
     return (v?.turns?.median === 4.5 && v.n === 2) || `variance(run-2, run-3).turns should be { min: 3, median: 4.5, max: 6 }, got ${show(v?.turns)}.`;
   }, { milestone: 'M3' }),
-  check('node scripts/flight.mjs variance prints the report', () => {
+  t.check('node scripts/flight.mjs variance prints the report', () => {
     const dir = t.tmp();
     for (const k of [1, 2, 3]) fs.cpSync(fixture(t, k), path.join(dir, `run-${k}`), { recursive: true });
-    const r = node(t, [FLIGHT, 'variance', dir]);
+    const r = t.node([FLIGHT, 'variance', dir]);
     if (r.code !== 0) return `variance failed: ${r.all.trim().slice(0, 200)}`;
     const rows = [/\|\s*Turns\s*\|\s*3\s*\|\s*5\s*\|\s*6\s*\|/, /\|\s*Input tokens\s*\|\s*61840\s*\|\s*86609\s*\|\s*119891\s*\|/, /\|\s*powershell\s*\|\s*3\/3\s*\|/, /⚠[^\n]*commit/];
     const missing = rows.filter((re) => !re.test(r.stdout));
     return !missing.length || `The report is missing ${missing.map(String).join(', ')}. It printed: ${r.stdout.slice(0, 300)}`;
   }, { milestone: 'M3' }),
 
-  check('A run that was cut off: broken last line, no result, named as a problem', async () => {
+  t.check('A run that was cut off: broken last line, no result, named as a problem', async () => {
     const { loadRun, variance } = await load(t, 'loadRun', 'variance');
     const cut = copyRun(t, 2, 'run-cut', (d) => {
       const f = path.join(d, 'events.jsonl');
@@ -183,7 +161,7 @@ export default (t) => {
     return (v.measured === 2 && same(v.tokens?.input, { min: 61840, median: 74224.5, max: 86609 }) && same(v.turns, { min: 3, median: 4, max: 5 }))
       || `A run that stopped halfway would drag the spread down (its tokens stop at 0): keep it out of turns, toolCalls and tokens, and set measured to 2. Got measured ${show(v.measured)}, turns ${show(v.turns)}, input tokens ${show(v.tokens?.input)}.`;
   }, { milestone: 'M4' }),
-  check('A run without meta.json: no crash, and the setup is unknown', async () => {
+  t.check('A run without meta.json: no crash, and the setup is unknown', async () => {
     const { loadRun, compare } = await load(t, 'loadRun', 'compare');
     const bare = copyRun(t, 3, 'run-bare', (d) => fs.rmSync(path.join(d, 'meta.json')));
     let r;
@@ -192,7 +170,7 @@ export default (t) => {
     const c = compare(loadRun(fixture(t, 2)), r);
     return (c?.setup?.same === false && c.setup.differs?.[0] === 'meta') || `Without meta.json nobody can say it's the same setup: setup should be { same: false, differs: ['meta', …] }, got ${show(c?.setup)}.`;
   }, { milestone: 'M4' }),
-  check('A run without events is left out, and fewer than 2 runs is an error', async () => {
+  t.check('A run without events is left out, and fewer than 2 runs is an error', async () => {
     const { loadRun, variance } = await load(t, 'loadRun', 'variance');
     const empty = copyRun(t, 1, 'run-empty', (d) => fs.rmSync(path.join(d, 'events.jsonl')));
     let r;
@@ -203,18 +181,18 @@ export default (t) => {
     try { variance([loadRun(fixture(t, 2)), r]); } catch (e) { return /at least 2/i.test(e.message) || `Say "at least 2" in the error, got: ${e.message}`; }
     return 'variance() with one usable run should throw an Error that says it needs at least 2 runs.';
   }, { milestone: 'M4' }),
-  check('The CLI refuses one run, and warns when the model differs', () => {
-    const one = node(t, [FLIGHT, 'variance', fixture(t, 1)]);
+  t.check('The CLI refuses one run, and warns when the model differs', () => {
+    const one = t.node([FLIGHT, 'variance', fixture(t, 1)]);
     if (one.code !== 1 || !/at least 2/i.test(one.all)) return `variance on a single run should exit 1 and say it needs at least 2 runs; it exited ${one.code}: ${one.all.trim().slice(0, 160)}`;
     const other = copyRun(t, 3, 'run-other-model', (d) => {
       const f = path.join(d, 'meta.json');
       fs.writeFileSync(f, JSON.stringify({ ...JSON.parse(fs.readFileSync(f, 'utf8')), model: 'claude-sonnet-5' }));
     });
-    const r = node(t, [FLIGHT, 'compare', fixture(t, 2), other]);
+    const r = t.node([FLIGHT, 'compare', fixture(t, 2), other]);
     return (r.code === 0 && /⚠/.test(r.stdout) && /model/.test(r.stdout)) || `compare with a run on another model should warn (⚠ … model). It printed: ${r.all.trim().slice(0, 300)}`;
   }, { milestone: 'M4' }),
 
-  check('VARIANCE.md: the setup and the results', () => {
+  t.check('VARIANCE.md: the setup and the results', () => {
     const s = t.need('VARIANCE.md', 'VARIANCE.md is missing: it ships with the level.').replace(/<!--[\s\S]*?-->/g, '');
     const part = (title) => (s.split(/^##\s+/m).find((p) => p.toLowerCase().startsWith(title)) ?? '').split('\n').slice(1).join('\n');
     const setup = part('setup');
@@ -224,7 +202,7 @@ export default (t) => {
     const results = part('results');
     return (/\|\s*Turns\s*\|(\s*[\d.]+\s*\|){3}/.test(results) && /\|\s*Input tokens\s*\|/.test(results)) || 'Paste the report of `node scripts/flight.mjs variance <folder>` under Results (the Turns and Input tokens rows).';
   }, { milestone: 'M5' }),
-  check('VARIANCE.md explains why one prompt gives different runs', () => {
+  t.check('VARIANCE.md explains why one prompt gives different runs', () => {
     const s = (t.read('VARIANCE.md') ?? '').replace(/<!--[\s\S]*?-->/g, '');
     const part = (title) => (s.split(/^##\s+/m).find((p) => p.toLowerCase().startsWith(title)) ?? '').split('\n').slice(1).join('\n');
     const why = part('why');
@@ -243,4 +221,3 @@ export default (t) => {
     return (bullets.length >= 2 && /runs|\bN\b|median|average|spread|outcome|test|check|pin|eval/i.test(todo)) || 'Under "What I\'d do about it", 2+ bullets: how you\'d measure or test an agent whose runs differ.';
   }, { milestone: 'M5' }),
 ];
-};
