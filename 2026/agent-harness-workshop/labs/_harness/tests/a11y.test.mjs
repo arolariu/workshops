@@ -27,10 +27,19 @@ test('a state is never shown by colour alone: every status has its own icon and 
   for (const s of states) assert.ok(statusIcon(s) && statusWord(s), s);
 });
 
-test('NO_COLOR: the CLI prints no colour codes', () => {
+const COLOURED = /\x1b\[(?:38|48);5;|\x1b\[(?:3|4|9)\dm/;
+const cli = (args, env) => {
+  const e = { ...process.env, ...env };
+  for (const k of Object.keys(e)) if (e[k] === undefined) delete e[k];
+  return spawnSync(process.execPath, [path.join(labsDir, 'start.mjs'), ...args], { encoding: 'utf8', timeout: 60000, env: e });
+};
+
+test('NO_COLOR: the CLI prints no colour codes, even where colour is forced on', () => {
+  // FORCE_COLOR turns colour on for piped output, so NO_COLOR is what turns it off; the control run proves it.
+  assert.match(cli(['list'], { FORCE_COLOR: '1', NO_COLOR: undefined }).stdout, COLOURED, 'control: FORCE_COLOR alone prints colour');
   for (const args of [['list'], ['path'], ['help'], ['glossary'], ['next'], ['xray', 'lab-00', 'easy'], ['present', 'lab-00'], ['replay']]) {
-    const r = spawnSync(process.execPath, [path.join(labsDir, 'start.mjs'), ...args], { encoding: 'utf8', timeout: 60000, env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '' } });
+    const r = cli(args, { FORCE_COLOR: '1', NO_COLOR: '1' });
     assert.equal(r.status, 0, `${args.join(' ')}: ${r.stderr}`);
-    assert.doesNotMatch(r.stdout, /\x1b\[(?:38|48);5;|\x1b\[(?:3|4|9)\dm/, `${args.join(' ')} printed colour`);
+    assert.doesNotMatch(r.stdout, COLOURED, `${args.join(' ')} printed colour`);
   }
 });

@@ -26,7 +26,7 @@ export async function run(ctx) {
     say();
     say(`  🔬 ${bold(bright(`X-RAY · Lab ${lab.num} · ${ex.label}`))} ${dim(`· ${opt.sol ? 'the reference' : 'your work'}: ${rel(dir)}`)}`);
     say();
-    for (const l of xrayLines(report, { W: Math.min(96, (process.stdout.columns || 100) - 4), fmt: { green, bright, dim, white, yellow, bold, cyan } })) say(l);
+    for (const l of xrayLines(report, { W: Math.min(96, ((process.stdout.columns || Number(process.env.COLUMNS)) || 100) - 4), fmt: { green, bright, dim, white, yellow, bold, cyan } })) say(l);
     say();
     return;
   }

@@ -517,7 +517,9 @@ function visitEveryScreen({ plain = false } = {}) {
         report.frames.push({ state, frame });
         const wide = lines.map(stripAnsi).filter((l) => width(l) > 79);
         if (wide.length) report.cut.push(state + ': ' + wide[0]);
-        if (lines.length > 24 - footer.length && !/more below|↓|v$/m.test(frame)) report.cut.push(state + ': scrolls without saying so');
+        // The marker paint() adds to the last footer line (not the ↑↓ of a key hint).
+        const last = frame.split('\\r\\n').filter((l) => l.trim()).at(-1) ?? '';
+        if (lines.length > 24 - footer.length && !/(more below|[↓v])\\s*$/.test(last)) report.cut.push(state + ': scrolls without saying so');
       };
       const key = async (s, name = s) => { input.emit('keypress', s, { name }); await wait(40); };
       await wait(60);
@@ -549,7 +551,8 @@ function visitEveryScreen({ plain = false } = {}) {
     process.exit(0);
   `;
   const url = (f) => pathToFileURL(path.join(import.meta.dirname, '..', ...f.split('/'))).href;
-  const r = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', timeout: 120000, env: { ...process.env, NO_COLOR: '1', LABS: labsDir, TUI_URL: url('tui.mjs'), CATALOG_URL: url('catalog.mjs'), PRESENT_URL: url('screens/present.mjs'), UI_URL: url('ui.mjs') } });
+  // FORCE_COLOR keeps colour on for a piped child, so NO_COLOR is the only thing that turns it off.
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', timeout: 120000, env: { ...process.env, FORCE_COLOR: '1', NO_COLOR: '1', LABS: labsDir, TUI_URL: url('tui.mjs'), CATALOG_URL: url('catalog.mjs'), PRESENT_URL: url('screens/present.mjs'), UI_URL: url('ui.mjs') } });
   assert.equal(r.status, 0, r.stderr);
   return JSON.parse(r.stdout.slice(r.stdout.indexOf('{')));
 }
@@ -569,6 +572,8 @@ test('accessibility: every screen in the key table, with NO_COLOR, fits 80x24 wi
 
 test('--plain: every screen in the key table prints only ASCII and box-drawing, at 80 columns', () => {
   const out = visitEveryScreen({ plain: true });
+  assert.deepEqual(out.cut, [], '--plain markers are wider than emoji: nothing may be cut at the edge');
+  for (const { state, frame } of out.frames) assert.ok(frame.split('\r\n').length <= 24, `${state}: rows`);
   for (const { state, frame } of out.frames) assert.match(frame, /^[\x00-\x7f\u2500-\u257f]*$/, `${state}: ${[...new Set([...frame].filter((c) => !/[\x00-\x7f\u2500-\u257f]/.test(c)))].join(' ')}`);
 });
 

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { loadCatalog, readmeSections, DIFFICULTIES } from '../catalog.mjs';
 import { PATHS } from '../learning.mjs';
-import { slidesFor, howSection, SLIDE_W, SLIDE_ROWS } from '../screens/present.mjs';
+import { slidesFor, slidesOf, howSection, SLIDE_W, SLIDE_ROWS } from '../screens/present.mjs';
 import { stripAnsi, width } from '../ui.mjs';
 import fs from 'node:fs';
 
@@ -76,4 +76,20 @@ test('without a terminal, present prints the slides as text', () => {
   for (const l of stripAnsi(all.stdout).split('\n')) assert.ok(width(l) <= 80, `wider than 80: ${l}`);
   assert.match(cli('present', '01', '--plain').stdout, /^[\x00-\x7f]*$/);
   assert.notEqual(cli('present', 'lab-42').status, 0);
+});
+
+test('a table that goes on repeats its own whole header, even after another table on the same slide', () => {
+  const rows = (n, tag) => Array.from({ length: n }, (_, i) => `| ${tag}${i} | value ${i} |`).join('\n');
+  const md = `| A | B |\n|---|---|\n${rows(2, 'a')}\n\n| A long header that wraps onto a second line in this narrow column, surely, yes | Second |\n|---|---|\n${rows(30, 'r')}`;
+  const parts = slidesOf('x', 'k', 'S', md);
+  assert.ok(parts.length >= 3);
+  const first = stripAnsi(parts[0].lines.join('\n'));
+  const header = first.slice(first.indexOf('A long header'), first.indexOf('─┼─') > first.indexOf('A long header') ? first.lastIndexOf('\n', first.lastIndexOf('─┼─')) : undefined);
+  for (const p of parts.slice(1)) {
+    const text = stripAnsi(p.lines.join('\n'));
+    assert.ok(text.startsWith(stripAnsi(p.lines[0])) && /A long header/.test(stripAnsi(p.lines[0])), `part ${p.part} starts with the second table's header: ${stripAnsi(p.lines[0])}`);
+    assert.doesNotMatch(stripAnsi(p.lines[0]), /^\s*A\s+│\s+B\s*$/, 'not the first table\'s header');
+    assert.ok(p.lines.length <= SLIDE_ROWS);
+  }
+  assert.ok(header.length > 0);
 });

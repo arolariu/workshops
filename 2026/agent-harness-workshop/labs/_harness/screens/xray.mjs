@@ -12,7 +12,7 @@ export function xrayLines(report, { W = 96, fmt }) {
   const { scan, budget, maturity: m, rules, marks } = report;
 
   // 1. The layer tree.
-  L.push(`  🌳 ${fmt.bold(fmt.white('YOUR HARNESS'))} ${fmt.dim('· 🆕 you added it · ✏️ you changed it · 🧳 you brought it in')}`);
+  put(`🌳 ${fmt.bold(fmt.white('YOUR HARNESS'))} ${fmt.dim('· 🆕 you added it · ✏️ you changed it · 🧳 you brought it in')}`, '  ', '     ');
   const shown = LAYERS.filter((l) => scan.artifacts.some((a) => a.layer === l.id));
   if (!shown.length) put(fmt.dim('Nothing yet: no instructions, skills, agents, MCP servers or hooks in this folder.'));
   for (const l of shown) {
@@ -61,7 +61,7 @@ export function xrayLines(report, { W = 96, fmt }) {
 export function inheritedLines(group, { W = 96, fmt }) {
   const L = [];
   const put = (text, indent = '   ', cont = '       ') => wrap(text, Math.max(16, W - width(indent))).forEach((l, i) => L.push(`${i ? cont : indent}${l}`));
-  L.push(`  🧱 ${fmt.bold(fmt.white('YOUR HARNESS SO FAR'))} ${fmt.dim('· advisory: what earlier labs built still holds (never counted)')}`);
+  put(`🧱 ${fmt.bold(fmt.white('YOUR HARNESS SO FAR'))} ${fmt.dim('· advisory: what earlier labs built still holds (never counted)')}`, '  ', '     ');
   for (const g of group.layers) {
     if (!g.present) { put(`◻ ${fmt.dim(`${g.icon} ${g.title}: not in this folder (Lab ${g.lab.slice(4)} teaches it)`)}`); continue; }
     if (!g.rules.length) { put(`✅ ${fmt.green(`${g.icon} ${g.title}`)}`); continue; }

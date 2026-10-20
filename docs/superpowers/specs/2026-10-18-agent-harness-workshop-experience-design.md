@@ -788,8 +788,8 @@ and, where a tool's behaviour decided it, the evidence:
 
 - **PR #1 is the base.** Its concepts were extended instead of duplicated: the five-tier `DIFFICULTIES` table, the
   starter manifest (the chain's seed manifest), progress fingerprints (a source counts as passed only when its pass is
-  fresh), `learning.mjs` paths, its test layout, its doctor and its linear mode. G6 and a new setup doctor were dropped
-  because PR #1 has one.
+  fresh), `learning.mjs` paths, its test layout, its doctor and its linear mode. (G6 and a new setup doctor had already
+  been dropped in this spec's own review, revision 2; PR #1's doctor covers setup.)
 - **The credit meter shows what is verifiable**: agent-check runs this month and the upper bound from their caps, with
   `/usage` for the real number, never an estimate.
 - **`--plain` is PR #1's `--ascii`** under the spec's name, with one fold table that gives every meaning-carrying glyph

@@ -8,6 +8,9 @@ import { test } from 'node:test';
 const labsDir = path.resolve(import.meta.dirname, '..', '..');
 const workshop = path.dirname(labsDir);
 const SKIP = /^(\.runs|\.recovery|\.backups|node_modules|\.git|_harness)$/;
+const SKIP_ALL = /^(\.runs|\.recovery|\.backups|node_modules|\.git)$/;
+/** Every file under labs/ (any type, the harness too), for the catch-all search. */
+const everyFile = (rel = '') => fs.readdirSync(path.join(labsDir, rel), { withFileTypes: true }).flatMap((e) => (SKIP_ALL.test(e.name) ? [] : e.isDirectory() ? everyFile(rel ? `${rel}/${e.name}` : e.name) : [rel ? `${rel}/${e.name}` : e.name]));
 const SOURCES = [
   'lab-08/hard-plus/todo.md',
   'lab-08/hard-plus/sol/.github/workflows/harness-ci.yml',
@@ -39,13 +42,16 @@ test('every pin of this repository in the levels is the same commit, set in the 
   assert.equal(shas.length, 1, `pins disagree: ${found.map((p) => `${p.file} ${p.sha.slice(0, 7)}`).join(', ')}`);
   assert.match(shas[0], /^[0-9a-f]{40}$/, 'a full commit SHA');
   for (const s of SOURCES) assert.ok(found.some((p) => p.file === s), `${s} has no pin`);
-  // Anything else is an inherited copy of a source (sync-seeds carries the workflows down the chain).
+  // Anything else is an inherited copy of a source (sync-seeds carries the workflows down the chain); the SHA check
+  // above already holds it to the same commit, and a later level may extend the file around the pin.
   for (const p of found.filter((x) => !SOURCES.includes(x.file))) {
     const rel = p.file.split('/').slice(3).join('/');
-    const source = SOURCES.find((s) => s.endsWith(`/${rel}`));
-    assert.ok(source, `${p.file}: a pin outside the three places that is not an inherited copy`);
-    assert.equal(lf(fs.readFileSync(path.join(labsDir, p.file), 'utf8')), lf(fs.readFileSync(path.join(labsDir, source), 'utf8')), `${p.file} differs from ${source}: run sync-seeds`);
+    assert.ok(SOURCES.some((s) => s.endsWith(`/${rel}`)), `${p.file}: a pin outside the three places that is not an inherited copy`);
   }
+  // A catch-all: the commit anywhere else (another file type, another spelling of the pin) is a pin this scan missed.
+  const known = new Set(found.map((p) => p.file));
+  const stray = everyFile().filter((f) => !known.has(f) && fs.statSync(path.join(labsDir, f)).size < 2e6 && fs.readFileSync(path.join(labsDir, f), 'latin1').includes(shas[0].slice(0, 7)));
+  assert.deepEqual(stray, [], 'the pinned commit appears where the scan found no pin: a form it does not know');
   const readme = fs.readFileSync(path.join(workshop, 'readme.md'), 'utf8');
   const section = readme.slice(readme.indexOf('## 🧑‍🏫 For facilitators'));
   for (const s of SOURCES) assert.ok(section.includes(`labs/${s}`), `the facilitator checklist lists labs/${s}`);

@@ -4,6 +4,8 @@
 export const ESC = '\x1b[';
 export const isTTY = Boolean(process.stdout.isTTY);
 export const noColor = 'NO_COLOR' in process.env || process.env.TERM === 'dumb' || (!process.stdout.isTTY && !process.env.FORCE_COLOR);
+/** The CLI's width: the terminal's, else COLUMNS, else null (piped with no width: lines are left as they are). */
+export const termColumns = () => process.stdout.columns || Number(process.env.COLUMNS) || null;
 
 const fg = (n) => `${ESC}38;5;${n}m`;
 const bgc = (n) => `${ESC}48;5;${n}m`;
@@ -59,7 +61,7 @@ const FOLD = new Map(Object.entries({
   // Glyphs that carry meaning on their own get a marker (--plain, Phase 6): modes, the X-ray's and the chain's file
   // marks, the change view, trace and replay rows, the doctor, the layer map.
   '👥': '[live]', '🏠': '[hw]', '🆕': '[new]', '✏': '[chg]', '🧳': '[brought]', '🌱': '[start]', '➖': '[n/a]',
-  '📝': '[edit]', '🗑': '[del]', '➕': '[+]', '−': '-', '🔧': '[tool]', '⏳': '[...]', '✓': 'ok', '≈': '~', 'Σ': 'total',
+  '📝': '[edit]', '🗑': '[del]', '➕': '[+]', '−': '-', '🔧': '[tool]', '⏳': '[...]', '✓': 'ok', '≈': '~', 'Σ': 'total', '💬': '[answer]',
   '🙋': '[manual]', '├': '|-', '└': '`-', '┌': '+', '┐': '+', '┘': '+', '┤': '|', '┬': '+', '┴': '+', '◀': '<-', '▶': '->',
   '≤': '<=', '≥': '>=', '↔': '<->', '▏': '|', '☰': '=', '×': 'x', '÷': '/', '§': 'S', '½': '.5', '¼': '.25', '¾': '.75',
 }));

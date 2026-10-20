@@ -36,7 +36,7 @@ const trim = (lines) => {
 
 /** One section as one or more slides of at most SLIDE_ROWS lines. A long one is split into parts of about equal length,
  * each ending before a blank line or a list item when there is one nearby, so no part is a stray line or two. */
-function slidesOf(lab, kicker, section, md) {
+export function slidesOf(lab, kicker, section, md) {
   let rest = trim(renderMarkdown(md, SLIDE_W - 2));
   const chunks = [];
   const cell = (l) => stripAnsi(l).includes('│');
@@ -52,9 +52,14 @@ function slidesOf(lab, kicker, section, md) {
     if (cut > 2 && /─┼─/.test(stripAnsi(rest[cut - 1]))) cut -= 2;
     const head = rest.slice(0, cut);
     let next = trim(rest.slice(cut));
-    // A table that goes on: its header row and rule go on too.
-    const rule = head.findIndex((l) => /─┼─/.test(stripAnsi(l)));
-    if (cell(head.at(-1)) && next.length && cell(next[0]) && rule > 0) next = [head[rule - 1], head[rule], ...next];
+    // A table that goes on: its whole header block and rule go on too (the last table on the slide, the one cut).
+    const rule = head.findLastIndex((l) => /─┼─/.test(stripAnsi(l)));
+    if (cell(head.at(-1)) && next.length && cell(next[0]) && rule > 0) {
+      let top = rule;
+      while (top > 0 && cell(head[top - 1]) && !/─┼─/.test(stripAnsi(head[top - 1]))) top--;
+      // The header is what sits between the table's first line and its rule (rows come after the rule).
+      next = [...head.slice(top, rule + 1), ...next];
+    }
     chunks.push(trim(head));
     rest = next;
   }
@@ -69,8 +74,7 @@ export function homeworkMap(catalog) {
     return `- **${p.label}** (\`${p.id}\`)${t ? ` · ${t}` : ''}`;
   });
   return [
-    'Start anywhere: every level starts from the reference of the one before.',
-    '**Tiers**', ...tiers,
+    '**Tiers** (start anywhere: each level starts from the one before it)', ...tiers,
     '', '**Paths** (press **p** in the app, or `node labs/start.mjs path`)', ...paths,
   ].join('\n');
 }

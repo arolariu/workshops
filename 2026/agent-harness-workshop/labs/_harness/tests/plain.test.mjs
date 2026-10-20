@@ -19,7 +19,7 @@ const MEANING = {
   modes: ['👥', '🏠'],
   'x-ray and chain marks': ['🆕', '✏️', '🧳', '🌱', '➖', '✅', '❌'],
   'change view': ['📝', '🗑️', '➕', '−'],
-  'trace and replay': ['🔧', '⛔', '❌', '⏳', '✓', '≈', 'Σ'],
+  'trace and replay': ['🔧', '⛔', '❌', '⏳', '✓', '≈', 'Σ', '💬'],
   doctor: ['🙋', '⚠️', '⬜'],
   'layer map': ['├', '└', '◀', '─'],
   symbols: ['≤', '↔', '→', '←', '…'],
@@ -62,6 +62,7 @@ test('--plain: the CLI prints only ASCII and box-drawing, at 80 columns', () => 
     const out = stripAnsi(r.stdout);
     assert.ok(out.trim().length > 0, args.join(' '));
     assert.match(out, PLAIN, `${args.join(' ')} prints: ${offending(out)}`);
+    for (const l of out.split('\n')) assert.ok(l.length <= 80, `${args.join(' ')}: wider than 80 columns: ${l}`);
   }
 });
 

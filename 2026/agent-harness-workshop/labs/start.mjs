@@ -21,7 +21,7 @@ if (major < 22) {
 const labsDir = process.env.WORKSHOP_LABS_DIR ? path.resolve(process.env.WORKSHOP_LABS_DIR) : path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.dirname(labsDir);
 const ui = await import('./_harness/ui.mjs');
-const { green, bright, dim, white, yellow, red, cyan, bold, wrap, inline, bar, style, C, statusIcon, statusWord, asciiFold, setAscii } = ui;
+const { green, bright, dim, white, yellow, red, cyan, bold, wrap, inline, bar, style, C, statusIcon, statusWord, asciiFold, setAscii, termColumns, width, stripAnsi } = ui;
 const { loadCatalog, findExercise, levelChoices, DIFFICULTIES, normalizeLabId } = await import('./_harness/catalog.mjs');
 const { progressStore, captureEvidence } = await import('./_harness/progress.mjs');
 const { BRAND, creditLine } = await import('./_harness/brand.mjs');
@@ -72,7 +72,14 @@ const spec = COMMANDS[cmd];
 // --plain (the spec's name) is --ascii (PR #1's): ASCII markers instead of emoji. Every command takes it.
 if ('plain' in opt) { opt.ascii = opt.plain; delete opt.plain; }
 if (opt.ascii) setAscii(true);
-const rawSay = (s = '') => process.stdout.write(`${style.fg(C.green)}${opt.ascii ? asciiFold(s) : s}${style.reset}\n`);
+// A line wider than the terminal (or COLUMNS) wraps under itself; piped output with no known width is left as it is.
+const rawSay = (s = '') => {
+  const text = opt.ascii ? asciiFold(s) : s;
+  const cols = termColumns();
+  const lead = stripAnsi(text).match(/^ */)[0].length;
+  const lines = cols && width(text) > cols ? wrap(text.slice(lead), Math.max(20, cols - lead - 2)).map((l, i) => `${' '.repeat(i ? lead + 2 : lead)}${l}`) : [text];
+  for (const l of lines) process.stdout.write(`${style.fg(C.green)}${l}${style.reset}\n`);
+};
 const say = rawSay;
 const fail = (msg, code = 2) => {
   say(`  ${red('❌')} ${msg}`);
@@ -187,7 +194,7 @@ async function printInherited(ex, target) {
   try { group = await inheritedChecks({ ex, dir: target }); } catch { return; }
   if (!group) return;
   say();
-  for (const l of inheritedLines(group, { W: Math.min(96, (process.stdout.columns || 100) - 4), fmt: { green, bright, dim, white, yellow, bold, cyan } })) say(l);
+  for (const l of inheritedLines(group, { W: Math.min(96, (termColumns() || 100) - 4), fmt: { green, bright, dim, white, yellow, bold, cyan } })) say(l);
 }
 
 async function printChecks(lab, ex, target, label, signal) {
@@ -367,7 +374,7 @@ if (cmd === '' || cmd === 'open') {
     await app.closed;
   } else {
     const { replayLines } = await import('./_harness/screens/replay.mjs');
-    const W = Math.min(96, (process.stdout.columns || 100) - 4);
+    const W = Math.min(96, (termColumns() || 100) - 4);
     say();
     say(`  🎬 ${bold(bright(`THE AGENT LOOP · ${rec.title}`))} ${dim(`· ${rec.turns.length} turns. Each turn: the model reads its context, writes a tool call, the harness decides, the result joins the history.`)}`);
     rec.turns.forEach((_, i) => { say(); for (const l of replayLines(rec, i, { W, fmt: { green, bright, dim, white, yellow, bold, cyan } })) say(l); });
