@@ -1,7 +1,7 @@
 // Free checks for Lab 07 · hard: a reviewer in CI.
 import fs from 'node:fs';
 import path from 'node:path';
-import { readOnly, unrestrictedBash, compileStrict, GLOBAL_SAFE_OUTPUT_KEYS, pathsTrigger, refEstimate, front, runOffline, withOffline } from './common.mjs';
+import { readOnly, unrestrictedBash, compileStrict, GLOBAL_SAFE_OUTPUT_KEYS, pathsTrigger, refEstimate, front, noGitHubEnv } from './common.mjs';
 
 const WF = '.github/workflows/pr-review.md';
 const PLAN = 'scripts/review-plan.mjs';
@@ -119,14 +119,14 @@ export default (t) => [
   }, { milestone: 'M4' }),
 
   // M5 · Measure it before it runs
-  t.check('globToRegExp() follows GitHub\'s filter pattern rules', () => withOffline(t, async () => {
+  t.check('globToRegExp() follows GitHub\'s filter pattern rules', async () => {
     const { globToRegExp } = await t.import(PLAN);
     const wrong = GLOBS.filter(([g, f, want]) => {
       try { return globToRegExp(g).test(f) !== want; } catch { return true; }
     });
     return !wrong.length || `Not like Actions yet: ${wrong.slice(0, 4).map(([g, f, want]) => `\`${g}\` ${want ? 'should' : 'should not'} match \`${f}\``).join(' · ')}`;
-  }), { milestone: 'M5' }),
-  t.check('estimate() counts review runs like Actions would', () => withOffline(t, async () => {
+  }, { milestone: 'M5' }),
+  t.check('estimate() counts review runs like Actions would', async () => {
     const { estimate } = await t.import(PLAN);
     for (const trig of TRIGGERS) {
       const want = refEstimate(PRS, trig, 100);
@@ -136,11 +136,11 @@ export default (t) => [
       if (diff.length) return t.fail(`estimate() is off for the trigger \`${JSON.stringify(trig)}\` (${diff.join(', ')}).`, { expected: want, actual: got });
     }
     return true;
-  }), { milestone: 'M5' }),
+  }, { milestone: 'M5' }),
   t.check('The CLI measures your own workflow on a month of PRs', () => {
     const file = path.join(t.dir, 'fixtures', 'prs.json');
     if (!fs.existsSync(file)) return '`fixtures/prs.json` is missing: it comes with the starter.';
-    const r = runOffline(t, [PLAN, 'fixtures/prs.json']);
+    const r = t.node([PLAN, 'fixtures/prs.json'], { env: noGitHubEnv(t) });
     if (r.code !== 0) return `\`node ${PLAN} fixtures/prs.json\` exited with ${r.code}: ${r.all.trim().split('\n').slice(-2).join(' ')}`;
     const d = fm(t);
     const want = refEstimate(JSON.parse(fs.readFileSync(file, 'utf8')).prs, d.on?.pull_request, d['max-ai-credits']);
@@ -148,7 +148,7 @@ export default (t) => [
     const got = { reviewed: num('reviewed'), skipped: num('skipped'), runs: num('runs'), worstCase: num('worst case') };
     const diff = Object.keys(got).filter((k) => got[k] !== want[k]);
     if (diff.length) return t.fail(`The report doesn't match your workflow's triggers (${diff.join(', ')}).`, { expected: want, actual: got });
-    const missing = runOffline(t, [PLAN, 'fixtures/no-such-file.json']);
+    const missing = t.node([PLAN, 'fixtures/no-such-file.json'], { env: noGitHubEnv(t) });
     return (missing.code === 1 && /not found|no such|missing|doesn.t exist|cannot/i.test(missing.all)) || 'With a file that doesn\'t exist, the CLI should say so and exit 1.';
   }, { milestone: 'M5' }),
 

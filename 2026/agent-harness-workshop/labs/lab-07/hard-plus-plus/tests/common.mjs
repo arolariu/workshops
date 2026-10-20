@@ -1,5 +1,5 @@
 // Shared helpers for the Lab 07 checks.
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -86,29 +86,11 @@ export function tableRows(md) {
   return rows;
 }
 
-// ---------- free checks never reach GitHub or spend credits ----------
-const REACH = /^(gh_token|github_token|gh_enterprise_token|github_enterprise_token|copilot_github_token|gh_host|gh_config_dir|copilot_home|harness_copilot)$/i;
-/** The environment minus every token and config folder that gh or Copilot could use: unauthenticated, nothing to spend. */
-export function noReachEnv(t, { keepPath = true } = {}) {
-  const empty = t.tmp();
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !REACH.test(k) && (keepPath || !/^path$/i.test(k))));
-  return { ...env, GH_CONFIG_DIR: empty, COPILOT_HOME: empty, HARNESS_COPILOT: path.join(empty, 'no-copilot'), GH_PROMPT_DISABLED: '1', ...(keepPath ? {} : { PATH: path.dirname(process.execPath) }) };
-}
-/** Run one of your scripts with Node only: no gh, no copilot and no token in reach, so a bug can't reach GitHub. */
-export function runOffline(t, args) {
-  const r = spawnSync(process.execPath, args, { cwd: t.dir, env: noReachEnv(t, { keepPath: false }), encoding: 'utf8', timeout: 20000 });
-  return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '', all: `${r.stdout ?? ''}\n${r.stderr ?? ''}` };
-}
-/** Import and call your code with the same environment in this process, then put everything back. */
-export async function withOffline(t, fn) {
-  const saved = { ...process.env };
-  const env = noReachEnv(t, { keepPath: false });
-  for (const k of Object.keys(process.env)) delete process.env[k];
-  Object.assign(process.env, env);
-  try { return await fn(); } finally {
-    for (const k of Object.keys(process.env)) delete process.env[k];
-    Object.assign(process.env, saved);
-  }
+// ---------- gh aw and learner scripts run without a GitHub token ----------
+// (Copilot is the kit's job: run-checks refuses any Copilot session a check or your code tries to start.)
+/** Environment overrides: no GitHub token and an empty gh config, so gh and gh aw run unauthenticated. */
+export function noGitHubEnv(t) {
+  return { GH_TOKEN: '', GITHUB_TOKEN: '', GH_ENTERPRISE_TOKEN: '', GITHUB_ENTERPRISE_TOKEN: '', GH_CONFIG_DIR: t.tmp(), GH_PROMPT_DISABLED: '1' };
 }
 
 /** Frontmatter references gh aw would fetch from GitHub at compile time (remote imports, skills, plugins). */
@@ -129,7 +111,7 @@ function remoteRefs(dir) {
   walk(path.join(dir, '.github', 'workflows'));
   return out;
 }
-/** Optional: compile with the real gh-aw CLI in a throwaway git repo, offline and unauthenticated. */
+/** Optional: compile with the real gh-aw CLI in a throwaway git repo: unauthenticated, no update check, no remote fetches. */
 export function compileStrict(t, names) {
   const dir = t.copy(t.tmp());
   const remote = remoteRefs(dir);
@@ -137,7 +119,7 @@ export function compileStrict(t, names) {
   execFileSync('git', ['init', '-q'], { cwd: dir });
   const list = [names].flat().filter(Boolean);
   try {
-    execFileSync('gh', ['aw', 'compile', ...list, '--strict', '--no-check-update'], { cwd: dir, env: noReachEnv(t), encoding: 'utf8', stdio: 'pipe', timeout: 180000 });
+    execFileSync('gh', ['aw', 'compile', ...list, '--strict', '--no-check-update'], { cwd: dir, env: { ...process.env, ...noGitHubEnv(t) }, encoding: 'utf8', stdio: 'pipe', timeout: 180000 });
   } catch (e) {
     return `gh aw compile --strict failed: ${String(e.stderr || e.stdout || e.message).trim().split('\n').slice(-4).join(' ')}`;
   }

@@ -1,7 +1,7 @@
 // Free checks for Lab 07 · hard++: a continuous-AI fleet (shared configuration, budgets, failure handling, costs, a runbook).
 import fs from 'node:fs';
 import path from 'node:path';
-import { readOnly, GLOBAL_SAFE_OUTPUT_KEYS, importsOf, refCostReport, compileStrict, simulator, tableRows, front, runOffline, withOffline } from './common.mjs';
+import { readOnly, GLOBAL_SAFE_OUTPUT_KEYS, importsOf, refCostReport, compileStrict, simulator, tableRows, front, noGitHubEnv } from './common.mjs';
 
 const SHARED = '.github/workflows/shared/fleet.md';
 const FLEET = ['issue-triage', 'pr-review', 'issue-assistant', 'weekly-report'];
@@ -152,7 +152,7 @@ export default (t) => [
   }, { milestone: 'M4' }),
 
   // M5 · The cost report
-  t.check('costReport() adds up the recorded runs', () => withOffline(t, async () => {
+  t.check('costReport() adds up the recorded runs', async () => {
     const { costReport } = await t.import(COST);
     const want = refCostReport(logs(t), FIXED_BUDGETS);
     let got;
@@ -170,9 +170,9 @@ export default (t) => [
     if (fails.join() !== want.failures.map((f) => f.run_id).join()) return t.fail('The failed runs (failure or timed_out, oldest first) don\'t match.', { expected: want.failures.map((f) => f.run_id), actual: fails });
     const empty = costReport({ runs: [] }, {});
     return (empty.runs === 0 && empty.aic === 0 && (empty.workflows ?? []).length === 0) || 'With no runs, the report should be all zeros and no workflows.';
-  }), { milestone: 'M5' }),
+  }, { milestone: 'M5' }),
   t.check('The CLI prints the report with your fleet\'s budgets', () => {
-    const r = runOffline(t, [COST, logsFile(t)]);
+    const r = t.node([COST, logsFile(t)], { env: noGitHubEnv(t) });
     if (r.code !== 0) return `\`node ${COST} <logs.json>\` exited with ${r.code}: ${r.all.trim().split('\n').slice(-2).join(' ')}`;
     const budgets = Object.fromEntries(fleet(t).map(({ id, data }) => [id, { run: Number(effective(t, data, 'max-ai-credits')) || null, daily: Number(effective(t, data, 'max-daily-ai-credits')) || null }]));
     const want = refCostReport(logs(t), budgets);
@@ -194,7 +194,7 @@ export default (t) => [
     }
     const missed = want.failures.filter((f) => !lines.some((l) => l.includes('❌') && l.includes(String(f.run_id))));
     if (missed.length) return `No ❌ line for the failed run(s): ${missed.map((f) => f.run_id).join(', ')}.`;
-    const none = runOffline(t, [COST, 'no-such-logs.json']);
+    const none = t.node([COST, 'no-such-logs.json'], { env: noGitHubEnv(t) });
     return (none.code === 1 && /not found|no such|missing|doesn.t exist/i.test(none.all)) || 'With a file that doesn\'t exist, the CLI should say so and exit 1.';
   }, { milestone: 'M5' }),
 
