@@ -19,7 +19,7 @@ own rules, and only its own.
    gate itself can't run; `--json` is for machines, `npm run check:instructions` for CI.
 3. Drift: file names that don't exist, scoped files that match nothing, a canary that names another package, a suite
    case that expects a canary nobody says. Coverage: every package has an `AGENTS.md` and a canary case. In a folder
-   without packages, the gate skips the package checks.
+   without packages (a later lab, where `bring` carries the gate), it skips the package and owner checks.
 4. `.github/CODEOWNERS` gives the baseline to `@studybuddy/platform`, each package to its team, and each package's
    `AGENTS.md` to its team and platform together. `ownersOf()` reads it the way GitHub does, and the gate flags every
    instruction file nobody owns.
@@ -29,7 +29,7 @@ own rules, and only its own.
 ## 🧭 Milestones
 ### M1 · Nested rules on a shared baseline
 - `packages/<p>/AGENTS.md` for `cli`, `portal` and `planner`: under 30 lines, a `## Commands` section whose commands
-  work in that package, 3+ rules of its own, and the line `Harness check: <p> rules loaded` on top of the baseline's
+  (`npm test`, `node --test`) work in that package, 3+ rules of its own, and the line `Harness check: <p> rules loaded` on top of the baseline's
   canary
 - Each says what is special about its package: cli, `run()` returns `{ code, out }` and never calls `process.exit`;
   portal, every value goes through `escapeHtml()` and a page has one `<h1>`; planner, a plan skips done assignments
@@ -38,7 +38,8 @@ own rules, and only its own.
 - `copilot instruction list --json`, started in `packages/cli`, lists both files
 
 ### M2 · The gate
-- `lintAll(root)` turns `lint()` into findings with a `severity` (from `SEVERITY`), plus `budget` warnings
+- `lintAll(root)` turns `lint()` into findings with a `severity` (from `SEVERITY`), plus `budget` warnings: a
+  3,000-character `.github/copilot-instructions.md` is a warning (exit 0, and exit 1 with `--strict`)
 - A vague rule in a package is a warning (exit 0, and exit 1 with `--strict`); a rule the baseline already has is a
   `duplicate` warning; "Round averages to one decimal." in a package is a `contradiction` error (exit 1); a command
   the package's own `package.json` can't run is a `command` error, even when the root's can
@@ -49,16 +50,18 @@ own rules, and only its own.
 - `drift(root)`: a file name in `code` that exists neither at the root nor next to the instruction file; a scoped file
   whose `applyTo` matches nothing; a nested canary that names another folder; a suite case that expects a canary no
   `AGENTS.md` on its path says
-- `coverage(root)`: a package without an `AGENTS.md` or without a canary case; an instruction file or skill without an
-  owner; no `CODEOWNERS` at all
-- In a copy without `packages/` and `evals/`, the gate doesn't crash, and says it skipped the package checks
+- `coverage(root)`: a package without an `AGENTS.md` or without a canary case; in a workspace, an instruction file or
+  skill without an owner, or no `CODEOWNERS` at all
+- In a copy without `packages/`, `evals/` and `CODEOWNERS`, the gate passes (exit 0) and says it skipped the package
+  checks
 
 ### M4 · Owners
 - `ownersOf(codeowners, path)` works like GitHub: the last matching line wins, a line without owners un-owns, `/x` and
   `a/b` are anchored at the root, `x/` is a folder, `*` stays inside one folder, `x` without a slash matches anywhere
 - `.github/CODEOWNERS`: `@studybuddy/platform` owns the baseline (`AGENTS.md`, `.github/`, `.agents/`, `scripts/`,
   `evals/`), each team its package, and each package's `AGENTS.md` both its team and platform
-- With a `CODEOWNERS` that only covers `packages/cli/`, the gate reports `AGENTS.md` as unowned
+- With a `CODEOWNERS` that only covers `packages/cli/`, the gate reports every instruction file and skill without an
+  owner: `AGENTS.md`, the scoped files, the grade-appeal skill
 
 ### M5 · A canary regression suite
 - `score(case, answer)` returns `{ id, pass, missing, leaked }`: every `expect` string is there, no `forbid` string
@@ -124,7 +127,8 @@ with a space: `import { x } from './grades.js'` is code, not a path.
 <details><summary>Why skip, not fail?</summary>
 
 `scripts/` travels with you: `bring` carries this gate into the later labs, where StudyBuddy has no packages. There,
-"no packages" is a fact, not a finding. Every other check still runs.
+"no packages" is a fact, not a finding, and who owns what is that level's business (Lab 05 hard++ has its own
+`CODEOWNERS`). The lint and drift checks still run.
 
 </details>
 

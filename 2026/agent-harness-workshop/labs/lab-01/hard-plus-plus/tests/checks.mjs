@@ -2,6 +2,7 @@
 // with one problem planted in it, and reads its --json output.
 import fs from 'node:fs';
 import path from 'node:path';
+import { freeNode, freeImport } from './helpers.mjs';
 
 const GATE = 'scripts/check-instructions.mjs';
 const RUNNER = 'scripts/canaries.mjs';
@@ -22,11 +23,17 @@ const STOPWORDS = new Set(['a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'and'
 const words = (s) => new Set(String(s).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w && !STOPWORDS.has(w)));
 const jaccard = (a, b) => { const x = words(a); const y = words(b); let n = 0; for (const w of x) if (y.has(w)) n++; return n / (x.size + y.size - n || 1); };
 const TOPICS = [
-  ['indent', /\b(\d+)[- ]space/i, (m) => m[1]],
-  ['quotes', /\b(single|double)[- ]quot/i, (m) => m[1].toLowerCase()],
-  ['decimals', /\b(\d+|one|two|three)\s+decimals?\b/i, (m) => ({ one: '1', two: '2', three: '3' })[m[1].toLowerCase()] ?? m[1]],
-  ['runner', /\b(node:test|jest|mocha|vitest)\b/i, (m) => m[1].toLowerCase()],
+  ['indent', /\b(\d+)[- ]space/gi, (m) => m[1]],
+  ['quotes', /\b(single|double)[- ]quot/gi, (m) => m[1].toLowerCase()],
+  ['decimals', /\b(\d+|one|two|three)\s+decimals?\b/gi, (m) => ({ one: '1', two: '2', three: '3' })[m[1].toLowerCase()] ?? m[1]],
+  ['runner', /\b(node:test|jest|mocha|vitest)\b/gi, (m) => m[1].toLowerCase()],
 ];
+const NEGATED = /\b(?:never|not|no|don'?t|instead of|avoid|rather than)\b[^.;:,]{0,15}$/i;
+/** The value a rule gives a topic: its first mention that isn't negated ("No Jest: use node:test" is node:test), or null. */
+const valueOf = (re, value, text) => {
+  for (const m of String(text).matchAll(re)) if (!NEGATED.test(String(text).slice(0, m.index))) return value(m);
+  return null;
+};
 function owners(text, file) {
   const glob = (g) => new RegExp(`^${g.split(/(\*\*\/|\*\*|\*|\?)/).map((p) => ({ '**/': '(?:.*/)?', '**': '.*', '*': '[^/]*', '?': '[^/]' })[p] ?? p.replace(/[.+^$()|[\]\\{}]/g, '\\$&')).join('')}$`);
   let out = [];
@@ -46,14 +53,14 @@ function owners(text, file) {
 function gate(t, edit = () => {}, args = []) {
   const copy = t.copy(t.tmp());
   edit(copy);
-  const r = t.node([GATE, '--json', ...args], { cwd: copy, timeout: 60000 });
+  const r = freeNode(t, [GATE, '--json', ...args], { cwd: copy });
   let out = null;
   try { out = JSON.parse(r.stdout); } catch { /* reported by the caller */ }
   return { ...r, out, copy };
 }
 const append = (rel, text) => (copy) => fs.appendFileSync(path.join(copy, rel), `\n${text}\n`);
 const findings = (g) => (Array.isArray(g.out?.findings) ? g.out.findings : []);
-const noJson = (g) => `node ${GATE} --json did not print JSON (exit ${g.code}). ${g.all.trim().slice(0, 200)}`;
+const noJson = (g) => (g.triedCopilot ? `node ${GATE}: ${g.spent}` : `node ${GATE} --json did not print JSON (exit ${g.code}). ${g.all.trim().slice(0, 200)}`);
 function expectFinding(g, want, what) {
   if (!g.out) return noJson(g);
   const hit = findings(g).find((f) => f.check === want.check && slash(f.file) === want.file);
@@ -75,14 +82,14 @@ export default (t) => [
       const cmds = text.split(/^#+\s/m).find((s) => /^commands\b/i.test(s));
       if (!cmds) return `${file} needs a "## Commands" section.`;
       const scripts = JSON.parse(t.read(`packages/${p}/package.json`) ?? '{}').scripts ?? {};
-      const spans = [...cmds.matchAll(/`(npm [^`]+)`/g)].map((m) => m[1].trim());
-      if (!spans.length) return `${file}: the Commands section should name a command, like \`npm test\`.`;
-      for (const c of spans) {
+      const spans = [...cmds.matchAll(/`((?:npm|node) [^`]+)`/g)].map((m) => m[1].trim());
+      if (!spans.length) return `${file}: the Commands section should name a command, like \`npm test\` or \`node --test\`.`;
+      for (const c of spans.filter((x) => x.startsWith('npm '))) {
         const [, sub, name] = c.split(/\s+/);
         const script = ['test', 't'].includes(sub) ? 'test' : ['run', 'run-script'].includes(sub) ? name : null;
         if (script && !(script in scripts)) return `${file}: \`${c}\` doesn't work in packages/${p}: its package.json has no "${script}" script.`;
       }
-      const rules = bullets(text).filter((b) => !b.includes('Harness check') && !/`npm /.test(b));
+      const rules = bullets(text).filter((b) => !b.includes('Harness check') && !/`(npm|node) /.test(b));
       if (rules.length < 3) return `${file} has ${rules.length} rule(s) of its own; write at least 3 from the team's notes.`;
     }
     return true;
@@ -109,9 +116,9 @@ export default (t) => [
         const twin = root.find((r) => jaccard(r, rule) >= 0.6);
         if (twin) return `${file} repeats the baseline: "${rule.slice(0, 60)}" (the root says "${twin.slice(0, 60)}"). It applies in the package already.`;
         for (const [id, re, value] of TOPICS) {
-          const m = rule.match(re);
-          const other = m && root.map((r) => r.match(re)).find((x) => x && value(x) !== value(m));
-          if (other) return `${file} says ${id} = ${value(m)}, the baseline says ${value(other)}: "${rule.slice(0, 60)}". Both load in this package, and Copilot puts no order between them.`;
+          const mine = valueOf(re, value, rule);
+          const other = mine != null && root.map((r) => valueOf(re, value, r)).find((v) => v != null && v !== mine);
+          if (other) return `${file} says ${id} = ${mine}, the baseline says ${other}: "${rule.slice(0, 60)}". Both load in this package, and Copilot puts no order between them.`;
         }
       }
     }
@@ -147,7 +154,8 @@ export default (t) => [
   t.check('A command the package can\'t run fails the gate, even when the root can run it', () =>
     expectFinding(gate(t, append('packages/cli/AGENTS.md', '- Check the rules with `npm run check:instructions`.')), { check: 'command', severity: 'error', code: 1, file: 'packages/cli/AGENTS.md' }, '`npm run check:instructions` in packages/cli (only the root package.json has it)'), { milestone: 'M2' }),
   t.check('Exit codes for CI: 2 when the gate can\'t run; --json gives { ok, code, findings }', () => {
-    const bad = t.node([GATE, '--nope']);
+    const bad = freeNode(t, [GATE, '--nope']);
+    if (bad.triedCopilot) return `node ${GATE}: ${bad.spent}`;
     if (bad.code !== 2) return `An unknown option means the gate can't do its job: exit 2, not ${bad.code}.`;
     const g = gate(t, append('packages/cli/AGENTS.md', '- Keep the output nice.'));
     if (!g.out) return noJson(g);
@@ -156,6 +164,17 @@ export default (t) => [
     if (!f) return 'The gate reported nothing for a vague rule: lintAll() first.';
     return ['check', 'severity', 'file', 'line', 'message'].every((k) => k in f) || 'Every finding has check, severity, file, line and message.';
   }, { milestone: 'M2' }),
+  t.check('Blowing the token budget is a warning (it fails only with --strict)', () => {
+    const prose = `# Notes for Copilot\n\n${'This paragraph is history nobody reads, sent on every turn anyway. '.repeat(45)}\n`;
+    const edit = (copy) => fs.writeFileSync(path.join(copy, '.github/copilot-instructions.md'), prose);
+    const g = gate(t, edit);
+    if (!g.out) return noJson(g);
+    const hit = findings(g).find((f) => f.check === 'budget');
+    if (!hit) return `A 3,000-character .github/copilot-instructions.md puts every turn over budget: expected a "budget" finding; the gate found ${findings(g).map((f) => `${f.check} ${f.file}`).slice(0, 3).join(', ') || 'nothing'}.`;
+    if (hit.severity !== 'warning') return `A blown budget is a warning (SEVERITY), not ${hit.severity}.`;
+    if (g.code !== 0) return `Warnings alone don't fail the gate: exit 0, not ${g.code}.`;
+    return gate(t, edit, ['--strict']).code === 1 || 'With --strict, the budget warning fails the gate (exit 1).';
+  }, { milestone: 'M2' }),
   t.check('npm run check:instructions runs the gate', () => {
     const scripts = JSON.parse(t.read('package.json') ?? '{}').scripts ?? {};
     return /check-instructions\.mjs/.test(scripts['check:instructions'] ?? '') || 'Add a "check:instructions" script to the root package.json that runs node scripts/check-instructions.mjs (CI calls it).';
@@ -163,11 +182,11 @@ export default (t) => [
 
   // M3 · Drift and coverage
   t.check('A file the instructions name that doesn\'t exist is drift', () => {
-    const g = gate(t, append('packages/cli/AGENTS.md', '- The argument parser lives in `packages/cli/args.js`.\n- `index.js` exports `run()`.'));
+    const g = gate(t, append('packages/cli/AGENTS.md', '- The argument parser lives in `packages/cli/args.js`.\n- `index.test.js` calls `run()` directly.'));
     const ok = expectFinding(g, { check: 'drift', severity: 'error', code: 1, file: 'packages/cli/AGENTS.md' }, '`packages/cli/args.js` (missing) in packages/cli/AGENTS.md');
     if (ok !== true) return ok;
-    const wrong = findings(g).filter((f) => f.check === 'drift' && /index\.js/.test(f.message));
-    return !wrong.length || '`index.js` in packages/cli/AGENTS.md is packages/cli/index.js, which exists: look next to the instruction file too.';
+    const wrong = findings(g).filter((f) => f.check === 'drift' && /index\.test\.js/.test(f.message));
+    return !wrong.length || '`index.test.js` in packages/cli/AGENTS.md is packages/cli/index.test.js, which exists (there is none at the root): look next to the instruction file too.';
   }, { milestone: 'M3' }),
   t.check('A scoped file that matches nothing is drift', () => {
     const edit = (copy) => fs.writeFileSync(path.join(copy, '.github/instructions/lib.instructions.md'), '---\napplyTo: "lib/**"\ndescription: Rules for lib\n---\n- Every function in lib has a test.\n');
@@ -176,6 +195,16 @@ export default (t) => [
   t.check('A canary that names another package is drift', () => {
     const edit = (copy) => { const f = path.join(copy, 'packages/planner/AGENTS.md'); fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace(canary('planner'), canary('cli'))); };
     return expectFinding(gate(t, edit), { check: 'drift', severity: 'error', file: 'packages/planner/AGENTS.md' }, 'packages/planner/AGENTS.md copied the cli canary');
+  }, { milestone: 'M3' }),
+  t.check('A suite case that expects a canary nobody says is drift', () => {
+    const edit = (copy) => {
+      const f = path.join(copy, SUITE);
+      const suite = JSON.parse(fs.readFileSync(f, 'utf8'));
+      const c = (suite.cases ?? []).find((x) => x.cwd === 'packages/cli');
+      if (c) c.expect = [ROOT_CANARY, 'Harness check: cli rules are loaded'];
+      fs.writeFileSync(f, JSON.stringify(suite));
+    };
+    return expectFinding(gate(t, edit), { check: 'drift', severity: 'error', code: 1, file: SUITE }, 'The cli case expects "Harness check: cli rules are loaded", which no AGENTS.md on its path says');
   }, { milestone: 'M3' }),
   t.check('Every package is covered: an AGENTS.md and a canary case', () => {
     const g = gate(t, (copy) => fs.rmSync(path.join(copy, 'packages/portal/AGENTS.md')));
@@ -193,14 +222,16 @@ export default (t) => [
     const copy = t.copy(t.tmp());
     fs.rmSync(path.join(copy, 'packages'), { recursive: true, force: true });
     fs.rmSync(path.join(copy, 'evals'), { recursive: true, force: true });
-    const r = t.node([GATE], { cwd: copy });
-    if (r.code === 2 || r.code === null) return `Without packages/, the gate crashed (exit ${r.code}): ${r.all.trim().slice(0, 200)}`;
+    fs.rmSync(path.join(copy, '.github/CODEOWNERS'), { force: true });
+    const r = freeNode(t, [GATE], { cwd: copy });
+    if (r.triedCopilot) return `node ${GATE}: ${r.spent}`;
+    if (r.code !== 0) return `Without packages/, evals/ or CODEOWNERS (a later lab), the gate should pass: exit 0, not ${r.code}. Owners are that level's business, and there is nothing to cover. ${r.stdout.split('\n').filter((l) => /error|warning/.test(l)).slice(0, 2).join(' | ').trim().slice(0, 200)}`;
     return /skip/i.test(r.stdout) || 'Say that the package checks were skipped (no packages here).';
   }, { milestone: 'M3' }),
 
   // M4 · Owners
   t.check('ownersOf(): the last matching line wins', async () => {
-    const { ownersOf } = await t.import(GATE);
+    const { ownersOf } = await freeImport(t, GATE);
     const text = fx(t, 'codeowners.sample');
     const cases = [
       ['README.md', ['@studybuddy/docs']],
@@ -234,6 +265,9 @@ export default (t) => [
     const g = gate(t, (copy) => fs.writeFileSync(path.join(copy, '.github/CODEOWNERS'), '/packages/cli/ @studybuddy/cli-team\n'));
     const ok = expectFinding(g, { check: 'owner', severity: 'error', code: 1, file: 'AGENTS.md' }, 'With a CODEOWNERS that only covers packages/cli/');
     if (ok !== true) return ok;
+    for (const f of ['.github/instructions/tests.instructions.md', ...t.find(/^\.agents\/skills\/[^/]+\/SKILL\.md$/)]) {
+      if (!findings(g).some((x) => x.check === 'owner' && slash(x.file) === f)) return `With a CODEOWNERS that only covers packages/cli/, ${f} has no owner either: report every instruction file and skill, not just AGENTS.md.`;
+    }
     if (findings(g).some((f) => f.check === 'owner' && slash(f.file) === 'packages/cli/AGENTS.md')) return 'packages/cli/AGENTS.md has an owner there (/packages/cli/): no owner finding for it.';
     const none = gate(t, (copy) => fs.rmSync(path.join(copy, '.github/CODEOWNERS')));
     return findings(none).some((f) => f.check === 'owner') || 'Without any CODEOWNERS, nobody has to review an instruction change: report it.';
@@ -241,7 +275,7 @@ export default (t) => [
 
   // M5 · A canary regression suite
   t.check('score() finds missing and leaked canaries', async () => {
-    const { score } = await t.import(RUNNER);
+    const { score } = await freeImport(t, RUNNER);
     const suite = JSON.parse(fx(t, 'canary-suite.json'));
     const answers = JSON.parse(fx(t, 'canary-answers.json'));
     const got = Object.fromEntries(suite.cases.map((c) => [c.id, score(c, answers[c.id])]));
@@ -254,11 +288,12 @@ export default (t) => [
     fs.mkdirSync(path.join(copy, 'evals'), { recursive: true });
     fs.copyFileSync(fxPath(t, 'canary-suite.json'), path.join(copy, SUITE));
     fs.copyFileSync(fxPath(t, 'canary-answers.json'), path.join(copy, 'answers.json'));
-    const r = t.node([RUNNER, '--from', 'answers.json'], { cwd: copy });
+    const r = freeNode(t, [RUNNER, '--from', 'answers.json'], { cwd: copy });
+    if (r.triedCopilot) return `node ${RUNNER} --from: ${r.spent}`;
     if (r.code !== 1) return `Two of the four recorded answers fail, so the suite exits 1; it exited ${r.code}. ${r.stderr.trim().slice(0, 160)}`;
     const good = Object.fromEntries(['root', 'cli', 'portal', 'planner'].map((id) => [id, `${ROOT_CANARY}${id === 'root' ? '' : `\n${canary(id)}`}`]));
     fs.writeFileSync(path.join(copy, 'answers.json'), JSON.stringify(good));
-    const ok = t.node([RUNNER, '--from', 'answers.json'], { cwd: copy });
+    const ok = freeNode(t, [RUNNER, '--from', 'answers.json'], { cwd: copy });
     return ok.code === 0 || `When every answer has its canaries, the suite exits 0; it exited ${ok.code}.`;
   }, { milestone: 'M5' }),
   t.check('Your suite covers the root and every package', () => {
@@ -276,7 +311,8 @@ export default (t) => [
     return true;
   }, { milestone: 'M5' }),
   t.check('--dry-run shows one command per case, in its folder', () => {
-    const r = t.node([RUNNER, '--dry-run']);
+    const r = freeNode(t, [RUNNER, '--dry-run']);
+    if (r.triedCopilot) return `node ${RUNNER} --dry-run: ${r.spent}`;
     const n = r.stdout.split('\n').filter((l) => /^\s*copilot /.test(l)).length;
     const cases = t.json(SUITE).cases ?? [];
     if (r.code !== 0 || n !== cases.length || n < 4) return `Expected ${Math.max(4, cases.length)} commands (one per case), got ${n} (exit ${r.code}). ${r.stderr.trim().slice(0, 120)}`;

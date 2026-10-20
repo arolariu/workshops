@@ -38,8 +38,10 @@ export function loadSuite(root) {
 /** Arguments for one read-only, capped run. */
 export const buildArgs = (prompt) => ['-p', prompt, '-s', '--no-ask-user', '--max-ai-credits=30', '--deny-tool=write', '--deny-tool=shell'];
 
+const RUN_TIMEOUT = 5 * 60 * 1000;
+
 function runCopilot(args, cwd) {
-  const opts = { cwd, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 };
+  const opts = { cwd, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout: RUN_TIMEOUT };
   let r = spawnSync('copilot', args, opts);
   if (r.error?.code === 'ENOENT' && process.platform === 'win32') {
     const q = (a) => (/^[\w\-./:=@,]+$/.test(a) ? a : `"${a.replace(/"/g, '""')}"`);
@@ -91,7 +93,7 @@ function main(argv) {
     const r = runCopilot(buildArgs(suite.prompt), path.resolve(root, c.cwd));
     if (r.status !== 0) {
       console.log('❌');
-      console.error((r.stderr || r.stdout || r.error?.message || '').trim().slice(0, 400));
+      console.error(r.error?.code === 'ETIMEDOUT' ? `The run took longer than ${RUN_TIMEOUT / 60000} minutes and was stopped.` : (r.stderr || r.stdout || r.error?.message || '').trim().slice(0, 400));
       return 2;
     }
     results.push({ ...score(c, r.stdout), cwd: c.cwd, answer: r.stdout.trim() });
@@ -105,5 +107,8 @@ function main(argv) {
   return code;
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths: a symlinked temp folder, a junction or an 8.3 short path must not make the script silently do nothing.
+const isMain = (() => {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) process.exitCode = main(process.argv.slice(2));

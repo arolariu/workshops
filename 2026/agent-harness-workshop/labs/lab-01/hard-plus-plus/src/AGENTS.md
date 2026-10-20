@@ -8,7 +8,8 @@ Plain Node.js 22+, ES modules, zero dependencies.
 - Run one file: `node --test grades.test.js`
 
 ## Conventions
-- ES modules only (`import`/`export`), never `require()`. No TypeScript, no build step.
+- ES modules only (`import`/`export`), never `require()`.
+- No TypeScript, no build step.
 - Every exported function has a short JSDoc comment.
 - Tests sit next to the code (`grades.js` -> `grades.test.js`) and use `node:test` with `node:assert/strict`.
 - Use 2-space indentation.
@@ -19,7 +20,8 @@ Plain Node.js 22+, ES modules, zero dependencies.
 - Prefer simple loops over long `reduce` chains.
 - Throw a `RangeError` for out-of-range input and a `TypeError` for input of the wrong type.
 - Where no rule here covers a case, do what the surrounding code does.
-- Every module is listed in `README.md` with one line: add or update it in the same pull request.
+- Every module is listed in `README.md` with one line.
+- When you add or rename a module, update its line in `README.md` in the same pull request.
 
 ## Domain rules
 - Grades use the 1-10 scale. Weighted averages are rounded to 2 decimals.
@@ -31,7 +33,7 @@ Plain Node.js 22+, ES modules, zero dependencies.
 - Never change a test just to make it pass - fix the code instead.
 - Never read or print `.env` files, not even to debug.
 - Never push to `main`: open a pull request.
-- Ask before you delete a file.
+- Only delete files when the task asks you to.
 
 ## Definition of done
 - `npm test` is green.

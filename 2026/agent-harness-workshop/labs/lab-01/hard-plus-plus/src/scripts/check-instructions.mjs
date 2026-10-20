@@ -49,10 +49,14 @@ export function packagesOf(root) {
   return [...new Set(listFiles(root).filter((f) => f.endsWith('/package.json')).map((f) => path.posix.dirname(f)).filter((d) => globs.some((g) => matches(g, d))))].sort();
 }
 
-/** Every package has an AGENTS.md and a suite case; every instruction file and skill has an owner in CODEOWNERS. */
+/**
+ * Every package has an AGENTS.md and a suite case; in a workspace with instruction files, every instruction file and
+ * skill has an owner in CODEOWNERS. Without packages (the later labs, where this gate travels) there is nothing to
+ * cover, and owners are that level's business: no findings.
+ */
 export function coverage(root) {
-  // TODO(M3): a package without AGENTS.md or without a suite case; an instruction file or skill without an owner
-  // (ownersOf() from M4), or no CODEOWNERS at all.
+  // TODO(M3): a package without AGENTS.md or without a suite case; in a workspace with instruction files, an
+  // instruction file or skill without an owner (ownersOf() from M4), or no CODEOWNERS at all.
   return [];
 }
 
@@ -104,5 +108,8 @@ function main(argv) {
   return code;
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths: a symlinked temp folder, a junction or an 8.3 short path must not make the script silently do nothing.
+const isMain = (() => {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) process.exitCode = main(process.argv.slice(2));

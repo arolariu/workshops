@@ -3,9 +3,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { freeNode, freeImport } from './helpers.mjs';
 
 const AB = 'scripts/ab.mjs';
-const load = (t) => t.import(AB);
+const load = (t) => freeImport(t, AB);
 const fixturePath = (t, name) => path.join(t.exDir, 'tests', 'fixtures', name);
 const fixture = (t, name) => JSON.parse(fs.readFileSync(fixturePath(t, name), 'utf8'));
 // The checks' own copy of the rules (independent of the RULES in your script).
@@ -80,7 +81,7 @@ function fromFixture(t, name) {
   const copy = t.copy(t.tmp());
   const file = path.join(copy, 'saved.json');
   fs.copyFileSync(fixturePath(t, name), file);
-  return { copy, r: t.node([AB, '--from', 'saved.json'], { cwd: copy }) };
+  return { copy, r: freeNode(t, [AB, '--from', 'saved.json'], { cwd: copy }) };
 }
 
 export default (t) => [
@@ -91,6 +92,7 @@ export default (t) => [
     if (!Array.isArray(a) || !a.length) return 'buildArgs() returns an empty list.';
     if (flag(a, '-p') !== 'Q?' && flag(a, '--prompt') !== 'Q?') return 'Pass the prompt with -p.';
     if (!a.includes('-s') && !a.includes('--silent')) return 'Add -s so you only get the answer (no stats).';
+    if (!a.includes('--no-ask-user')) return 'Add --no-ask-user: a scripted run has nobody to answer its questions.';
     const cap = Number(flag(a, '--max-ai-credits'));
     if (!(cap >= 30 && cap <= 50)) return 'Cap the budget: --max-ai-credits between 30 and 50.';
     if (!norm(a).some((x) => /^--deny-tool=.*write/.test(x))) return 'Make it read-only: deny file writes.';
@@ -110,23 +112,29 @@ export default (t) => [
     const wrong = INSTRUCTION_PATHS.filter(([p, want]) => Boolean(isInstructionFile(p)) !== want);
     return !wrong.length || `isInstructionFile() is off for: ${wrong.slice(0, 4).map(([p, want]) => `${p} (${want ? 'it is one' : 'not one'})`).join(', ')}.`;
   }, { milestone: 'M1' }),
-  t.check('The "without" copy has no instruction file left, and all the code', async () => {
-    const { stripInstructions } = await load(t);
+  t.check('The "without" copy has no instruction file and nothing that quotes the canary, and all the code', async () => {
+    const { prepare, release } = await load(t);
     const copy = t.copy(t.tmp());
-    const extra = ['CLAUDE.md', 'GEMINI.md', '.github/copilot-instructions.md', '.claude/CLAUDE.md', 'docs/AGENTS.md', '.github/instructions/sub/x.instructions.md'];
+    const extra = ['CLAUDE.md', 'GEMINI.md', '.github/copilot-instructions.md', '.claude/CLAUDE.md', 'docs/AGENTS.md', '.github/instructions/sub/x.instructions.md', 'evals/canaries.json'];
     for (const f of extra) {
       fs.mkdirSync(path.dirname(path.join(copy, f)), { recursive: true });
-      fs.writeFileSync(path.join(copy, f), '- A rule.\n');
+      fs.writeFileSync(path.join(copy, f), '- A rule. End with: Harness check: AGENTS.md loaded\n');
     }
-    const removed = stripInstructions(copy);
-    const left = ['AGENTS.md', ...extra, ...t.find(/^\.github\/instructions\//)].filter((f) => fs.existsSync(path.join(copy, f)));
-    if (left.length) return `After stripInstructions(), the copy still has: ${left.join(', ')}. The model could read them with its view tool.`;
-    const gone = ['grades.js', 'package.json', 'docs/grading.md', AB].filter((f) => !fs.existsSync(path.join(copy, f)));
-    if (gone.length) return `stripInstructions() also deleted ${gone.join(', ')}: only instruction files go.`;
-    return (Array.isArray(removed) && removed.includes('docs/AGENTS.md')) || 'stripInstructions() should return the removed paths (relative, with /).';
+    const { dir, instructions, canary } = prepare('without', copy);
+    try {
+      const left = [...new Set(['AGENTS.md', ...extra, ...t.find(/^\.github\/instructions\//)])].filter((f) => fs.existsSync(path.join(dir, f)));
+      if (left.length) return `The "without" copy still has: ${left.join(', ')}. The agent could read them with its view tool (isInstructionFile() decides what goes).`;
+      if (canary?.length) return `In the "without" copy, these files still quote the canary: ${canary.join(', ')}.`;
+      const gone = ['grades.js', 'package.json', 'docs/grading.md'].filter((f) => !fs.existsSync(path.join(dir, f)));
+      if (gone.length) return `The "without" copy lost ${gone.join(', ')}: only instruction files go.`;
+      return (Array.isArray(instructions) && !instructions.length) || 'prepare() should report the instruction files left in the copy: none.';
+    } finally {
+      release(dir);
+    }
   }, { milestone: 'M1' }),
   t.check('The dry run shows both variants, and where "without" runs', () => {
-    const r = t.node([AB, '--dry-run', '--runs', '2']);
+    const r = freeNode(t, [AB, '--dry-run', '--runs', '2']);
+    if (r.triedCopilot) return `node ${AB} --dry-run: ${r.spent}`;
     const lines = r.stdout.split('\n').filter((l) => /^\s*copilot /.test(l));
     const off = lines.filter((l) => l.includes('--no-custom-instructions')).length;
     if (lines.length !== 4 || off !== 2) return `Expected 4 commands (2 without instructions), got ${lines.length} (${off} without). ${r.stderr.trim().slice(0, 160)}`;
@@ -183,8 +191,19 @@ export default (t) => [
     const md = report(WITH_FIXTURE, { prompt: 'Q?', runs: 5 });
     return expectRows(md, REPORT_ROWS, 'The report');
   }, { milestone: 'M4' }),
+  t.check('report() works from the hits, not rounded rates, and says n/a for a spread of one run', async () => {
+    const { report } = await load(t);
+    const z = { canary: 0, tests: 0, examRule: 0, deps: 0 };
+    const three = { with: { runs: 3, hits: { ...z, canary: 2 }, rate: { ...z, canary: 0.67 }, score: { n: 3, mean: 0.67, sd: 0.58 } }, without: { runs: 3, hits: { ...z, canary: 1 }, rate: { ...z, canary: 0.33 }, score: { n: 3, mean: 0.33, sd: 0.58 } } };
+    const a = expectRows(report(three, { prompt: 'Q?', runs: 3 }), [['canary', '2/3 (67%)', '1/3 (33%)', '+33 pts']], 'With 2/3 against 1/3, the report');
+    if (a !== true) return `${a} (Δ comes from the hits: 2/3 − 1/3 is 33 points; the rounded rates 0.67 − 0.33 would say 34.)`;
+    const one = { with: { runs: 1, hits: { ...z, canary: 1 }, rate: { ...z, canary: 1 }, score: { n: 1, mean: 1, sd: 0 } }, without: { runs: 1, hits: z, rate: z, score: { n: 1, mean: 0, sd: 0 } } };
+    const b = expectRows(report(one, { prompt: 'Q?', runs: 1 }), [['score (0–4)', '1.00 ± n/a', '0.00 ± n/a', '+1.00']], 'With a single run, the report');
+    return b === true || `${b} (one run has no spread to measure: print n/a, not ± 0.00.)`;
+  }, { milestone: 'M4' }),
   t.check('node scripts/ab.mjs --from saves the report without spending a credit', () => {
     const { copy, r } = fromFixture(t, 'results.json');
+    if (r.triedCopilot) return `node scripts/ab.mjs --from: ${r.spent}`;
     if (r.code !== 0) return `node scripts/ab.mjs --from saved.json exited with ${r.code}. ${r.all.trim().slice(0, 200)}`;
     const ok = expectRows(r.stdout, REPORT_ROWS.slice(0, 2), 'The printed report');
     if (ok !== true) return ok;
@@ -226,6 +245,7 @@ export default (t) => [
   }, { milestone: 'M5' }),
   t.check('--from on ablation results prints the ablation table', () => {
     const { copy, r } = fromFixture(t, 'ablation.json');
+    if (r.triedCopilot) return `node scripts/ab.mjs --from: ${r.spent}`;
     if (r.code !== 0) return `node scripts/ab.mjs --from (ablation) exited with ${r.code}. ${r.all.trim().slice(0, 200)}`;
     const ok = expectRows(r.stdout, ABLATION_ROWS.slice(2, 3), 'The printed ablation table');
     if (ok !== true) return ok;

@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { instructionSources, applicable, listFiles } from './which-instructions.mjs';
+import { instructionSources, applicable, listFiles, matches } from './which-instructions.mjs';
 
 /** ≈tokens the always-on files may cost, and the most any single path may cost (always-on + scoped). */
 export const BUDGET = { always: 600, path: 900 };
@@ -15,7 +15,7 @@ export const BUDGET = { always: 600, path: 900 };
 export const VAGUE = ['clean', 'best practice', 'careful', 'readable', 'nice', 'proper', 'appropriate', 'good', 'simple', 'small', 'as needed', 'up to date', 'high quality', 'robust', 'elegant', 'sensible', 'reasonable'];
 /** Words that carry no meaning of their own; words() leaves them out. Negations (no, not, never) stay. */
 export const STOPWORDS = new Set(['a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'and', 'or', 'for', 'with', 'is', 'are', 'be', 'it', 'its', 'this', 'that', 'these', 'those', 'by', 'as', 'from', 'you', 'your', 'we', 'our', 'us', 'any', 'all', 'please', 'always', 'just', 'so', 'if', 'then', 'than', 'do', 'does', 'will', 'can', 'should', 'must']);
-/** Topics where two rules can say different things. Extend it when you find a new kind of conflict. */
+/** Topics where two rules can say different things (read them with topicValue()). Add one for a new kind of conflict. */
 export const TOPICS = [
   { id: 'indent', re: /\b(\d+)[- ]space/i, value: (m) => m[1] },
   { id: 'quotes', re: /\b(single|double)[- ]quot/i, value: (m) => m[1].toLowerCase() },
@@ -65,13 +65,14 @@ export function findDuplicates(rules) {
 // ---------- M2 · Conflicts and wrong commands ----------
 
 /**
- * For every topic in TOPICS: do two rules that can be in the context together give it different values?
+ * For every topic in TOPICS: do two rules that can be in the context together give it different values? A rule's
+ * value is topicValue(topic, rule.text): negated mentions don't count ("No Jest: use node:test" says node:test).
  * @returns {{ topic, values, rules }[]} values sorted; rules = every rule in a clash, in order, each with its `value`
  */
 export function findContradictions(rules) {
   const out = [];
   for (const topic of TOPICS) {
-    const hits = rules.map((r) => { const m = r.text.match(topic.re); return m ? { ...r, value: topic.value(m) } : null; }).filter(Boolean);
+    const hits = rules.map((r) => { const value = topicValue(topic, r.text); return value == null ? null : { ...r, value }; }).filter(Boolean);
     const clash = new Set();
     for (let i = 0; i < hits.length; i++) {
       for (let j = i + 1; j < hits.length; j++) {
@@ -134,10 +135,25 @@ export function words(text) {
   return new Set(String(text).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w && !STOPWORDS.has(w)));
 }
 
+/**
+ * What a rule says about a topic: the value of the first mention that isn't negated ("No Jest: use node:test" says
+ * node:test; "never 4 spaces" says nothing), or null.
+ */
+export function topicValue(topic, text) {
+  for (const m of String(text).matchAll(new RegExp(topic.re.source, 'gi'))) {
+    if (!NEGATED.test(String(text).slice(0, m.index))) return topic.value(m);
+  }
+  return null;
+}
+const NEGATED = /\b(?:never|not|no|don'?t|instead of|avoid|rather than)\b[^.;:,]{0,15}$/i;
+
 /** Is this file sent on every turn? */
 export const alwaysOn = (file) => /^(AGENTS|CLAUDE|GEMINI)\.md$|^\.github\/copilot-instructions\.md$|^\.claude\/CLAUDE\.md$/.test(file);
-/** Two rules can meet in one context when they come from the same file, or one of them is always on. */
-export const inContextTogether = (a, b) => a.file === b.file || alwaysOn(a.file) || alwaysOn(b.file);
+/**
+ * Can two rules meet in one context? When they come from the same file, when one of them is always on, or when their
+ * files apply to a file in common (`paths`, which lint() adds: tests and grades rules both load for grades.test.js).
+ */
+export const inContextTogether = (a, b) => a.file === b.file || alwaysOn(a.file) || alwaysOn(b.file) || (a.paths ?? []).some((p) => (b.paths ?? []).includes(p));
 
 /** The rules of an instruction file: its list items (outside code blocks and frontmatter), with line and section. */
 export function parseRules(text, file = '') {
@@ -176,7 +192,9 @@ export function nearestScripts(root, file) {
 export function lint(root) {
   const sources = instructionSources(root);
   const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
-  const rules = sources.flatMap((s) => parseRules(read(s.path), s.path));
+  const files = listFiles(root);
+  const pathsOf = (s) => (s.applyTo == null ? null : files.filter((f) => s.applyTo.some((g) => matches(g, f))));
+  const rules = sources.flatMap((s) => { const paths = pathsOf(s); return parseRules(read(s.path), s.path).map((r) => ({ ...r, paths })); });
   const findings = [
     ...(findVague(rules) ?? []).map((f) => ({ check: 'vague', file: f.file, line: f.line, message: `"${f.text}" says "${f.word}" and nothing the agent can check` })),
     ...(findDuplicates(rules) ?? []).map((d) => ({ check: 'duplicate', file: d.b.file, line: d.b.line, message: `"${d.b.text}" repeats ${d.a.file}:${d.a.line} "${d.a.text}"` })),
@@ -184,7 +202,7 @@ export function lint(root) {
     ...(findBadCommands(rules, (f) => nearestScripts(root, f)) ?? []).map((b) => ({ check: 'command', file: b.file, line: b.line, message: `\`${b.command}\`: ${b.why}` })),
   ];
   const always = sources.filter((s) => s.applyTo == null).reduce((n, s) => n + tokens(read(s.path)), 0);
-  const paths = (tokensPerPath(root, listFiles(root)) ?? []).sort((a, b) => b.tokens - a.tokens || a.path.localeCompare(b.path));
+  const paths = (tokensPerPath(root, files) ?? []).sort((a, b) => b.tokens - a.tokens || a.path.localeCompare(b.path));
   return { findings, always, paths, budget: BUDGET };
 }
 
@@ -198,7 +216,10 @@ export function inventorySkeleton(text) {
   ].join('\n');
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths: a symlinked temp folder, a junction or an 8.3 short path must not make the script silently do nothing.
+const isMain = (() => {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) {
   const args = process.argv.slice(2);
   const root = process.cwd();

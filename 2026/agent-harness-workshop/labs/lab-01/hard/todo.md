@@ -27,8 +27,9 @@ carries which behaviour.
 - `isInstructionFile(path)` is true for `AGENTS.md`, `CLAUDE.md` and `GEMINI.md` in any folder,
   `.github/copilot-instructions.md` and anything in `.github/instructions/`; false for `README.md`, `MY-AGENTS.md` or
   `AGENTS.md.bak`
-- In a copy, `stripInstructions()` (given) leaves no instruction file and all the code, and
-  `node scripts/ab.mjs --dry-run --runs 2` shows four commands, two of them without instructions
+- `prepare('without', folder)` (given) makes a copy with no instruction file, nothing that quotes the canary (it
+  leaves out `scripts/` and `evals/`) and all the code; `node scripts/ab.mjs --dry-run --runs 2` shows four
+  commands, two of them without instructions
 
 ### M2 · Score every rule
 - `score(answer)` returns `{ canary, tests, examRule, deps }`, case-insensitive: `Harness check`; `npm test`,
@@ -37,7 +38,7 @@ carries which behaviour.
 
 ### M3 · N runs and the spread
 - `stats(values)` returns `{ n, mean, sd }`, with the sample standard deviation (divide by n − 1), both rounded to 2
-  decimals; `sd` is 0 for fewer than two values
+  decimals; `sd` is 0 for fewer than two values (there is nothing to spread)
 - `summarize(results, variants = ['with', 'without'])` returns `{ runs, hits, rate, score }` per variant: hits per
   signal, `rate` = hits / runs (2 decimals), and `score` = `stats()` of how many signals each answer hit. Results of
   other variants are ignored
@@ -54,6 +55,8 @@ carries which behaviour.
 | no dependencies | 3/5 (60%) | 0/5 (0%) | +60 pts |
 | score (0–4) | 3.40 ± 0.55 | 0.80 ± 0.84 | +2.60 |
 ```
+- Δ comes from the hits (2/3 against 1/3 is +33 pts, not the +34 the rounded rates would give), and a score with fewer
+  than two runs reads `1.00 ± n/a`
 - `node scripts/ab.mjs --from runs/ab-results.json` prints the report and saves it to `runs/ab-report.md`
 
 ### M5 · Take one rule away
@@ -92,7 +95,11 @@ and, for "without", the flag that disables custom instructions.
 `--no-custom-instructions` keeps `AGENTS.md` out of the context, but not off the disk: the agent can still open it
 with its `view` tool and repeat the canary. That's exactly how the old version of this experiment fooled itself. In a
 copy without instruction files there is nothing to find, and the original is out of reach: Copilot only lets the
-agent read inside its working folder and the temp folder (`copilot help permissions`).
+agent read inside its working folder and the temp folder (`copilot help permissions`). Other files can quote the
+canary too (this script does, so do the hard++ evals): the copies leave out `scripts/` and `evals/`, and each
+result lists the files that still mention it. One more difference: `--no-custom-instructions` also turns off your
+personal and plugin instructions, which "with" keeps; each "with" result records what `copilot instruction list`
+showed in its copy.
 
 </details>
 
@@ -108,7 +115,7 @@ Regular expressions with the `i` flag do it. For `deps`, look for "no", "never",
 <details><summary>Variance in three lines</summary>
 
 mean = sum / n; variance = the sum of (x − mean)² / (n − 1); sd = √variance. Round at the end with `round2()`, which is
-already there. With n − 1, a single run has no spread at all: that's the point.
+already there. One run has no spread to measure (n − 1 would be 0): `stats()` says 0, and the report prints n/a.
 
 </details>
 
@@ -128,17 +135,19 @@ The score of one answer is how many signals it hit (0–4). Collect them per var
 ### M4
 <details><summary>Formatting the cells</summary>
 
-A rate is `Math.round(rate * 100)` and a `%`. Δ is the difference of the two rates in percentage points, with its sign:
-`+40 pts`. The score cells use `toFixed(2)`. `LABELS` names the rows.
+A rate is hits ÷ runs as a whole percentage. Δ is the difference of the two rates in percentage points, with its sign
+(`+40 pts`): work it out from the hits, then round, or two rounded rates can be a point off. The score cells use
+`toFixed(2)`, and `n/a` for the spread of a single run. `LABELS` names the rows.
 
 </details>
 
 ### M5
 <details><summary>Why the ablation surprises</summary>
 
-Run the fixture through your table: without the test-command rule, its signal barely moves, because `package.json` and
-the tests give it away anyway. A rule the model can work out from the code is a rule you pay for on every turn for
-little; a rule nobody can guess (the canary, the exam rule) earns its tokens. Lab 01 hard+ starts from there.
+Run the fixture through your table: without the canary rule the canary drops 100 points, but without the test-command
+rule its signal drops only 33, because `package.json` and the tests give the command away. A rule the model can work
+out from the code buys little for what it costs on every turn; a rule nobody can guess (the canary, the exam rule)
+earns its tokens. Lab 01 hard+ starts from there.
 
 </details>
 
@@ -154,9 +163,9 @@ you conclude?
 
 <details><summary>Answer</summary>
 
-**2.** The canary exists nowhere but in your instructions, so a "without" answer that has it read it somewhere: a file
-its tools could open, your personal instructions, a parent folder. Fix the experiment first, then measure with more
-runs.
+**2.** `--no-custom-instructions` switches off every instruction file, personal ones included, so a "without" answer
+with the canary read it somewhere else: a file its tools could open (an instruction file left in its folder, a script
+or an eval that quotes the canary). Fix the experiment first, then measure with more runs.
 
 </details>
 

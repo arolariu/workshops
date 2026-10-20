@@ -4,9 +4,9 @@
 //   node scripts/ab.mjs --runs 3                          with vs without: 2 variants × 3 runs = 6 prompts
 //   node scripts/ab.mjs --ablate --runs 3                 every rule vs one rule removed: 5 variants × 3 runs = 15 prompts
 //   node scripts/ab.mjs --from runs/ab-results.json       redo the report from saved results (free)
-// Every run uses AI credits and is capped with --max-ai-credits. Every variant runs in its own copy of this folder:
-// "with" is a plain copy, "without" a copy with no instruction files at all, "no-<rule>" a copy whose AGENTS.md lacks
-// that one rule. Results and reports go to runs/.
+// Every run uses AI credits and is capped with --max-ai-credits. Every variant runs in its own copy of this folder,
+// without scripts/ and evals/ (they quote the canary): "with" is a plain copy, "without" a copy with no instruction
+// files at all, "no-<rule>" a copy whose AGENTS.md lacks that one rule. Results and reports go to runs/.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -70,7 +70,8 @@ export function score(answer) {
 // ---------- M3 · N runs and the spread ----------
 
 /**
- * Mean and sample standard deviation (divide by n − 1), both rounded to 2 decimals. Fewer than 2 values: sd 0.
+ * Mean and sample standard deviation (divide by n − 1), both rounded to 2 decimals. Fewer than 2 values: sd 0 (there
+ * is no spread to measure; the report prints n/a).
  * @param {number[]} values
  * @returns {{ n: number, mean: number, sd: number }}
  */
@@ -115,30 +116,33 @@ export function summarize(results, variants = ['with', 'without']) {
 
 // ---------- M4 · The report ----------
 
-const pct = (rate) => `${Math.round(rate * 100)}%`;
+const pct = (b, k) => `${Math.round(share(b, k) * 100)}%`;
 const signed = (x, digits = 0) => `${x >= 0 ? '+' : ''}${x.toFixed(digits)}`;
+const share = (b, k) => (Number.isFinite(b.runs) && b.hits ? (b.runs ? b.hits[k] / b.runs : 0) : b.rate[k]);
 
 /**
- * The A/B report in Markdown: one row per signal (hits/runs, the rate, the difference in percentage points), then the
- * score as mean ± sd.
+ * The A/B report in Markdown: one row per signal (hits/runs, the rate, the difference in percentage points, worked out
+ * from the hits, not from rounded rates), then the score as mean ± sd (n/a below two runs).
  * @param {ReturnType<typeof summarize>} summary
  * @param {{ prompt?: string, runs?: number }} [meta]
  */
 export function report(summary, { prompt = PROMPT, runs } = {}) {
   const w = summary.with;
   const wo = summary.without;
-  const cell = (b, k) => `${b.hits[k]}/${b.runs} (${pct(b.rate[k])})`;
-  const sd = (b) => `${b.score.mean.toFixed(2)} ± ${b.score.sd.toFixed(2)}`;
+  const cell = (b, k) => `${b.hits[k]}/${b.runs} (${pct(b, k)})`;
+  const spread = (b) => `${b.score.mean.toFixed(2)} ± ${b.score.n < 2 ? 'n/a' : b.score.sd.toFixed(2)}`;
   return [
     '# A/B: does AGENTS.md change the answers?',
     '',
     `Prompt: "${prompt}"`,
-    `Runs: ${runs ?? w.runs} per variant. With: instructions on. Without: a copy with no instruction files.`,
+    `Runs: ${runs ?? w.runs} per variant, each in its own copy of the project (without scripts/ and evals/).`,
+    'With: the project\'s instruction files, plus your personal and plugin instructions if you have any.',
+    'Without: no instruction files, and --no-custom-instructions (no personal or plugin instructions either).',
     '',
     '| Signal | With | Without | Δ |',
     '|---|---|---|---|',
-    ...SIGNALS.map((k) => `| ${LABELS[k]} | ${cell(w, k)} | ${cell(wo, k)} | ${signed(Math.round((w.rate[k] - wo.rate[k]) * 100))} pts |`),
-    `| score (0–4) | ${sd(w)} | ${sd(wo)} | ${signed(w.score.mean - wo.score.mean, 2)} |`,
+    ...SIGNALS.map((k) => `| ${LABELS[k]} | ${cell(w, k)} | ${cell(wo, k)} | ${signed(Math.round((share(w, k) - share(wo, k)) * 100))} pts |`),
+    `| score (0–4) | ${spread(w)} | ${spread(wo)} | ${signed(w.score.mean - wo.score.mean, 2)} |`,
     '',
     'Score: how many signals one answer hit, as mean ± sample standard deviation over the runs.',
     '',
@@ -162,13 +166,13 @@ export function removeRule(text, rule) {
 }
 
 /**
- * The signal whose hit rate fell the most from `base` to `other`, in percentage points, or null when none fell.
- * On a tie, the first signal in SIGNALS order.
+ * The signal whose hit rate fell the most from `base` to `other`, in percentage points (from hits / runs when the
+ * summaries have them, else from `rate`), or null when none fell. On a tie, the first signal in SIGNALS order.
  */
 export function biggestDrop(base, other) {
   let best = null;
   for (const k of SIGNALS) {
-    const drop = Math.round((base.rate[k] - other.rate[k]) * 100);
+    const drop = Math.round((share(base, k) - share(other, k)) * 100);
     if (drop > 0 && (!best || drop > best.drop)) best = { signal: k, drop };
   }
   return best;
@@ -181,7 +185,7 @@ export function biggestDrop(base, other) {
  */
 export function ablationTable(summary, { runs } = {}) {
   const base = summary.with;
-  const row = (label, b, drop) => `| ${label} | ${SIGNALS.map((k) => pct(b.rate[k])).join(' | ')} | ${drop} |`;
+  const row = (label, b, drop) => `| ${label} | ${SIGNALS.map((k) => pct(b, k)).join(' | ')} | ${drop} |`;
   const lines = [
     '# Ablation: which rule carries which signal?',
     '',
@@ -202,25 +206,38 @@ export function ablationTable(summary, { runs } = {}) {
 
 // ---------- you don't need to change anything below this line ----------
 
-const SKIP_COPY = /(^|[\\/])(node_modules|\.git|\.agent-logs|runs)([\\/]|$)|^ab-results\.json$/;
+// Never copied: dependencies, logs, run output, and the folders that quote the canary (this script, the evals).
+const SKIP_COPY = /(^|[\\/])(node_modules|\.git|\.agent-logs|runs)([\\/]|$)|^(scripts|evals)([\\/]|$)|^ab-results\.json$/;
+const RUN_TIMEOUT = 5 * 60 * 1000;
+const TEMP = new Set();
 
-/** Copy the project (without dependencies, logs and run output) to `to`. */
+/** Copy the project (without dependencies, logs, run output, scripts/ and evals/) to `to`. */
 export function copyProject(from, to) {
   fs.cpSync(from, to, { recursive: true, filter: (src) => { const rel = path.relative(from, src); return !rel || !SKIP_COPY.test(rel); } });
   return to;
 }
 
-/** The instruction files in a folder (relative paths, with /). */
-export function instructionsIn(dir) {
+/** Every file in a folder (relative paths, with /), without node_modules and .git. */
+function filesIn(dir) {
   const out = [];
   const walk = (abs, rel) => {
     for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
       const r = rel ? `${rel}/${e.name}` : e.name;
-      if (e.isDirectory()) { if (!/^(node_modules|\.git)$/.test(e.name)) walk(path.join(abs, e.name), r); } else if (isInstructionFile(r)) out.push(r);
+      if (e.isDirectory()) { if (!/^(node_modules|\.git)$/.test(e.name)) walk(path.join(abs, e.name), r); } else if (e.isFile()) out.push(r);
     }
   };
   walk(dir, '');
   return out.sort();
+}
+
+/** The instruction files in a folder (relative paths, with /). */
+export const instructionsIn = (dir) => filesIn(dir).filter(isInstructionFile);
+
+/** The files in a folder that mention the canary: in a "without" copy there must be none, or the agent can read it. */
+export function canaryIn(dir) {
+  return filesIn(dir).filter((f) => {
+    try { return fs.statSync(path.join(dir, f)).size < 1024 * 1024 && /harness check/i.test(fs.readFileSync(path.join(dir, f), 'utf8')); } catch { return false; }
+  });
 }
 
 /** Delete every instruction file in a folder; returns what was removed. */
@@ -230,26 +247,45 @@ export function stripInstructions(dir) {
   return found;
 }
 
-/** A fresh copy of the project for one variant, in the system temp folder: { dir, instructions }. */
+/** A fresh copy of the project for one variant, in the system temp folder: { dir, instructions, canary }. */
 export function prepare(variant, project) {
-  const dir = copyProject(project, fs.mkdtempSync(path.join(os.tmpdir(), `ab-${variant}-`)));
-  if (variant === 'without') stripInstructions(dir);
-  const rule = RULES.find((r) => variant === `no-${r.id}`);
-  if (rule) {
-    const file = path.join(dir, 'AGENTS.md');
-    fs.writeFileSync(file, removeRule(fs.readFileSync(file, 'utf8'), rule).text);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `ab-${variant}-`));
+  TEMP.add(dir);
+  try {
+    copyProject(project, dir);
+    if (variant === 'without') stripInstructions(dir);
+    const rule = RULES.find((r) => variant === `no-${r.id}`);
+    if (rule) {
+      const file = path.join(dir, 'AGENTS.md');
+      fs.writeFileSync(file, removeRule(fs.readFileSync(file, 'utf8'), rule).text);
+    }
+    return { dir, instructions: instructionsIn(dir), canary: canaryIn(dir) };
+  } catch (e) {
+    release(dir);
+    throw e;
   }
-  return { dir, instructions: instructionsIn(dir) };
 }
 
-function runCopilot(args, cwd) {
-  const opts = { cwd, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 };
+/** Remove a copy made by prepare(). Copies left at exit (an error, Ctrl+C) are removed too. */
+export function release(dir) {
+  TEMP.delete(dir);
+  try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* the OS cleans its temp folder */ }
+}
+
+function copilot(args, cwd, timeout) {
+  const opts = { cwd, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout };
   let r = spawnSync('copilot', args, opts);
   if (r.error?.code === 'ENOENT' && process.platform === 'win32') {
     const q = (a) => (/^[\w\-./:=@,]+$/.test(a) ? a : `"${a.replace(/"/g, '""')}"`);
     r = spawnSync('copilot', args.map(q), { ...opts, shell: true });
   }
   return r;
+}
+
+/** What Copilot loads in a folder (`copilot instruction list --json`, free): source paths, or null when unknown. */
+function listedIn(dir) {
+  const r = copilot(['instruction', 'list', '--json'], dir, 60000);
+  try { return JSON.parse(r.stdout).map((s) => String(s.sourcePath ?? s.label).replace(/\\/g, '/')); } catch { return null; }
 }
 
 const WHERE = (v) => (v === 'with' ? 'a copy of this folder' : v === 'without' ? 'a copy with no instruction files' : `a copy whose AGENTS.md lacks the ${v.slice(3)} rule`);
@@ -288,7 +324,11 @@ function main(argv) {
   console.log(`\n🧪 ${ablate ? 'Ablation' : 'A/B'}: "${PROMPT}"`);
   console.log(`   ${variants.length} variants × ${runs} run(s) = ${variants.length * runs} prompts, each capped with --max-ai-credits.\n`);
   const resultsFile = ablate ? 'ablation-results.json' : 'ab-results.json';
-  if (!dry) fs.rmSync(path.join(out, resultsFile), { force: true });
+  if (!dry) {
+    fs.rmSync(path.join(out, resultsFile), { force: true });
+    process.on('exit', () => [...TEMP].forEach(release));
+    process.on('SIGINT', () => process.exit(130));
+  }
   const results = [];
   for (let i = 0; i < runs; i++) {
     for (const variant of variants) {
@@ -304,15 +344,21 @@ function main(argv) {
         continue;
       }
       process.stdout.write(`   ⏳ ${variant.padEnd(16)} run ${i + 1}… `);
-      const { dir, instructions } = prepare(variant, project);
+      const { dir, instructions, canary } = prepare(variant, project);
       let r;
-      try { r = runCopilot(args, dir); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+      let listed = null;
+      try {
+        if (variant !== 'without') listed = listedIn(dir);
+        r = copilot(args, dir, RUN_TIMEOUT);
+      } finally {
+        release(dir);
+      }
       if (r.status !== 0) {
         console.log('❌');
-        console.error((r.stderr || r.stdout || r.error?.message || '').trim().slice(0, 400));
+        console.error(r.error?.code === 'ETIMEDOUT' ? `The run took longer than ${RUN_TIMEOUT / 60000} minutes and was stopped.` : (r.stderr || r.stdout || r.error?.message || '').trim().slice(0, 400));
         process.exit(1);
       }
-      results.push({ variant, run: i + 1, answer: r.stdout.trim(), folder: dir, instructions });
+      results.push({ variant, run: i + 1, answer: r.stdout.trim(), folder: dir, instructions, canaryFiles: canary, listed });
       console.log(`✅ (${instructions.length ? instructions.join(', ') : 'no instruction files'})`);
     }
   }
@@ -324,5 +370,8 @@ function main(argv) {
   console.log(`Saved to runs/${resultsFile} and ${save(ablate ? 'ablation-report.md' : 'ab-report.md', md)}\n`);
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths: a symlinked temp folder, a junction or an 8.3 short path must not make the script silently do nothing.
+const isMain = (() => {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) main(process.argv.slice(2));

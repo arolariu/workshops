@@ -14,14 +14,14 @@ rule it joined).
 | L05 | Be careful when you change the grade logic. | rewritten | .github/instructions/grades.instructions.md | When you change the grade logic, work out one result by hand first and add it as a test. |
 | L06 | Name functions with a verb: `computeAverage`, not `average`. | kept | AGENTS.md | |
 | L07 | Make the code readable. | merged | AGENTS.md | L06 |
-| L08 | Ask before you delete a file. | kept | AGENTS.md | |
-| L09 | Run the tests with `npm test`. | merged | AGENTS.md | Run all tests: `npm test` |
+| L08 | Ask before you delete a file. | rewritten | AGENTS.md | Only delete files when the task asks you to. |
+| L09 | Run the tests with `npm test`. | merged | AGENTS.md | Run all tests: `npm test` (the built-in `node:test` runner) |
 | L10 | Run one test file with `node --test grades.test.js`. | merged | AGENTS.md | Run one file: `node --test grades.test.js` |
 | L11 | Lint with `npm run lint` before every commit. | fixed | AGENTS.md | `npm test` is green. |
 | L12 | Build with `npm run build` before you open a pull request. | fixed | AGENTS.md | No TypeScript, no build step. |
 | L13 | Use `npm run test:watch` while you work. | fixed | AGENTS.md | Run one file: `node --test grades.test.js` |
 | L14 | Check the test coverage with `npm run coverage`. | fixed | AGENTS.md | New behaviour comes with at least one new test. |
-| L15 | On CI the tests run with `yarn test`. | fixed | AGENTS.md | Run all tests: `npm test` |
+| L15 | On CI the tests run with `yarn test`. | fixed | AGENTS.md | Run all tests: `npm test` (the built-in `node:test` runner) |
 | L16 | ES modules only (`import`/`export`), never `require()`. | kept | AGENTS.md | |
 | L17 | Use 2-space indentation. | kept | AGENTS.md | |
 | L18 | Strings use single quotes. | kept | AGENTS.md | |
@@ -32,7 +32,7 @@ rule it joined).
 | L23 | Wrap strings in double quotes. | resolved | AGENTS.md | Strings use single quotes. |
 | L24 | Keep the code nice and simple. | merged | AGENTS.md | L21 |
 | L25 | Grades use the 1-10 scale, and weighted averages are rounded to 2 decimals. | merged | AGENTS.md | Grades use the 1-10 scale. Weighted averages are rounded to 2 decimals. |
-| L26 | Round weighted averages to one decimal. | resolved | AGENTS.md | Weighted averages are rounded to 2 decimals. |
+| L26 | Round weighted averages to one decimal. | resolved | AGENTS.md | Grades use the 1-10 scale. Weighted averages are rounded to 2 decimals. |
 | L27 | A student passes a course only with a final grade of at least 5 and an exam grade of at least 5. | merged | AGENTS.md | A student passes a course only if the final grade is at least 5 **and** the exam grade is at least 5. |
 | L28 | Weights can be percentages or relative weights: never assume they add up to 100. | moved | .github/instructions/grades.instructions.md | |
 | L29 | A grade below 1 or above 10 is invalid: throw a `RangeError`. | moved | .github/instructions/grades.instructions.md | |
@@ -40,15 +40,15 @@ rule it joined).
 | L31 | Dates are `YYYY-MM-DD` strings. | kept | AGENTS.md | |
 | L32 | Never call `new Date()` without an argument in `deadlines.js`: pass `now` in, so the tests stay deterministic. | moved | .github/instructions/deadlines.instructions.md | |
 | L33 | An overdue assignment is never "upcoming". | moved | .github/instructions/deadlines.instructions.md | |
-| L34 | Tests use `node:test` and `node:assert/strict`. | merged | .github/instructions/tests.instructions.md | Use `node:test` (`import { test } from 'node:test'`) and `node:assert/strict`. |
+| L34 | Tests use `node:test` and `node:assert/strict`. | merged | .github/instructions/tests.instructions.md | Use `node:test` (`import { test } from 'node:test'`) and `node:assert/strict`. No other test libraries. |
 | L35 | Write good tests. | merged | .github/instructions/tests.instructions.md | One behaviour per test. The test name is a full sentence that says what should happen. |
-| L36 | Never use random numbers in a test. | merged | .github/instructions/tests.instructions.md | Never `new Date()` or random values. |
-| L37 | Mock timers with `jest.useFakeTimers()`. | resolved | .github/instructions/tests.instructions.md | Pass `now` in instead of mocking timers |
+| L36 | Never use random numbers in a test. | merged | .github/instructions/tests.instructions.md | Use fixed data (dates as 'YYYY-MM-DD' strings, literal numbers). Never `new Date()` or random values. |
+| L37 | Mock timers with `jest.useFakeTimers()`. | resolved | .github/instructions/tests.instructions.md | Pass `now` in instead of mocking timers: `upcoming(list, '2026-10-15')`, never a fake clock. |
 | L38 | Every function gets at least one error-case test. | merged | .github/instructions/tests.instructions.md | Cover at least one error case with `assert.throws(fn, ErrorType)` for every function you test. |
 | L39 | Never change a test just to make it pass: fix the code instead. | merged | AGENTS.md | Never change a test just to make it pass - fix the code instead. |
 | L40 | Every module is listed in `README.md` with one line. | kept | AGENTS.md | |
-| L41 | Keep the docs up to date. | rewritten | AGENTS.md | add or update it in the same pull request. |
-| L42 | Code examples in the docs use `import`, never `require()`. | merged | .github/instructions/docs.instructions.md | Code examples use ES modules, like the code |
+| L41 | Keep the docs up to date. | rewritten | AGENTS.md | When you add or rename a module, update its line in `README.md` in the same pull request. |
+| L42 | Code examples in the docs use `import`, never `require()`. | merged | .github/instructions/docs.instructions.md | Code examples use ES modules, like the code: `import { weightedAverage } from './grades.js';` |
 | L43 | Never add dependencies: no `npm install <package>`. | merged | AGENTS.md | Never add dependencies (no `npm install <package>`). |
 | L44 | Never read or print `.env` files. | merged | AGENTS.md | L46 |
 | L45 | Never push to `main`: open a pull request. | kept | AGENTS.md | |

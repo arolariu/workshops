@@ -76,18 +76,24 @@ export function packagesOf(root) {
   return [...new Set(listFiles(root).filter((f) => f.endsWith('/package.json')).map((f) => path.posix.dirname(f)).filter((d) => globs.some((g) => matches(g, d))))].sort();
 }
 
-/** Every package has an AGENTS.md and a suite case; every instruction file and skill has an owner in CODEOWNERS. */
+/**
+ * Every package has an AGENTS.md and a suite case; in a workspace with instruction files, every instruction file and
+ * skill has an owner in CODEOWNERS. Without packages (the later labs, where this gate travels) there is nothing to
+ * cover, and owners are that level's business: no findings.
+ */
 export function coverage(root) {
   const out = [];
   const files = new Set(listFiles(root));
   const suite = loadSuite(root);
-  for (const p of packagesOf(root)) {
+  const pkgs = packagesOf(root);
+  for (const p of pkgs) {
     if (!files.has(`${p}/AGENTS.md`)) out.push(finding('coverage', `${p}/package.json`, 1, `${p} has no AGENTS.md: its rules live nowhere`));
     if (!suite) out.push(finding('coverage', SUITE, 1, `no ${SUITE}: nothing proves that ${p}'s rules load`));
     else if (!suite.cases.some((c) => c.cwd === p)) out.push(finding('coverage', SUITE, 1, `no canary case runs in ${p}`));
   }
   const co = ['.github/CODEOWNERS', 'CODEOWNERS', 'docs/CODEOWNERS'].find((f) => files.has(f));
   const owned = [...instructionSources(root).map((s) => s.path), ...[...files].filter((f) => /^\.(github|agents|claude)\/skills\/[^/]+\/SKILL\.md$/.test(f))];
+  if (!pkgs.length || !owned.length) return out;
   if (!co) out.push(finding('owner', '.github/CODEOWNERS', 1, 'no CODEOWNERS: a change to the instructions needs nobody\'s review'));
   else for (const f of owned) if (!ownersOf(read(root, co), f).length) out.push(finding('owner', f, 1, `${f} has no owner in ${co}`));
   return out;
@@ -153,5 +159,8 @@ function main(argv) {
   return code;
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths: a symlinked temp folder, a junction or an 8.3 short path must not make the script silently do nothing.
+const isMain = (() => {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) process.exitCode = main(process.argv.slice(2));

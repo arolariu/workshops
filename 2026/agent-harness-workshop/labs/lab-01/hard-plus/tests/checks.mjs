@@ -3,18 +3,24 @@
 // level's instruction files), so the answers never depend on how far your refactor got. M4–M5 look at your folder.
 import fs from 'node:fs';
 import path from 'node:path';
+import { freeNode, freeImport } from './helpers.mjs';
 
 const LINT = 'scripts/lint-instructions.mjs';
 const LEGACY = '.github/copilot-instructions.md';
 const INVENTORY = 'RULES-INVENTORY.md';
-// Copilot reads project skills from .github/skills/, .agents/skills/ and .claude/skills/ (`copilot skill --help`).
-const SKILL = /^\.(github|agents|claude)\/skills\/[^/]+\/SKILL\.md$/;
+// The skill lives in .agents/skills/ (a project location, `copilot skill --help`): bring carries .github/** into the
+// later labs, and Lab 02's missions are about their own skills.
+const SKILL = /^\.agents\/skills\/[^/]+\/SKILL\.md$/;
 const BUDGET = { always: 600, path: 900 };
+// What the code does, so what a surviving rule must say.
+const CODE = { indent: '2', quotes: 'single', decimals: '2', runner: 'node:test' };
 const fx = (t, name) => fs.readFileSync(path.join(t.exDir, 'tests', 'fixtures', name), 'utf8');
 const expected = (t) => JSON.parse(fx(t, 'legacy-expected.json'));
 const key = (r) => `${r?.file}:${r?.line}`;
 const pair = (a, b) => [key(a), key(b)].sort().join(' ~ ');
 const list = (xs, n = 3) => `${xs.slice(0, n).join('; ')}${xs.length > n ? ` (and ${xs.length - n} more)` : ''}`;
+const lid = (i) => `L${String(i + 1).padStart(2, '0')}`;
+const load = (t) => freeImport(t, LINT);
 
 /** The checks' own reading of rules (the same as parseRules() in your script). */
 function parseRules(text, file = '') {
@@ -23,11 +29,14 @@ function parseRules(text, file = '') {
   let i = 0;
   if (lines[0] === '---') i = lines.indexOf('---', 1) + 1 || lines.length;
   let fence = false;
+  let section = '';
   for (; i < lines.length; i++) {
     if (/^\s*(```|~~~)/.test(lines[i])) { fence = !fence; continue; }
-    if (fence || /^#{1,6}\s/.test(lines[i])) continue;
+    if (fence) continue;
+    const h = lines[i].match(/^#{1,6}\s+(.*)$/);
+    if (h) { section = h[1].trim(); continue; }
     const m = lines[i].match(/^\s*(?:[-*+]|\d+[.)])\s+(.*\S)\s*$/);
-    if (m) rules.push({ file, line: i + 1, text: m[1] });
+    if (m) rules.push({ file, line: i + 1, text: m[1], section });
   }
   return rules;
 }
@@ -63,11 +72,17 @@ function sourcesOf(t) {
 }
 const applies = (t, s, file) => s.applyTo === null || (Array.isArray(s.applyTo) ? s.applyTo.some((g) => t.globs.applyToMatches(g, file)) : t.globs.applyToMatches(s.applyTo, file));
 const TOPICS = [
-  ['indent', /\b(\d+)[- ]space/i, (m) => m[1]],
-  ['quotes', /\b(single|double)[- ]quot/i, (m) => m[1].toLowerCase()],
-  ['decimals', /\b(\d+|one|two|three)\s+decimals?\b/i, (m) => ({ one: '1', two: '2', three: '3' })[m[1].toLowerCase()] ?? m[1]],
-  ['runner', /\b(node:test|jest|mocha|vitest)\b/i, (m) => m[1].toLowerCase()],
+  ['indent', /\b(\d+)[- ]space/gi, (m) => m[1]],
+  ['quotes', /\b(single|double)[- ]quot/gi, (m) => m[1].toLowerCase()],
+  ['decimals', /\b(\d+|one|two|three)\s+decimals?\b/gi, (m) => ({ one: '1', two: '2', three: '3' })[m[1].toLowerCase()] ?? m[1]],
+  ['runner', /\b(node:test|jest|mocha|vitest)\b/gi, (m) => m[1].toLowerCase()],
 ];
+const NEGATED = /\b(?:never|not|no|don'?t|instead of|avoid|rather than)\b[^.;:,]{0,15}$/i;
+/** The value a rule gives a topic: its first mention that isn't negated, or null. */
+const valueOf = ([, re, value], text) => {
+  for (const m of String(text).matchAll(re)) if (!NEGATED.test(String(text).slice(0, m.index))) return value(m);
+  return null;
+};
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[`*_]/g, '').replace(/\s+/g, ' ').trim().replace(/[.;:]$/, '');
 
 /** The inventory table: [{ id, legacy, status, where, now }]. */
@@ -80,11 +95,12 @@ function inventoryRows(text) {
     });
 }
 const STATUSES = ['kept', 'moved', 'rewritten', 'fixed', 'resolved', 'merged'];
+const SURVIVED = ['kept', 'moved', 'rewritten', 'fixed'];
 
 export default (t) => [
   // M1 · Find the noise
   t.check('findVague() finds the 8 vague rules, and not the concrete ones', async () => {
-    const { findVague } = await t.import(LINT);
+    const { findVague } = await load(t);
     const want = expected(t).vague;
     const got = (findVague(fixtureRules(t)) ?? []).map(key);
     if (!got.length) return `findVague() found 0 of the ${want.length} vague rules (the first one: line ${want[0].split(':')[1]} of the legacy file, "Write clean code.").`;
@@ -98,22 +114,27 @@ export default (t) => [
     ]).map((v) => v.line);
     return sameSet(extra, [1], 'findVague() on four more rules (only "Write elegant, robust code." is vague)');
   }, { milestone: 'M1' }),
-  t.check('findDuplicates() finds the rules that say the same thing, across files', async () => {
-    const { findDuplicates } = await t.import(LINT);
+  t.check('findDuplicates() finds the rules that say the same thing, wherever they can meet', async () => {
+    const { findDuplicates } = await load(t);
     const got = (findDuplicates(fixtureRules(t)) ?? []).map((d) => pair(d.a, d.b));
     const want = expected(t).duplicates.map(([a, b]) => [a, b].sort().join(' ~ '));
     const set = sameSet(got, want, 'findDuplicates()');
     if (set !== true) return `${set} (Jaccard of words() ≥ 0.6, and only rules that can be in the context together.)`;
     const sibling = findDuplicates([
-      { file: 'packages/a/AGENTS.md', line: 1, text: 'Never add dependencies.' },
-      { file: 'packages/b/AGENTS.md', line: 1, text: 'Never add dependencies.' },
+      { file: 'packages/a/AGENTS.md', line: 1, text: 'Never add dependencies.', paths: ['packages/a/index.js'] },
+      { file: 'packages/b/AGENTS.md', line: 1, text: 'Never add dependencies.', paths: ['packages/b/index.js'] },
     ]);
-    return !sibling.length || 'Two scoped files that never load together can repeat each other: only compare rules from the same file, or where one side is always on (inContextTogether()).';
+    if (sibling.length) return 'Two scoped files that never apply to the same file never meet, so they may repeat each other: use inContextTogether().';
+    const overlap = findDuplicates([
+      { file: '.github/instructions/tests.instructions.md', line: 5, text: 'Every test checks one behaviour.', paths: ['grades.test.js'] },
+      { file: '.github/instructions/grades.instructions.md', line: 5, text: 'Every test checks one behaviour.', paths: ['grades.js', 'grades.test.js'] },
+    ]);
+    return overlap.length === 1 || 'The tests rules and the grades rules both load for grades.test.js, so a rule repeated in both is a duplicate: use inContextTogether(), which knows the paths.';
   }, { milestone: 'M1' }),
 
   // M2 · Conflicts and wrong commands
   t.check('findContradictions() finds the four topics where rules disagree', async () => {
-    const { findContradictions } = await t.import(LINT);
+    const { findContradictions } = await load(t);
     const want = expected(t).contradictions;
     const got = findContradictions(fixtureRules(t)) ?? [];
     const topics = got.map((c) => c.topic);
@@ -123,10 +144,15 @@ export default (t) => [
       if (JSON.stringify(c.values) !== JSON.stringify(want[c.topic].values)) return `${c.topic}: expected the values ${JSON.stringify(want[c.topic].values)} (sorted), got ${JSON.stringify(c.values)}.`;
       if (!Array.isArray(c.rules) || !c.rules.length) return `${c.topic}: list the rules that clash in "rules".`;
     }
-    return true;
+    const negated = findContradictions([
+      { file: 'AGENTS.md', line: 1, text: 'Tests use `node:test`.' },
+      { file: 'AGENTS.md', line: 2, text: 'No Jest: use `node:test` for every test.' },
+      { file: 'AGENTS.md', line: 3, text: 'Use 2-space indentation, never 4 spaces.' },
+    ]) ?? [];
+    return !negated.length || `"No Jest: use node:test" and "never 4 spaces" agree with the rest: read each rule with topicValue(), which skips negated mentions (found ${negated.map((c) => c.topic).join(', ')}).`;
   }, { milestone: 'M2' }),
   t.check('findBadCommands() flags the commands package.json can\'t run', async () => {
-    const { findBadCommands } = await t.import(LINT);
+    const { findBadCommands } = await load(t);
     const scripts = { test: 'node --test' };
     const got = (findBadCommands(fixtureRules(t), () => scripts) ?? []).map((b) => `${key(b)} ${b.command}`);
     const set = sameSet(got, expected(t).commands, 'findBadCommands() on the legacy file');
@@ -144,7 +170,7 @@ export default (t) => [
     put(LEGACY, 'y'.repeat(101));
     put('.github/instructions/t.instructions.md', `---\napplyTo: "**/*.test.js"\n---\n${'z'.repeat(50)}\n`);
     put('packages/x/AGENTS.md', 'w'.repeat(12));
-    const { tokensPerPath } = await t.import(LINT);
+    const { tokensPerPath } = await load(t);
     const got = tokensPerPath(copy, ['a.js', 'a.test.js', 'packages/x/b.test.js']);
     const want = [
       { path: 'a.js', files: ['AGENTS.md', LEGACY], tokens: 10 + 26 },
@@ -161,7 +187,8 @@ export default (t) => [
     const copy = t.copy(t.tmp());
     fs.mkdirSync(path.join(copy, '.github'), { recursive: true });
     fs.writeFileSync(path.join(copy, LEGACY), fx(t, 'legacy-instructions.md'));
-    const r = t.node([LINT, '--json'], { cwd: copy });
+    const r = freeNode(t, [LINT, '--json'], { cwd: copy });
+    if (r.triedCopilot) return `node ${LINT}: ${r.spent}`;
     let out;
     try { out = JSON.parse(r.stdout); } catch { return `node ${LINT} --json did not print JSON. ${r.all.trim().slice(0, 200)}`; }
     if (r.code !== 1) return `With the legacy file back in place, the linter should exit 1 (findings, over budget); it exited ${r.code}.`;
@@ -191,12 +218,13 @@ export default (t) => [
       [/npm test/, 'the test command (`npm test`)'],
       [s.split('\n').some((l) => /exam/i.test(l) && /\b5\b|\bfive\b/i.test(l)), 'the exam rule (the exam and 5 on one line)'],
       [/depend/i, 'the no-dependencies boundary'],
+      [/change a test|fix the code,? not the test/i, 'the "never change a test to make it pass" boundary'],
       [/\.env/, 'the `.env` boundary'],
       [/^#+.*command/im, 'a Commands section'],
       [/^#+.*(boundar|never)/im, 'a Boundaries section'],
       [/^#+.*done/im, 'a Definition of done section'],
     ].filter(([ok]) => !(typeof ok === 'boolean' ? ok : ok.test(s))).map(([, what]) => what);
-    return !missing.length || `AGENTS.md lost: ${missing.join(', ')}. Later labs and the canary depend on them.`;
+    return !missing.length || `AGENTS.md lost: ${missing.join(', ')}. Boundaries must hold on every turn, and later labs and the canary depend on them.`;
   }, { milestone: 'M4' }),
   t.check('Scoped files carry the rest, and each one matches real files', () => {
     const scoped = sourcesOf(t).filter((s) => s.applyTo !== null && s.path.startsWith('.github/instructions/'));
@@ -205,9 +233,10 @@ export default (t) => [
     const dead = scoped.filter((s) => !files.some((f) => applies(t, s, f))).map((s) => s.path);
     return !dead.length || `These files match no file in the project, so they never load: ${dead.join(', ')}.`;
   }, { milestone: 'M4' }),
-  t.check('One skill holds the grade-appeal procedure', () => {
+  t.check('One skill in .agents/skills/ holds the grade-appeal procedure, and no boundary', () => {
+    const elsewhere = t.find(/^\.(github|claude)\/skills\/[^/]+\/SKILL\.md$/).filter((f) => /appeal/i.test(t.read(f) ?? ''));
     const skills = t.find(SKILL).filter((f) => /appeal/i.test(t.read(f) ?? ''));
-    if (!skills.length) return 'Move the grade-appeal procedure into a skill: `.agents/skills/<name>/SKILL.md`. It is long and needed twice a term, so it should load only when someone appeals.';
+    if (!skills.length) return `Move the grade-appeal procedure into a skill in .agents/skills/<name>/SKILL.md${elsewhere.length ? ` (not ${elsewhere[0]}: bring would carry it into Lab 02, whose missions are about their own skills)` : ''}. It is long and needed twice a term, so it should load only when someone appeals.`;
     const f = skills[0];
     const { data, body } = t.frontmatter(f);
     const folder = f.split('/')[2];
@@ -215,14 +244,18 @@ export default (t) => [
     const d = String(data.description ?? '');
     if (d.length < 40 || !/\buse (it |this )?when\b/i.test(d)) return `${f}: the description is what Copilot sees on every turn; say what the skill does and when to use it ("Use when …"), in 40+ characters.`;
     const steps = body.split('\n').filter((l) => /^\s*\d+[.)]\s+\S/.test(l)).length;
-    return steps >= 10 || `${f} has ${steps} numbered step(s); the procedure has 10.`;
+    if (steps < 10) return `${f} has ${steps} numbered step(s); the procedure has 10.`;
+    const boundary = parseRules(body).find((r) => /dependenc|\.env|change a test|push to .?main/i.test(r.text));
+    return !boundary || `${f} holds a boundary ("${boundary.text.slice(0, 60)}"): a skill only loads on demand, so a boundary there doesn't hold on the other turns. Keep boundaries in AGENTS.md.`;
   }, { milestone: 'M4' }),
-  t.check('The new files agree with each other, and every command works', () => {
-    const sources = sourcesOf(t);
-    const rules = sources.flatMap((s) => parseRules(t.read(s.path), s.path));
-    for (const [id, re, value] of TOPICS) {
-      const vals = new Set(rules.map((r) => r.text.match(re)).filter(Boolean).map(value));
+  t.check('The new files agree with each other and with the code, and every command works', () => {
+    const rules = sourcesOf(t).flatMap((s) => parseRules(t.read(s.path), s.path));
+    for (const topic of TOPICS) {
+      const [id] = topic;
+      const vals = new Set(rules.map((r) => valueOf(topic, r.text)).filter((v) => v != null));
       if (vals.size > 1) return `Your instruction files still disagree on ${id}: ${[...vals].join(' vs ')}. Decide, and keep one.`;
+      if (!vals.size) return `No rule says the ${id} any more (the code uses ${CODE[id]}): a rule of the legacy file got lost.`;
+      if (!vals.has(CODE[id])) return `Your rules say ${id} = ${[...vals][0]}, but the code uses ${CODE[id]}: the code is the tie-breaker.`;
     }
     const scripts = JSON.parse(t.read('package.json') ?? '{}').scripts ?? {};
     for (const r of rules) {
@@ -235,7 +268,8 @@ export default (t) => [
     return true;
   }, { milestone: 'M4' }),
   t.check('Your linter is happy with your folder (exit 0)', () => {
-    const r = t.node([LINT, '--json']);
+    const r = freeNode(t, [LINT, '--json']);
+    if (r.triedCopilot) return `node ${LINT}: ${r.spent}`;
     if (r.code === 0) return true;
     let out = {};
     try { out = JSON.parse(r.stdout); } catch { return `node ${LINT} exits ${r.code}. ${r.all.trim().slice(0, 200)}`; }
@@ -247,39 +281,38 @@ export default (t) => [
   t.check('RULES-INVENTORY.md has one row per legacy rule', () => {
     const legacy = parseRules(fx(t, 'legacy-instructions.md'), LEGACY);
     const rows = inventoryRows(t.need(INVENTORY));
-    const id = (i) => `L${String(i + 1).padStart(2, '0')}`;
-    const missing = legacy.filter((r, i) => !rows.some((row) => row.id === id(i) && norm(row.legacy) === norm(r.text))).map((r, i) => `${id(legacy.indexOf(r))} "${r.text.slice(0, 50)}"`);
+    const missing = legacy.map((r, i) => ({ r, id: lid(i) })).filter(({ r, id }) => !rows.some((row) => row.id === id && norm(row.legacy) === norm(r.text))).map(({ r, id }) => `${id} "${r.text.slice(0, 50)}"`);
     if (missing.length === legacy.length) return `${INVENTORY} has no rows yet. Generate the table with node ${LINT} --inventory (before you delete ${LEGACY}, or on the copy: --inventory ../tests/fixtures/legacy-instructions.md).`;
     return !missing.length || `${missing.length} legacy rule(s) have no row (ID and text as --inventory prints them): ${list(missing)}.`;
   }, { milestone: 'M5' }),
-  t.check('Every row says where its rule lives now, and it really is there', () => {
+  t.check('Every row names a whole rule that really is where it says', () => {
     const legacy = parseRules(fx(t, 'legacy-instructions.md'), LEGACY);
     const rows = inventoryRows(t.need(INVENTORY));
-    const byId = new Map(rows.map((r) => [r.id, r]));
     if (!rows.length) return `${INVENTORY} has no rows yet (see the check above).`;
+    const byId = new Map(rows.map((r) => [r.id, r]));
     const homes = new Set([...sourcesOf(t).map((s) => s.path), ...t.find(SKILL)]);
+    const rulesIn = (f) => parseRules(t.read(f) ?? '', f).map((r) => norm(r.text));
     const problems = [];
-    for (let i = 0; i < legacy.length; i++) {
-      const row = byId.get(`L${String(i + 1).padStart(2, '0')}`);
-      if (!row) continue;
-      if (!STATUSES.includes(row.status)) { problems.push(`${row.id}: status "${row.status}" (use ${STATUSES.join(', ')})`); continue; }
-      if (!homes.has(row.where)) { problems.push(`${row.id}: "${row.where}" is not an instruction file or skill of this folder`); continue; }
-      const home = norm(t.read(row.where));
+    legacy.forEach((rule, i) => {
+      const row = byId.get(lid(i));
+      if (!row) return;
+      if (!STATUSES.includes(row.status)) { problems.push(`${row.id}: status "${row.status}" (use ${STATUSES.join(', ')})`); return; }
+      if (!homes.has(row.where)) { problems.push(`${row.id}: "${row.where}" is not an instruction file or skill of this folder`); return; }
       if (['kept', 'moved'].includes(row.status)) {
-        if (!home.includes(norm(legacy[i].text))) problems.push(`${row.id} is "${row.status}", but ${row.where} doesn't say "${legacy[i].text.slice(0, 50)}" (if you changed the words, it is "rewritten")`);
+        if (!rulesIn(row.where).includes(norm(rule.text))) problems.push(`${row.id} is "${row.status}", but no rule in ${row.where} reads "${rule.text.slice(0, 50)}" word for word (if you changed the words, it is "rewritten")`);
       } else if (row.status === 'merged' && /^L\d+$/.test(row.now.trim())) {
         const other = byId.get(row.now.trim());
-        if (!other || other.status === 'merged') problems.push(`${row.id} is merged into ${row.now.trim()}, which must be a row that survived (not merged itself)`);
-      } else if (!row.now.trim()) problems.push(`${row.id} is "${row.status}": put the rule as it reads now in "Now reads" (or, for merged, the row it joined: L07)`);
-      else if (!home.includes(norm(row.now))) problems.push(`${row.id}: ${row.where} doesn't say "${row.now.slice(0, 50)}"`);
-    }
+        if (!other || !SURVIVED.includes(other.status)) problems.push(`${row.id} is merged into ${row.now.trim()}, which must be a row whose rule survived (kept, moved, rewritten or fixed; not ${other?.status ?? 'missing'})`);
+      } else if (!row.now.trim()) problems.push(`${row.id} is "${row.status}": put the rule it became in "Now reads", a whole rule as ${row.where} says it (or, for merged, the row it joined: L07)`);
+      else if (!rulesIn(row.where).includes(norm(row.now))) problems.push(`${row.id}: no rule in ${row.where} reads "${row.now.slice(0, 60)}" (quote a whole rule or step, as it is written there)`);
+    });
     return !problems.length || `${problems.length} row(s) don't check out: ${list(problems, 2)}.`;
   }, { milestone: 'M5' }),
-  t.check('The noise is fixed, not moved: vague rules, wrong commands, contradictions', () => {
+  t.check('The noise is fixed, not moved: vague rules, wrong commands, contradictions, boundaries', () => {
     const legacy = parseRules(fx(t, 'legacy-instructions.md'), LEGACY);
     const rows = new Map(inventoryRows(t.need(INVENTORY)).map((r) => [r.id, r]));
     if (!rows.size) return `${INVENTORY} has no rows yet (see the first M5 check).`;
-    const idOf = (k) => `L${String(legacy.findIndex((r) => key(r) === k) + 1).padStart(2, '0')}`;
+    const idOf = (k) => lid(legacy.findIndex((r) => key(r) === k));
     const exp = expected(t);
     const status = (k) => rows.get(idOf(k))?.status;
     const vagueKept = exp.vague.filter((k) => ['kept', 'moved'].includes(status(k))).map(idOf);
@@ -290,6 +323,15 @@ export default (t) => [
       const own = c.rules.filter((k) => k.startsWith(`${LEGACY}:`));
       if (!own.some((k) => status(k) === 'resolved')) return `${topic}: the legacy file disagrees with itself or with AGENTS.md (${own.map(idOf).join(', ')}). Mark the side you dropped as "resolved", with the rule that won in "Now reads".`;
     }
-    return true;
+    const boundaries = legacy.map((r, i) => ({ r, id: lid(i) })).filter(({ r }) => r.section === 'Boundaries' || /change a test/i.test(r.text));
+    const away = boundaries.filter(({ id }) => rows.get(id) && !ALWAYS.includes(rows.get(id).where)).map(({ id }) => `${id} (${rows.get(id).where})`);
+    return !away.length || `Boundaries must hold on every turn, so they live in AGENTS.md: ${away.join(', ')}.`;
+  }, { milestone: 'M5' }),
+  t.check('Every legacy rule left a trace in your instruction files or the skill', () => {
+    const keys = expected(t).keys;
+    const legacy = parseRules(fx(t, 'legacy-instructions.md'), LEGACY);
+    const text = norm([...sourcesOf(t).map((s) => s.path), ...t.find(SKILL)].map((f) => t.read(f) ?? '').join('\n'));
+    const lost = Object.entries(keys).filter(([, k]) => k && !new RegExp(k, 'i').test(text)).map(([id, k]) => `${id} "${legacy[Number(id.slice(1)) - 1]?.text.slice(0, 50)}" (looked for "${k.replace(/\\/g, '')}")`);
+    return !lost.length || `${lost.length} rule(s) got lost on the way: ${list(lost, 2)}. Keep every rule: the inventory says where each one went, and it has to be there.`;
   }, { milestone: 'M5' }),
 ];

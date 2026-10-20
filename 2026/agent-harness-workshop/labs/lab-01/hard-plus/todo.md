@@ -24,13 +24,14 @@ one skill, within a budget. Keep every rule: an inventory proves that nothing wa
 - `findVague(rules)` returns the rules that use a `VAGUE` word and give nothing concrete to check (no `code`, no
   digit, no file name): the 8 in the legacy file, and not "Keep functions small (under 30 lines)"
 - `findDuplicates(rules)` returns `{ a, b, similarity }` for every pair whose `words()` have a Jaccard similarity of
-  at least 0.6 and that can meet in one context (`inContextTogether()`): the 9 pairs in the legacy file and
-  `AGENTS.md`, and never two sibling scoped files
+  at least 0.6 and that can meet in one context (`inContextTogether()`: the same file, an always-on file, or two
+  files that apply to a file in common): the 9 pairs in the legacy file and `AGENTS.md`, and never two sibling
+  scoped files
 
 ### M2 · Conflicts and wrong commands
 - `findContradictions(rules)` returns `{ topic, values, rules }` for every `TOPICS` entry where two rules that can
-  meet disagree: indentation (2 vs 4), quotes (single vs double), decimals (1 vs 2), the test runner (`jest` vs
-  `node:test`)
+  meet disagree, reading each rule with `topicValue()` ("No Jest: use node:test" says node:test): indentation (2 vs
+  4), quotes (single vs double), decimals (1 vs 2), the test runner (`jest` vs `node:test`)
 - `findBadCommands(rules, scriptsOf)` returns `{ file, line, command, why }` for every `npm test` or `npm run x` that
   the nearest `package.json` can't run, and every `yarn` or `pnpm` command: 5 in the legacy file
 
@@ -42,21 +43,23 @@ one skill, within a budget. Keep every rule: an inventory proves that nothing wa
 
 ### M4 · The diet
 - `.github/copilot-instructions.md` is gone; the always-on files cost at most 600 tokens, and no path more than 900
-- `AGENTS.md` (under 100 lines) keeps the canary, `npm test`, the exam rule, the three boundaries and its sections
+- `AGENTS.md` (under 100 lines) keeps the canary, `npm test`, the exam rule, the boundaries (no dependencies, never
+  change a test to make it pass, no `.env`) and its sections
 - At least three scoped files, each matching real files: tests and docs were there already, so add one for the code
   that has rules of its own
-- One skill, `.agents/skills/<name>/SKILL.md`, holds the 10-step grade-appeal procedure: its name matches its folder,
-  and its description says when to use it
-- The new files have one value per topic and no command that doesn't work, and `node scripts/lint-instructions.mjs`
-  exits 0
+- One skill, `.agents/skills/<name>/SKILL.md`, holds the 10-step grade-appeal procedure and no boundary: its name
+  matches its folder, and its description says when to use it
+- The new files have one value per topic, the code's (2 spaces, single quotes, 2 decimals, `node:test`), no command
+  that doesn't work, and `node scripts/lint-instructions.mjs` exits 0
 
 ### M5 · Nothing lost
 - `RULES-INVENTORY.md` has a row per legacy rule, `L01` to `L56`, as `--inventory` prints them
 - Every row has a status (`kept`, `moved`, `rewritten`, `fixed`, `resolved` or `merged`) and a `Where` that exists.
-  `kept` and `moved` rules are in `Where` word for word; the others say what they read now (or, for `merged`, which row
-  they joined), and that is in `Where` too
+  A `kept` or `moved` rule is a whole rule (or step) of `Where`, word for word; the others quote, in "Now reads", the
+  whole rule they became in `Where`, or, for `merged`, the row they joined, whose rule survived
 - Vague rules are rewritten or merged, never kept as they were; wrong commands are `fixed`; one side of every
-  contradiction is `resolved`
+  contradiction is `resolved`; the boundaries stay in `AGENTS.md`
+- Every rule leaves a trace: its key content (`30 lines`, `push to main`, `.env`, …) is still in your files
 
 ## 📂 Work here
 ```bash
@@ -85,8 +88,9 @@ word at the start of a word (`\b` before it, not after: `careful` also catches `
 <details><summary>Jaccard in four lines</summary>
 
 `a = words(x.text)`, `b = words(y.text)`; count the words in both; similarity = both ÷ (a.size + b.size − both).
-Compare each pair once (`j > i`), and skip the pairs `inContextTogether()` rules out: two scoped files for different
-folders never meet in one context, so a rule repeated there costs nothing.
+Compare each pair once (`j > i`), and skip the pairs `inContextTogether()` rules out. Two scoped files meet when
+their globs match a file in common (the tests rules and the grades rules both load for `grades.test.js`), so a rule
+repeated there costs twice; scoped files that never match the same file never meet.
 
 </details>
 
@@ -94,9 +98,9 @@ folders never meet in one context, so a rule repeated there costs nothing.
 <details><summary>A table beats free text</summary>
 
 Nobody can find every contradiction in prose. But most conflicts are about a handful of topics with a value: how many
-spaces, which quotes, how many decimals, which test runner. `TOPICS` gives each one a regex and a `value()`: collect
-the rules that match a topic and look for two that can meet and differ. When you meet a new kind of conflict, add a
-topic.
+spaces, which quotes, how many decimals, which test runner. `TOPICS` gives each one a regex and a `value()`, and
+`topicValue(topic, text)` reads a rule (skipping negated mentions like "never 4 spaces"): collect the rules with a
+value and look for two that can meet and differ. When you meet a new kind of conflict, add a topic.
 
 </details>
 
@@ -121,10 +125,11 @@ where. Read each source once, `tokens()` it, then add up per path.
 
 Ask of every rule: does it matter on every turn? Commands, boundaries, the domain rules and the canary do: they stay
 in `AGENTS.md`. Rules that only matter when the agent touches some files go to a scoped file with a tight `applyTo`.
-A long procedure needed twice a term goes into a skill: only its name and description are always in the context.
-Copilot reads project skills from `.github/skills/`, `.agents/skills/` and `.claude/skills/`; use `.agents/skills/`
-here. Lab 02 is all about `.github/skills/`, and this skill belongs to StudyBuddy's grading, so it shouldn't follow
-you there. History, FAQ and changelog hold no rules: they go.
+A long procedure needed twice a term goes into a skill: only its name and description are always in the context. A
+boundary never does: it must hold on every turn, so it stays in `AGENTS.md`. Copilot reads project skills from
+`.github/skills/`, `.agents/skills/` and `.claude/skills/`; use `.agents/skills/` here, because `bring` carries
+`.github/` into the later labs and Lab 02 is all about its own skills. History, FAQ and changelog hold no rules: they
+go.
 
 </details>
 
@@ -139,8 +144,8 @@ it, and mark the other one `resolved`, with the winner in "Now reads".
 <details><summary>Fill it in as you go</summary>
 
 Paste the `--inventory` table into `RULES-INVENTORY.md` first. Then, every time you move a rule, write its status and
-its new file next to it. For `merged`, "Now reads" can name the row that survived (`L03`) or quote the rule that
-already said it (`AGENTS.md` had a few of them).
+its new file next to it. "Now reads" quotes a whole rule as it stands in that file, not a piece of one: one rule per
+bullet makes that easy. For `merged`, it can also name the row that survived (`L03`).
 
 </details>
 

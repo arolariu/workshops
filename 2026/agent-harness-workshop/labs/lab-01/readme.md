@@ -69,8 +69,9 @@ Good to know:
   `copilot` in that folder and `copilot instruction list` shows it next to the root's.
 - Scoped files are found in the repository root and in the folder you start in, not in the folders between them. In
   this workshop, `src/` is one of those in-between folders, so start `copilot` in `src/`.
-- `--no-custom-instructions` keeps instructions out of the context, not off the disk: the agent can still open
-  `AGENTS.md` with its `view` tool. An honest "without" run needs a folder without instruction files (Lab 01 hard).
+- `--no-custom-instructions` keeps every instruction file out of the context (your personal and plugin ones too), but
+  not off the disk: the agent can still open `AGENTS.md` with its `view` tool. An honest "without" run needs a folder
+  without instruction files, or anything else that quotes them (Lab 01 hard).
 
 ## 🏛️ In the enterprise
 - **At scale:** treat instructions as code. They live in the repo, change through pull requests, and have owners

@@ -1,6 +1,7 @@
 // Free checks for Lab 01 · medium: rules for one folder.
 import fs from 'node:fs';
 import path from 'node:path';
+import { freeNode, freeImport } from './helpers.mjs';
 
 const TESTS = '.github/instructions/tests.instructions.md';
 const DOCS = '.github/instructions/docs.instructions.md';
@@ -22,12 +23,15 @@ function globCheck(t, file, must, mustNot, hint) {
   return Boolean(String(data.description ?? '').trim()) || `Add a one-line \`description:\` to the frontmatter of ${file}.`;
 }
 
-// A scoped rule that says the opposite of AGENTS.md, unless the line says "never …" / "not …" / "instead of …".
-const NEGATED = /\b(never|not|no|don'?t|instead of|avoid|rather than)\b/i;
+// A scoped rule that says the opposite of AGENTS.md. A mention right after "never", "no", "not", "instead of"… doesn't
+// count ("never `require()`", "write 7.5, never 75%"), but a negation somewhere else in the line doesn't save it.
+const NOT = String.raw`\b(?:never|not|no|don'?t|instead of|avoid|rather than)\b[^.;:,]{0,15}`;
 const CONFLICTS = [
-  { re: /require\s*\(|CommonJS/i, why: 'asks for CommonJS (`require()`), but AGENTS.md says "ES modules only"' },
-  { re: /percent|\d\s*%/i, also: /grade/i, why: 'shows grades as percentages, but AGENTS.md says grades use the 1-10 scale' },
+  { term: String.raw`(?:require\s*\(|CommonJS)`, why: 'asks for CommonJS (`require()`), but AGENTS.md says "ES modules only"' },
+  { term: String.raw`(?:percent|\d\s*%)`, also: /grade/i, why: 'shows grades as percentages, but AGENTS.md says grades use the 1-10 scale' },
 ];
+/** Does the line use the term without a negation right before it? */
+const asks = (line, term) => [...line.matchAll(new RegExp(term, 'gi'))].some((m) => !new RegExp(`${NOT}$`, 'i').test(line.slice(0, m.index)));
 
 const GLOBS = [
   ['**/*.test.js', 'grades.test.js', true],
@@ -79,7 +83,7 @@ export default (t) => [
     try { list = JSON.parse(r.stdout); } catch { return `Could not read the list: ${r.all.trim().slice(0, 200)}`; }
     const hit = list.find((s) => /\.github\/instructions\/tests\.instructions\.md$/.test(slash(s.sourcePath)));
     return (hit && Array.isArray(hit.applyTo) && hit.applyTo.length > 0) || 'Copilot does not list tests.instructions.md with an applyTo. Check the folder, the file name and the frontmatter.';
-  }, { needs: ['copilot'], milestone: 'M1' }),
+  }, { needs: ['copilot'], env: true, milestone: 'M1' }),
 
   // M2 · Rules for docs
   t.check('docs.instructions.md applies to the docs, and only to the docs', () =>
@@ -97,7 +101,7 @@ export default (t) => [
       const { body } = t.frontmatter(f);
       for (const line of bullets(body)) {
         for (const c of CONFLICTS) {
-          if (c.re.test(line) && (!c.also || c.also.test(line)) && !NEGATED.test(line)) hits.push(`${f}: "${line.trim().replace(/^[-*]\s+/, '').slice(0, 80)}" ${c.why}.`);
+          if (asks(line, c.term) && (!c.also || c.also.test(line))) hits.push(`${f}: "${line.trim().replace(/^[-*]\s+/, '').slice(0, 80)}" ${c.why}.`);
         }
       }
     }
@@ -111,12 +115,12 @@ export default (t) => [
 
   // M4 · Which rules apply where
   t.check('matches() understands **, *, ? and {a,b}', async () => {
-    const { matches } = await t.import(WHICH);
+    const { matches } = await freeImport(t, WHICH);
     const wrong = GLOBS.filter(([g, p, want]) => matches(g, p) !== want);
     return !wrong.length || `matches() is off for ${wrong.length} case(s): ${wrong.slice(0, 3).map(([g, p, want]) => `\`matches("${g}", "${p}")\` should be ${want}`).join('; ')}.`;
   }, { milestone: 'M4' }),
   t.check('applicable() lists the always-on files and every match', async () => {
-    const { applicable } = await t.import(WHICH);
+    const { applicable } = await freeImport(t, WHICH);
     const sources = [
       { path: 'AGENTS.md', applyTo: null },
       { path: TESTS, applyTo: ['**/*.test.js'] },
@@ -140,7 +144,8 @@ export default (t) => [
     fs.mkdirSync(path.join(copy, 'packages', 'x'), { recursive: true });
     fs.writeFileSync(path.join(copy, 'packages', 'x', 'AGENTS.md'), '# Package x\n- A rule for package x.\n');
     const paths = ['grades.js', 'grades.test.js', 'README.md', 'docs/grading.md', 'packages/x/a.js'];
-    const r = t.node([WHICH, '--json', ...paths], { cwd: copy });
+    const r = freeNode(t, [WHICH, '--json', ...paths], { cwd: copy });
+    if (r.triedCopilot) return `node ${WHICH}: ${r.spent}`;
     let rows;
     try { rows = JSON.parse(r.stdout); } catch { return `node ${WHICH} --json … did not print JSON. ${r.all.trim().slice(0, 200)}`; }
     const { applyToMatches } = t.globs;
@@ -154,7 +159,7 @@ export default (t) => [
     return true;
   }, { milestone: 'M4' }),
   t.check('Copilot agrees about the scoped files and their applyTo', async () => {
-    const { instructionSources } = await t.import(WHICH);
+    const { instructionSources } = await freeImport(t, WHICH);
     const mine = instructionSources(t.dir);
     const r = t.copilot(['instruction', 'list', '--json']);
     let list;

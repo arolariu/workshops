@@ -114,7 +114,10 @@ export function instructionSources(root) {
   return out;
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths: a symlinked temp folder, a junction or an 8.3 short path must not make the script silently do nothing.
+const isMain = (() => {
+  try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
 if (isMain) {
   const args = process.argv.slice(2);
   const unknown = args.find((a) => a.startsWith('--') && a !== '--json');
