@@ -1,6 +1,7 @@
 // The check kit: small helpers every exercise's tests/checks.mjs uses.
 // A check returns true/undefined (pass), a string (fail, shown to the student) or throws CheckFail.
 // To show evidence, fail with details: t.fail('Wrong total.', { expected: 42, actual: 41, files: ['grades.js'] }).
+import { guardNodeOptions } from './no-copilot.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -164,9 +165,12 @@ export function applyToMatches(applyTo, file) {
 // ---------- processes ----------
 const winQuote = (a) => (/^[\w\-./:=@,]+$/.test(a) ? a : `"${String(a).replace(/"/g, '""')}"`);
 export function spawnCompat(cmd, args, opts = {}) {
+  // A .cmd or .bat file only runs through the shell on Windows (Node refuses it otherwise); one command string, because
+  // passing args together with `shell` is deprecated.
+  if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(String(cmd))) return spawnSync([`"${cmd}"`, ...args.map(winQuote)].join(' '), { encoding: 'utf8', ...opts, shell: true });
   let r = spawnSync(cmd, args, { encoding: 'utf8', ...opts });
   if (r.error && r.error.code === 'ENOENT' && process.platform === 'win32') {
-    r = spawnSync(cmd, args.map(winQuote), { encoding: 'utf8', ...opts, shell: true });
+    r = spawnSync([cmd, ...args.map(winQuote)].join(' '), { encoding: 'utf8', ...opts, shell: true });
     if (r.status === 9009 || /is not recognized/.test(r.stderr ?? '')) r.error = Object.assign(new Error('not found'), { code: 'ENOENT' });
   }
   return r;
@@ -360,7 +364,7 @@ export function makeKit({ dir, exDir }) {
       return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '', all: `${r.stdout ?? ''}\n${r.stderr ?? ''}` };
     },
     unitTests(opts = {}) {
-      const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', ...(opts.files ?? [])], { cwd: opts.cwd ?? dir, encoding: 'utf8', timeout: 90000, env: { ...process.env, NODE_OPTIONS: '' } });
+      const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', ...(opts.files ?? [])], { cwd: opts.cwd ?? dir, encoding: 'utf8', timeout: 90000, env: { ...process.env, NODE_OPTIONS: guardNodeOptions() } });
       const out = r.stdout ?? '';
       const num = (k) => Number((out.match(new RegExp(`^# ${k} (\\d+)`, 'm')) ?? [])[1] ?? 0);
       const failing = [...out.matchAll(/^\s*not ok \d+ - (.*)$/gm)].map((m) => m[1].trim()).filter((n) => !/\.(m?js|cjs)$/.test(n));

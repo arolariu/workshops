@@ -6,7 +6,10 @@ import { register } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { makeKit, CheckFail, commandExists, spawnCompat, copilotBin } from './kit.mjs';
+import os from 'node:os';
+import { makeKit, CheckFail, commandExists, spawnCompat } from './kit.mjs';
+import { resolveCommand } from './process.mjs';
+import { guardEnvironment, installGuard, attemptsSince, NO_COPILOT } from './no-copilot.mjs';
 import { recoveryFor } from './doctor.mjs';
 
 register('./fake-sdk/loader.mjs', import.meta.url);
@@ -27,6 +30,15 @@ const token = await new Promise((resolve) => {
   process.stdin.on('error', () => resolve(''));
 });
 process.stdin.destroy();
+
+// Free checks never start Copilot with a prompt: the guard (no-copilot.mjs) goes in before any checks or learner code
+// load, in this process, in every Node child (NODE_OPTIONS) and for shells (a stub `copilot` first on PATH).
+const realCopilot = process.env.HARNESS_COPILOT ? resolveCommand(process.env.HARNESS_COPILOT) : resolveCommand('copilot');
+const guardDir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-nocopilot-'));
+Object.assign(process.env, guardEnvironment({ dir: guardDir, real: realCopilot }));
+installGuard();
+process.on('exit', () => { try { fs.rmSync(guardDir, { recursive: true, force: true }); } catch { /* temp */ } });
+let guardOffset = 0;
 // Each event starts on its own line even when learner output did not end with a newline; the parent drops that separator.
 const emit = (o) => {
   const bytes = Buffer.from(`\n@@harness ${token} ${stringify(o)}\n`);
@@ -36,7 +48,7 @@ const emit = (o) => {
 };
 
 const available = (tool) => {
-  if (tool === 'copilot') return commandExists(copilotBin());
+  if (tool === 'copilot') return Boolean(realCopilot);
   if (tool === 'gh-aw') return commandExists('gh') && spawnCompat('gh', ['aw', 'version'], { timeout: 20000 }).status === 0;
   return commandExists(tool);
 };
@@ -119,6 +131,12 @@ for (const [idx, c] of checks.entries()) {
     } finally {
       clearTimeout(timer);
       kit.cleanup(mark);
+    }
+    const tried = attemptsSince(process.env.HARNESS_COPILOT_LOG, guardOffset);
+    guardOffset = tried.offset;
+    if (tried.attempts.length) {
+      status = 'fail';
+      message = `${NO_COPILOT} This check's code tried: \`${tried.attempts[0].command}\``;
     }
   }
   emit({ type: 'result', idx, name: String(c.name), status, message, optional: Boolean(c.optional), milestone: milestoneOf(c), ...(needs ? { needs } : {}), detail, files: status === 'pass' ? [] : filesFor(c, message, supplied) });
