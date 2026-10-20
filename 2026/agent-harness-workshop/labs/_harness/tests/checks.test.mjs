@@ -146,12 +146,13 @@ test('a learner who watches stdout never sees the grader\'s events, so cannot re
   assert.equal(result.allPass, false);
 });
 
-// PR #1 follow-up: under parallel load on Windows this test once stalled before its first check; it now fails in minutes, not 10.
+// Root cause of the PR #1 flake (Phase 5 plan, measured): pipe writes are synchronous on Windows, so 40,000 small writes
+// meant 40,000 handoffs to the parent, each of which can wait a scheduler quantum under load (70 ms alone, seconds to
+// minutes in a saturated parallel run). One write of the same bytes and lines keeps the test's meaning without them.
 test('noisy learner output is bounded and marked, and protocol events are still parsed after the limit', { timeout: 180000 }, async () => {
   const { exDir, target } = fixture(`export default (t) => [
     t.check('noisy', () => {
-      const line = 'x'.repeat(99) + '\\n';
-      for (let i = 0; i < 40000; i++) process.stdout.write(line);
+      process.stdout.write(('x'.repeat(99) + '\\n').repeat(40000));
       process.stdout.write('y'.repeat(9 * 1024 * 1024));
       process.stdout.write('\\nafter the long line\\n');
       return true;
