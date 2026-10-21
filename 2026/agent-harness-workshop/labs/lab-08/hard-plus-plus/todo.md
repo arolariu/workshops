@@ -107,6 +107,10 @@ node campushub/.github/skills/campushub-release/scope.mjs <ticket>
   in the row). A "transferred" family is denied in full on CampusHub, "transferred" allowed calls all pass, a
   "transferred" eval case passed at least half of its recorded runs and is in CampusHub's suite, every repo version
   named exists, and in each table at least one row transferred or has a repo version
+- The closing explanation requires the learner's recorded StudyBuddy and CampusHub artifacts/results and distinguishes
+  structural/install success from semantic portability. It explains the recorded numbers, confounders, and any
+  alternate evidence rather than manufacturing green scores or assuming a universal threshold. The global shell and
+  write denials can confound hook ablations, so negative hook-ablation evidence is not proof to remove hooks.
 
 ### M5 · Governance report
 - `summarize(logs)` and `render(summary)` in `scripts/report.mjs` turn `audit/2026-w45.jsonl` (StudyBuddy) and
@@ -144,13 +148,17 @@ node campushub/.github/skills/campushub-release/scope.mjs <ticket>
 
 ## 📂 Work here
 ```bash
+# Expected working directory: workshop root (2026/agent-harness-workshop/)
 cd labs/lab-08/hard-plus-plus/src
 node scripts/release.mjs patch --dry-run        # M1: builds dist/
-cd campushub && apm install --target copilot && cd ..
-code campushub/.github/hooks/scripts/policy-guard.mjs
-code campushub/mcp/tickets-server.mjs PORTABILITY.md
-code scripts/report.mjs REVIEW.md
-node labs/start.mjs test lab-08 hard++          # from the workshop
+cd campushub                                    # now CampusHub is the expected cwd
+apm install --target copilot
+cd ..                                           # back to Lab tier src/
+node scripts/replay-hooks.mjs campushub attacks/pack.json
+node scripts/report.mjs
+# Expected working directory: workshop root
+cd ../../../..
+node labs/start.mjs test lab-08 hard++          # from the workshop root
 ```
 `campushub/` is the second team's repository: read its `README.md` first, and keep its 55 tests green
 (`npm test` in `campushub/`). Each new starter file has a `TODO(M<n>)` where its milestone's work goes. The level

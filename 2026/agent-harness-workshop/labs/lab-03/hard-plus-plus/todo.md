@@ -48,6 +48,22 @@ verdict.json      the reviewer's JSON            (contract: verdict)
   unique; `failed` is the number of `failing` tests; an `approve` verdict has no `high` finding
 
 ### M2 · A team with separate duties
+- Pipeline field types: `id`, `agent`, `contract` and prompts are strings; `credits` is a number; `reads` is an array of
+  strings; `writes` is a **scalar string** naming one output, not an array. For example:
+  ```json
+  {
+    "id": "plan",
+    "agent": "planner",
+    "credits": 30,
+    "reads": [],
+    "writes": "plan.json",
+    "contract": "plan",
+    "allow": ["read(plan.json)", "read(BUGS.md)"],
+    "deny": ["write(approval.json)", "write(plan.json)", "shell(git push)"],
+    "prompt": "Read BUGS.md and write the plan to {run}/plan.json."
+  }
+  ```
+  Human approval stages use `"human": true`, `"reads": ["plan.json"]`, and `"writes": "approval.json"` with no agent.
 - `pipeline.json`: stages `plan → approve → implement → test → review`; `approve` is `"human": true`, with no agent;
   every other stage has its own agent, a `credits` cap (30+), `reads`, `writes` (`plan.json`, `changes.patch`,
   `test-report.json`, `verdict.json`), a `contract` where it has one, `allow` and `deny`, and a `prompt` (`{goal}` and

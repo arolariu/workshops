@@ -1,6 +1,6 @@
 {
   "format": 2,
-  "revision": "50f70cec51ae04fbe1daa73066d8d208ee4b83ac",
+  "revision": "b61038eda79ab7a8f332babbed979be9062fd813",
   "note": "Every seed file of every exercise's src/ as a git blob ID (line endings normalised), and the chain: where each level starts from and which files are its own starter files. Regenerate with: node labs/start.mjs sync-seeds",
   "exercises": {
     "lab-00/easy": {
@@ -14,7 +14,7 @@
     },
     "lab-00/medium": {
       "FINDINGS.md": "d2e58f2c09544e57fd3d5409b3f8953a45df52b9",
-      "PLAN.md": "8ec3f9ebf8ed772415d23268493d123ed9c3d183",
+      "PLAN.md": "6ec5c5467dd441e3ef7170ef0db7d283721e558e",
       "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
       "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
       "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
@@ -25,7 +25,7 @@
     },
     "lab-00/hard": {
       "FINDINGS.md": "d2e58f2c09544e57fd3d5409b3f8953a45df52b9",
-      "PLAN.md": "84432d297ee358d1a4c6e7bd347f93792d4713f2",
+      "PLAN.md": "4b228d63771a0ebfe5ce178d16f7df3f1ffaf86e",
       "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
       "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
       "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
@@ -41,7 +41,7 @@
     },
     "lab-00/hard-plus": {
       "FINDINGS.md": "d2e58f2c09544e57fd3d5409b3f8953a45df52b9",
-      "PLAN.md": "84432d297ee358d1a4c6e7bd347f93792d4713f2",
+      "PLAN.md": "4b228d63771a0ebfe5ce178d16f7df3f1ffaf86e",
       "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
       "VARIANCE.md": "4a197051a4efaecd499511086ecf7b8f7ada64eb",
       "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
@@ -66,7 +66,7 @@
     },
     "lab-00/hard-plus-plus": {
       "FINDINGS.md": "d2e58f2c09544e57fd3d5409b3f8953a45df52b9",
-      "PLAN.md": "84432d297ee358d1a4c6e7bd347f93792d4713f2",
+      "PLAN.md": "4b228d63771a0ebfe5ce178d16f7df3f1ffaf86e",
       "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
       "VARIANCE.md": "3d64434db2bab18f2e94270225f986421dea8abe",
       "agent/fake-model.mjs": "e4a9b3be61c745c9b56ba7ad1187bbefd1fad7fd",
@@ -1277,9 +1277,9 @@
       "AGENTS.md": "f2cff65468aac5a747bf8b43c0e44cf7f433a7d4",
       "CHANGELOG.md": "95211399046e32794564fb6d882a57163476b7ea",
       "HARNESS.md": "aa68cdf79faa044491de3c4c984362d11ce87fa7",
-      "PORTABILITY.md": "20d5867191a2817b4159cec185edf8b089dbcbc1",
+      "PORTABILITY.md": "e3f6bd1441ccadb425eae552b1d61dde4203f22c",
       "README.md": "aea3fbc476a919079799955a1cdf3ab2603bb5db",
-      "REVIEW.md": "c8c9881fd6516b9b3ec64a2990bf3da8a97718ba",
+      "REVIEW.md": "96b5945d5e8e4ec3181f3273b5288bd1fa35008c",
       "apm.yml": "e2f9e778f50de90498a007e57d71cb9f1a4e83b8",
       "attacks.local.json": "77cf6abaf84be348e33a6eeba41afe03d17cda33",
       "attacks/pack.json": "89270755c20c8d9489e1d0c6ed7f005cbbaa4d3e",
@@ -1406,7 +1406,7 @@
     "lab-00/medium": {
       "from": "lab-00/easy",
       "starter": {
-        "PLAN.md": "8ec3f9ebf8ed772415d23268493d123ed9c3d183",
+        "PLAN.md": "6ec5c5467dd441e3ef7170ef0db7d283721e558e",
         "grades.js": "371e2c9c25bcde2a20946153d81d0a3584603959"
       },
       "inherited": {
@@ -1430,7 +1430,7 @@
       },
       "inherited": {
         "FINDINGS.md": "d2e58f2c09544e57fd3d5409b3f8953a45df52b9",
-        "PLAN.md": "84432d297ee358d1a4c6e7bd347f93792d4713f2",
+        "PLAN.md": "4b228d63771a0ebfe5ce178d16f7df3f1ffaf86e",
         "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
         "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
         "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
@@ -1455,7 +1455,7 @@
       },
       "inherited": {
         "FINDINGS.md": "d2e58f2c09544e57fd3d5409b3f8953a45df52b9",
-        "PLAN.md": "84432d297ee358d1a4c6e7bd347f93792d4713f2",
+        "PLAN.md": "4b228d63771a0ebfe5ce178d16f7df3f1ffaf86e",
         "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
         "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
         "deadlines.test.js": "887bd58c5cc8b4080d81347b81d12297ab8ab148",
@@ -1486,7 +1486,7 @@
       },
       "inherited": {
         "FINDINGS.md": "d2e58f2c09544e57fd3d5409b3f8953a45df52b9",
-        "PLAN.md": "84432d297ee358d1a4c6e7bd347f93792d4713f2",
+        "PLAN.md": "4b228d63771a0ebfe5ce178d16f7df3f1ffaf86e",
         "README.md": "6bd41c6116c09a4df4497d823c0bf421aedbcae5",
         "VARIANCE.md": "3d64434db2bab18f2e94270225f986421dea8abe",
         "deadlines.js": "345df150d4b1ca5b10c3cdfee74f532897e6c2aa",
@@ -2863,8 +2863,8 @@
     "lab-08/hard-plus-plus": {
       "from": "lab-08/hard-plus",
       "starter": {
-        "PORTABILITY.md": "20d5867191a2817b4159cec185edf8b089dbcbc1",
-        "REVIEW.md": "c8c9881fd6516b9b3ec64a2990bf3da8a97718ba",
+        "PORTABILITY.md": "e3f6bd1441ccadb425eae552b1d61dde4203f22c",
+        "REVIEW.md": "96b5945d5e8e4ec3181f3273b5288bd1fa35008c",
         "audit/2026-w45.jsonl": "61362a653aa2944370c4c27891b8e09f1ebbda55",
         "campushub/.env.campushub.example": "bd63857ee0817be3602123f6384cb577a76769df",
         "campushub/.gitattributes": "0730d2ad1ecf2c515e84b4ddf02dcccadf421f17",

@@ -6,8 +6,9 @@
 Students keep asking "what's my GPA?". Add a `gpa(courses)` function to `grades.js`, but this time **think first**:
 let Copilot plan before it types, read the plan like a tech lead, build it, then review the diff like a code reviewer.
 Then break something on purpose and undo it with `/rewind`, so you know the safety net works before you need it.
-Last, measure: is planning worth its tokens? Do the same request once without a plan and compare `/usage`.
-`PLAN.md` is your logbook: the plan, your review, the rewind, and the bill.
+Last, perform each interactive step honestly, and measure: is planning worth its tokens? Do the same request once without a plan and compare `/usage`.
+`PLAN.md` separates automated checks from live-step evidence: the plan, review, rewind, and bill entries are
+completed only by actions you actually performed. Text mentioning a command is not proof of a live interaction.
 
 ## 📋 Requirements
 1. `PLAN.md` holds the plan (3+ numbered steps) that names `gpa`, how it handles bad input, and how it's tested.
@@ -15,8 +16,8 @@ Last, measure: is planning worth its tokens? Do the same request once without a 
    It throws a `TypeError` if `courses` is not an array, and a `RangeError` for an empty list, a grade outside 1–10,
    or credits that are not a positive whole number.
 3. `grades.test.js` tests `gpa`: the normal case and the errors. `npm test` is green.
-4. `PLAN.md` records your `/diff` review (2+ findings) and the turn you undid with `/rewind`.
-5. `PLAN.md` compares `/usage` for a plan-first run and a direct run, with numbers, and says which cost more and why.
+4. `PLAN.md` records the evidence template for live `/diff` and `/rewind` steps, separately from automated checks.
+5. `PLAN.md` compares actual `/usage` numbers for a plan-first run and a direct run, with numbers, and says which cost more and why.
 
 ## 🧭 Milestones
 ### M1 · The plan

@@ -18,6 +18,10 @@ with `scanHarness('campushub')`).
   organisation's force-push deny beats CampusHub's own override.
 - **Portable, on the record:** `PORTABILITY.md` (4 of 6 families and 1 of 8 eval cases transferred as they were; a
   false positive fixed upstream in 1.0.1); `campushub/evals/cases.json` holds CampusHub's own versions.
+- **Record, not guarantee:** the recorded artifact reports the learner's StudyBuddy and CampusHub results.
+  Structural checks prove installation and locking, not semantic portability. These figures are one trial's recorded
+  evidence, not live model evidence or a universal threshold, so confounders must be reported rather than green scores
+  manufactured. Global shell/write denials can confound hook ablations; this is not proof that hooks should be removed.
 - **Accountable:** `scripts/report.mjs` merges both repositories' logs: 7 sessions, 21 calls, 9 denied, 10 premium
   requests in week 45; the riskiest session tried three ways to read CampusHub's key, and all three were denied.
 

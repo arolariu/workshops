@@ -51,9 +51,13 @@ how many reviews a month of real pull requests would start, and what the worst c
 
 ## 📂 Work here
 ```bash
+# Start here: workshop root (2026/agent-harness-workshop/)
 cd labs/lab-07/hard/src
 code .github/workflows/pr-review.md scripts/review-plan.mjs
 node scripts/review-plan.mjs fixtures/prs.json
+cd ../../../..
+
+# Expected working directory: workshop root
 node labs/start.mjs test lab-07 hard        # from the workshop folder
 ```
 `pr-review.md` is an empty frame with a TODO per milestone. Your Lab 03 reviewer is already in

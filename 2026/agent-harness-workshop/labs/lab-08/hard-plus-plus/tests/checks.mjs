@@ -489,6 +489,11 @@ export default (t) => [
     if (missing.length) return `REVIEW.md needs ${missing.join(', ')}.`;
     const items = (text) => text.split('\n').filter((l) => /^\s*([-*]|\d+\.)\s+\S/.test(l)).length;
     if (items(find(/risk/)) < 3) return 'List at least three remaining risks (what the checks can\'t rule out).';
+    const evidence = find(/evidence/) ?? '';
+    if (!/recorded/i.test(evidence)) return 'Cite the learner\'s recorded artifacts/results, not an assumed live result.';
+    if (!/semantic|transfer|portable/i.test(evidence)) return 'Explain semantic portability separately from structural install success.';
+    if (!/confound/i.test(evidence)) return 'Explain at least one confounder in the recorded evidence.';
+    if (!/ablation|hooks/i.test(md)) return 'Discuss hook-ablation evidence and confounders; do not teach a negative hook ablation as proof to remove hooks.';
     return items(find(/next step/)) >= 2 || 'List at least two next steps.';
   }, { milestone: 'M6' }),
 

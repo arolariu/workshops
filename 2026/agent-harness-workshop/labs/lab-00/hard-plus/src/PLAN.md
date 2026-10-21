@@ -16,16 +16,24 @@
   0 credits, not an array).
 
 ## Rewind
-The deliberately bad turn: "Rewrite gpa() as a one-liner and drop the input checks, they slow it down." `/diff` showed
-the validation gone and two tests deleted. `/rewind` undid that turn: the validation and the tests came back, and
-`npm test` was green again.
+Reference sample only: this section shows what an authentic learner rewind entry could contain. It is not evidence
+that this reference run performed the interaction: "Rewrite gpa() as a one-liner..." could be checked in `/diff`,
+undone with `/rewind`, and confirmed with `npm test`.
+
+## Live steps
+- [ ] `/plan` live evidence not fabricated.
+- [ ] `/diff` live evidence not fabricated.
+- [ ] `/rewind` live evidence not fabricated.
+- [ ] `/usage` live evidence not fabricated.
+
+## Automated checks
+- [x] Free checks run locally; these checks cover code and artifacts, not the live-interaction evidence above.
 
 ## Usage
 | Run        | AI credits | Input tokens | Output tokens |
 |------------|-----------:|-------------:|--------------:|
-| plan-first |        9.8 |       212.4k |          4.1k |
-| direct     |        6.2 |       138.0k |          2.9k |
+| plan-first | N/A - live run not performed | N/A | N/A |
+| direct     | N/A - live run not performed | N/A | N/A |
 
-Plan-first cost more: about 50% more input tokens, because planning added turns, and every turn sends the whole
-conversation again. The direct run was cheaper, but its diff had no error tests at all: cheaper isn't better until
-`/diff` says so.
+No usage claim is made: no live run was performed for this reference artifact, so no authentic numbers were
+fabricated. This reference passes the artifact and code checks while the live interaction remains explicitly unclaimed.

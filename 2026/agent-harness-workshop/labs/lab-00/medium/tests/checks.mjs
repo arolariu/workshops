@@ -32,7 +32,50 @@ function usageTable(body) {
   return { head: head.map((h) => h.toLowerCase()), rows: rest.filter((r) => !r.every((c) => /^:?-+:?$/.test(c))) };
 }
 
+export function liveStepClaimed(live, step) {
+  const escaped = step.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const line = live.split('\n').find((l) => new RegExp(escaped, 'i').test(l));
+  return Boolean(line && /^\s*-\s*\[[xX]\]/.test(line));
+}
+export function validateUsageEvidence(live, usageBody) {
+  if (!liveStepClaimed(live, '/usage')) {
+    const hasUnclaimed = /\b(?:N\/A|not performed|unclaimed|live evidence not claimed)\b/i.test(live)
+      || /\b(?:N\/A|not performed|unclaimed)\b/i.test(usageBody);
+    return hasUnclaimed || 'Mark /usage unclaimed and use N/A until an actual live run supplies both rows.';
+  }
+  const table = usageTable(usageBody);
+  if (!table) return 'Claimed live /usage evidence needs the usage table.';
+  const col = (re) => table.head.findIndex((h) => re.test(h));
+  const cols = { credits: col(/credit|premium/), input: col(/input/), output: col(/output/) };
+  if (Object.values(cols).some((i) => i < 0)) return 'Keep the columns: Run, AI credits (or Premium requests), Input tokens, Output tokens.';
+  for (const run of ['plan-first', 'direct']) {
+    const row = table.rows.find((r) => r[0]?.toLowerCase().replace(/[`*]/g, '') === run);
+    if (!row) return `The claimed live table has no "${run}" row.`;
+    for (const [name, i] of Object.entries(cols)) {
+      if (!(number(row[i]) > 0)) return `${run}'s ${name} value must be numeric when /usage is claimed live.`;
+    }
+  }
+  return true;
+}
+
 export default (t) => [
+  t.check('PLAN.md separates automated checks from actual live-step evidence', () => {
+    const body = plan(t);
+    if (!/## Live steps/i.test(body)) return 'Add a "## Live steps" section listing /plan, /diff, /rewind and /usage. Leave it unchecked/not performed until each action happened.';
+    if (!/## Automated checks/i.test(body)) return 'Add a "## Automated checks" section so free checks are not claimed as live interaction evidence.';
+    const review = need(t, 'Review');
+    const live = section(body, 'Live steps') ?? '';
+    for (const step of ['/plan', '/diff', '/rewind', '/usage']) {
+      const line = live.split('\n').find((l) => new RegExp(step.replace('/', '\\/'), 'i').test(l));
+      if (liveStepClaimed(line ?? '', step) && /\b(?:not performed|unperformed|not run|not recorded yet)\b/i.test(line ?? '')) {
+        return `Do not mark ${step} complete while that same checklist line says it was not performed.`;
+      }
+      if (!liveStepClaimed(line ?? '', step) && /\b(?:completed live|recorded live)\b/i.test(line ?? '') && !/\b(?:not performed|unperformed)\b/i.test(line ?? '')) {
+        return `${step} needs an explicit [x] only after the live action happened.`;
+      }
+    }
+    return typeof review === 'string';
+  }, { milestone: 'M3' }),
   t.check('PLAN.md holds the plan: 3+ numbered steps', () => {
     const body = need(t, 'Plan');
     const steps = body.split('\n').filter((l) => /^\s*\d+[.)]\s+\S/.test(l)).length;
@@ -101,20 +144,23 @@ export default (t) => [
     const body = need(t, 'Usage');
     const table = usageTable(body);
     if (!table) return 'The Usage section needs the table from the starter: | Run | AI credits | Input tokens | Output tokens |';
+    const live = section(plan(t), 'Live steps') ?? '';
+    const usageValidation = validateUsageEvidence(live, body);
+    if (usageValidation !== true) return usageValidation;
     const col = (re) => table.head.findIndex((h) => re.test(h));
     const cols = { credits: col(/credit|premium/), input: col(/input/), output: col(/output/) };
     if (Object.values(cols).some((i) => i < 0)) return 'Keep the table\'s columns: Run, AI credits (or Premium requests), Input tokens, Output tokens.';
-    for (const run of ['plan-first', 'direct']) {
-      const row = table.rows.find((r) => r[0].toLowerCase().replace(/[`*]/g, '') === run);
-      if (!row) return `The table has no "${run}" row.`;
-      const bad = Object.entries(cols).filter(([, i]) => !(number(row[i]) > 0)).map(([k]) => k);
-      if (bad.length) return `The ${run} row needs a number > 0 for ${bad.join(', ')} (like 4.1, 45,300 or 45.3k): copy them from /usage.`;
-    }
     return true;
   }, { milestone: 'M4' }),
   t.check('…and says which one cost more, and why', () => {
     const body = need(t, 'Usage');
     const prose = body.split('\n').filter((l) => !/^\s*\|/.test(l)).join(' ');
+    const live = section(plan(t), 'Live steps') ?? '';
+    if (!liveStepClaimed(live, '/usage')) {
+      return /no live|no authentic|not performed|not fabricated/i.test(prose) || /N\/A/i.test(prose)
+        ? true
+        : 'Without live usage evidence, say the comparison is not claimed and do not invent numbers.';
+    }
     return (/plan-first|direct/i.test(prose) && /\b(more|less|fewer|cheaper|same|twice|half)\b/i.test(prose))
       || 'Below the table, one or two sentences: which run cost more, and why (more turns? more context?).';
   }, { milestone: 'M4' }),

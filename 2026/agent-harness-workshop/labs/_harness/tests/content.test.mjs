@@ -15,6 +15,49 @@ const labsDir = path.resolve(import.meta.dirname, '..', '..');
 const catalog = loadCatalog(labsDir);
 const levels = catalog.flatMap((lab) => lab.levels);
 
+test('follow-up regressions for completion, contradictions and learner command clarity', async () => {
+  const lab00 = fs.readFileSync(path.join(labsDir, 'lab-00/medium/src/PLAN.md'), 'utf8');
+  assert.match(lab00, /## Live steps/, 'Lab 00 must separate live evidence from automated checks');
+  assert.match(lab00, /Automated checks/, 'Lab 00 evidence template must label free-check coverage honestly');
+  const lab00Checks = await import('../../lab-00/medium/tests/checks.mjs');
+  assert.equal(typeof lab00Checks.liveStepClaimed, 'function');
+  assert.equal(lab00Checks.liveStepClaimed('- [x] `/diff` performed live\n- [ ] `/rewind` performed live', '/rewind'), false);
+  assert.equal(lab00Checks.liveStepClaimed('- [x] `/diff` performed live\n- [ ] `/rewind` performed live', '/diff'), true);
+  assert.equal(typeof lab00Checks.validateUsageEvidence, 'function');
+  assert.equal(lab00Checks.validateUsageEvidence('- [ ] `/usage` recorded live: **not performed yet**', '| plan-first | 1 | 100 | 10 |\n| direct | 2 | 200 | 20 |'), true);
+  assert.match(lab00Checks.validateUsageEvidence('- [x] `/usage` recorded live', '| Run | AI credits | Input tokens | Output tokens |\n| plan-first | blank | 100 | 10 |\n| direct | 2 | 200 | 20 |'), /numeric/i);
+
+  const contradiction = await import('../../lab-01/medium/tests/checks.mjs');
+  assert.equal(typeof contradiction.asks, 'function', 'Lab 01 should expose its contradiction predicate for regression tests');
+  assert.equal(contradiction.asks('Grades use the 1-10 scale; do not convert grades to percentages.', String.raw`(?:percent|\d\s*%)`), false);
+  assert.equal(contradiction.asks('Write 7.5, never 75%.', String.raw`(?:percent|\d\s*%)`), false);
+  assert.equal(contradiction.asks('Show grades as percentages (7.5 becomes 75%).', String.raw`(?:percent|\d\s*%)`), true);
+  assert.equal(contradiction.asks('Do not round grades; display grades as percentages.', String.raw`(?:percent|\d\s*%)`), true);
+  assert.equal(contradiction.asks('Do not convert grades to percentages; keep the 1-10 scale.', String.raw`(?:percent|\d\s*%)`), false);
+  assert.equal(contradiction.asks('Do not round grades and display grades as percentages.', String.raw`(?:percent|\d\s*%)`), true);
+  assert.equal(contradiction.asks('There is no build step but use require() for modules.', String.raw`(?:require\s*\(|CommonJS)`), true);
+
+  const lab03 = fs.readFileSync(path.join(labsDir, 'lab-03/hard-plus-plus/todo.md'), 'utf8');
+  assert.match(lab03, /writes.*string/i);
+  assert.match(lab03, /"writes":\s*"plan\.json"/);
+
+  const lab07 = fs.readFileSync(path.join(labsDir, 'lab-07/hard/todo.md'), 'utf8');
+  assert.match(lab07, /review-plan\.mjs.*fixtures\/prs\.json.*work(?:shop|ing directory)|cd labs\/lab-07\/hard\/src/si);
+
+  const lab08 = fs.readFileSync(path.join(labsDir, 'lab-08/hard-plus-plus/todo.md'), 'utf8');
+  assert.match(lab08, /Expected working directory/i);
+  assert.match(lab08, /campushub/);
+
+  const portability = fs.readFileSync(path.join(labsDir, 'lab-08/hard-plus-plus/todo.md'), 'utf8');
+  assert.match(portability, /learner's recorded/i);
+  assert.match(portability, /confound/i);
+  assert.match(portability, /hook-ablation/i);
+  const capstoneChecker = fs.readFileSync(path.join(labsDir, 'lab-08/hard-plus-plus/tests/checks.mjs'), 'utf8');
+  assert.doesNotMatch(capstoneChecker, /78\.1%.*37\.5%|37\.5%.*78\.1%/, 'acceptance must not hardcode one trial percentages');
+  assert.match(capstoneChecker, /recorded/i);
+  assert.match(capstoneChecker, /semantic|transfer|portable/i);
+});
+
 test('every todo.md has a title, a mission and a time', () => {
   assert.ok(levels.length >= 24);
   for (const ex of levels) {

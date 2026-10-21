@@ -78,6 +78,7 @@ node scripts/rollback.mjs --to <version> [--dry-run] [--json]
 
 ## 📂 Work here
 ```bash
+# Start here: workshop root (2026/agent-harness-workshop/)
 cd labs/lab-08/hard-plus/src
 code .github/workflows/harness-ci.yml .github/CODEOWNERS
 code .github/pull_request_template.md harness.json CHANGELOG.md
@@ -85,6 +86,9 @@ code scripts/release.mjs .github/workflows/harness-review.md
 code scripts/rollback.mjs HARNESS.md
 node scripts/harness-check.mjs                  # the maturity level
 node scripts/release.mjs minor --dry-run        # then look in dist/
+
+# Expected working directory: workshop root
+cd ../../../..
 node labs/start.mjs test lab-08 hard+           # from the workshop
 ```
 Each new starter file has a `TODO(M<n>)` where its milestone's work goes (M5's runbook goes in `HARNESS.md`). The

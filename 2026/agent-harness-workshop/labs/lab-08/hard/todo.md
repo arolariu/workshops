@@ -81,12 +81,17 @@ Optional: "agent": "reviewer", "allow": ["studybuddy(get_grades)"],
 
 ## 📂 Work here
 ```bash
+# Start here: workshop root (2026/agent-harness-workshop/)
 cd labs/lab-08/hard/src
 node scripts/eval.mjs --from evals/runs/full          # score recordings
 node scripts/eval.mjs --dry-run --runs 1 --budget 240 # plan, run nothing
 node scripts/eval.mjs --from evals/runs/ablate-skills \
   --baseline evals/baseline.json                      # a regression?
 node scripts/eval.mjs --ablate all                    # layer value
+cd ../../../..
+
+# Expected working directory: workshop root
+node labs/start.mjs test lab-08 hard
 ```
 
 The recordings are `evals/runs/<suite>/<case-id>.jsonl`: four runs per case in `full/`, two in each `ablate-*/`,

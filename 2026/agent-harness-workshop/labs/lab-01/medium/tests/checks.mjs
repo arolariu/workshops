@@ -29,8 +29,19 @@ const CONFLICTS = [
   { term: String.raw`(?:require\s*\(|CommonJS)`, why: 'asks for CommonJS (`require()`), but AGENTS.md says "ES modules only"' },
   { term: String.raw`(?:percent|\d\s*%)`, also: /grade/i, why: 'shows grades as percentages, but AGENTS.md says grades use the 1-10 scale' },
 ];
-/** Does the line use the term without a negation right before it? */
-const asks = (line, term) => [...line.matchAll(new RegExp(term, 'gi'))].some((m) => !new RegExp(`${NOT}$`, 'i').test(line.slice(0, m.index)));
+/** Does the line assert the term positively, rather than merely negating it? */
+export const asks = (line, term) => [...line.matchAll(new RegExp(term, 'gi'))].some((m) => {
+  const segments = [];
+  const separator = /[.;:,]|\s+(?:and|but|however|while|whereas)\s+/gi;
+  let start = 0;
+  for (const hit of line.matchAll(separator)) {
+    segments.push({ start, end: hit.index, text: line.slice(start, hit.index) });
+    start = hit.index + hit[0].length;
+  }
+  segments.push({ start, end: line.length, text: line.slice(start) });
+  const segment = segments.find((part) => m.index >= part.start && m.index < part.end);
+  return segment && !/\b(?:never|not|no|don'?t|do not|instead of|avoid|rather than)\b/i.test(segment.text);
+});
 
 const GLOBS = [
   ['**/*.test.js', 'grades.test.js', true],
