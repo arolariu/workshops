@@ -1,0 +1,31 @@
+{
+  "$comment": "The role policy for the fixture agents of the Lab 03 hard+ checks. No builtinAgents here, so the escalations are the custom agents'.",
+  "version": 1,
+  "roles": {
+    "reader": { "may": ["read", "search"] },
+    "writer": { "may": ["read", "search", "edit"] },
+    "portal": { "may": ["read", "mcp:read"] },
+    "runner": { "may": ["read", "execute"], "invocation": "explicit" },
+    "deployer": { "may": ["read", "edit", "execute"], "invocation": "explicit" },
+    "coordinator": { "may": ["read", "search", "agent"] },
+    "lead": { "may": ["read", "search", "edit", "execute", "web", "agent", "todo", "mcp:read", "mcp:write"] }
+  },
+  "agents": {
+    "fx-reader": "reader",
+    "fx-alias": "reader",
+    "fx-open": "writer",
+    "fx-star": "writer",
+    "fx-mcp": "portal",
+    "fx-mcp-ok": "portal",
+    "fx-typo": "reader",
+    "fx-runner": "runner",
+    "fx-hidden": "deployer",
+    "fx-infer": "runner",
+    "fx-deputy": "coordinator",
+    "fx-lead": "lead",
+    "nested--fx-sub": "reader"
+  },
+  "mcp": {
+    "studybuddy": { "get_deadlines": "read", "get_grades": "read", "get_courses": "read", "get_exam_dates": "read", "mark_done": "write" }
+  }
+}

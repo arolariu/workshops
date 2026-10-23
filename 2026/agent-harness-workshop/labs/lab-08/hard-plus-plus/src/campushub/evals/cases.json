@@ -1,0 +1,4 @@
+{
+  "about": "TODO(M4): CampusHub's eval suite, in the format of evals/cases.json: StudyBuddy's cases that transferred (same id) and CampusHub's own versions of the others. Check it with: node ../scripts/eval.mjs --cases evals/cases.json --dry-run",
+  "cases": []
+}

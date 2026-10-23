@@ -1,0 +1,21 @@
+{
+  "$comment": "TODO(M2): the agent team. Per stage: agent, credits, reads, writes, contract, allow, deny and prompt ({goal} and {run} get filled in); the approve stage is \"human\": true. Then a budget that pays for one pass.",
+  "budget": 0,
+  "stages": [
+    {
+      "id": "plan"
+    },
+    {
+      "id": "approve"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "test"
+    },
+    {
+      "id": "review"
+    }
+  ]
+}

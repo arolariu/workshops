@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "default": "allow",
+  "rules": [
+    {
+      "id": "no-recursive-force-delete",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "Recursive force-deletes (rm -rf, Remove-Item -Recurse, rd /s /q) are blocked in this project. Don't work around it by deleting the files one by one: ask the human to remove the folder.",
+      "match": {
+        "tool": "shell",
+        "command": "^delete --force --recursive\\b"
+      }
+    },
+    {
+      "id": "no-github-token",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a GitHub token. Secrets never go into files or commands: read it from an environment variable instead.",
+      "match": {
+        "tool": [
+          "write",
+          "shell"
+        ],
+        "text": "\\bghp_[A-Za-z0-9]{36}\\b"
+      }
+    },
+    {
+      "id": "no-github-fine-grained-token",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a GitHub fine-grained token. Secrets never go into files or commands: read it from an environment variable instead.",
+      "match": {
+        "tool": [
+          "write",
+          "shell"
+        ],
+        "text": "\\bgithub_pat_[A-Za-z0-9_]{22,}"
+      }
+    },
+    {
+      "id": "no-aws-key",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like an AWS access key. Secrets never go into files or commands: read it from an environment variable instead.",
+      "match": {
+        "tool": [
+          "write",
+          "shell"
+        ],
+        "text": "\\bAKIA[0-9A-Z]{16}\\b"
+      }
+    },
+    {
+      "id": "no-private-key",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a private key. Secrets never go into files or commands: read it from an environment variable instead.",
+      "match": {
+        "tool": [
+          "write",
+          "shell"
+        ],
+        "text": "-----BEGIN [A-Z ]*PRIVATE KEY-----"
+      }
+    },
+    {
+      "id": "no-api-key",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like an API key. Secrets never go into files or commands: read it from an environment variable instead.",
+      "match": {
+        "tool": [
+          "write",
+          "shell"
+        ],
+        "text": "\\bsk-[A-Za-z0-9]{32,}\\b"
+      }
+    }
+  ]
+}

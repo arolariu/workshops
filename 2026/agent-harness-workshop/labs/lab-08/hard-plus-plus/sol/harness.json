@@ -1,0 +1,5 @@
+{
+  "name": "studybuddy-harness",
+  "version": "1.0.0",
+  "description": "StudyBuddy's agent harness: instructions, a read-only reviewer, three skills, the guard hook and the portal MCP server."
+}

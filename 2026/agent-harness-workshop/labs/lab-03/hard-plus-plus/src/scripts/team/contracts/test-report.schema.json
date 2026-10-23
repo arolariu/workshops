@@ -1,0 +1,4 @@
+{
+  "$comment": "TODO(M1): the contract of test-report.json: the tester's answer. Start from the recorded artifact in tests/fixtures/run/artifacts/, and see what checkSchema() in scripts/team.mjs understands.",
+  "type": "object"
+}

@@ -1,0 +1,69 @@
+{
+  "_about": "M3: a project next to a plugin (plugins/sb-harness, named \"sb-harness\"). \"expected\" is exactly what findShadows(root, [\"plugins/sb-harness\"]) returns: project skills that hide the plugin's (shadow), and project agents with a plugin agent's name (look-alike; the plugin's stays available as sb-harness:<name>).",
+  "plugin": "plugins/sb-harness",
+  "files": {
+    "plugins/sb-harness/plugin.json": "{ \"name\": \"sb-harness\", \"version\": \"1.0.0\", \"description\": \"The shared StudyBuddy harness\" }\n",
+    "plugins/sb-harness/agents/sb-reviewer.agent.md": "---\nname: sb-reviewer\ndescription: A test agent called sb-reviewer. Read-only.\ntools: ['read']\n---\nYou are sb-reviewer.\n",
+    "plugins/sb-harness/agents/sb-tutor.agent.md": "---\nname: sb-tutor\ndescription: A test agent called sb-tutor. Read-only.\ntools: ['read']\n---\nYou are sb-tutor.\n",
+    "plugins/sb-harness/skills/sb-explain-error/SKILL.md": "---\nname: sb-explain-error\ndescription: A test skill called sb-explain-error. Use when testing shadows.\n---\nSteps for sb-explain-error.\n",
+    "plugins/sb-harness/skills/sb-new-module/SKILL.md": "---\nname: sb-new-module\ndescription: A test skill called sb-new-module. Use when testing shadows.\n---\nSteps for sb-new-module.\n",
+    "plugins/sb-harness/skills/sb-study-plan/SKILL.md": "---\nname: sb-study-plan\ndescription: A test skill called sb-study-plan. Use when testing shadows.\n---\nSteps for sb-study-plan.\n",
+    ".github/agents/sb-reviewer.agent.md": "---\nname: sb-reviewer\ndescription: A test agent called sb-reviewer. Read-only.\ntools: ['read']\n---\nYou are sb-reviewer.\n",
+    ".github/agents/tutor.agent.md": "---\nname: sb-tutor\ndescription: A test agent called sb-tutor. Read-only.\ntools: ['read']\n---\nYou are sb-tutor.\n",
+    ".claude/agents/sb-tutor.md": "---\nname: sb-tutor\ndescription: A test agent called sb-tutor. Read-only.\ntools: ['read']\n---\nYou are sb-tutor.\n",
+    ".github/skills/explain/SKILL.md": "---\nname: sb-explain-error\ndescription: A test skill called sb-explain-error. Use when testing shadows.\n---\nSteps for sb-explain-error.\n",
+    ".claude/skills/sb-new-module/SKILL.md": "---\nname: sb-new-module\ndescription: A test skill called sb-new-module. Use when testing shadows.\n---\nSteps for sb-new-module.\n",
+    ".agents/skills/study/SKILL.md": "---\nname: sb-study-plan\ndescription: A test skill called sb-study-plan. Use when testing shadows.\n---\nSteps for sb-study-plan.\n",
+    ".github/skills/sb-study-plan-v2/SKILL.md": "---\nname: sb-study-plan-v2\ndescription: A test skill called sb-study-plan-v2. Use when testing shadows.\n---\nSteps for sb-study-plan-v2.\n",
+    "docs/agents/sb-tutor.agent.md": "---\nname: sb-tutor\ndescription: A test agent called sb-tutor. Read-only.\ntools: ['read']\n---\nYou are sb-tutor.\n",
+    "docs/skills/sb-new-module/SKILL.md": "---\nname: sb-new-module\ndescription: A test skill called sb-new-module. Use when testing shadows.\n---\nSteps for sb-new-module.\n",
+    ".github/agents/reviewer.agent.md": "---\nname: reviewer\ndescription: A test agent called reviewer. Read-only.\ntools: ['read']\n---\nYou are reviewer.\n"
+  },
+  "expected": [
+    {
+      "kind": "agent",
+      "effect": "look-alike",
+      "name": "sb-reviewer",
+      "project": ".github/agents/sb-reviewer.agent.md",
+      "plugin": "plugins/sb-harness/agents/sb-reviewer.agent.md",
+      "id": "sb-harness:sb-reviewer"
+    },
+    {
+      "kind": "agent",
+      "effect": "look-alike",
+      "name": "sb-tutor",
+      "project": ".claude/agents/sb-tutor.md",
+      "plugin": "plugins/sb-harness/agents/sb-tutor.agent.md",
+      "id": "sb-harness:sb-tutor"
+    },
+    {
+      "kind": "agent",
+      "effect": "look-alike",
+      "name": "sb-tutor",
+      "project": ".github/agents/tutor.agent.md",
+      "plugin": "plugins/sb-harness/agents/sb-tutor.agent.md",
+      "id": "sb-harness:sb-tutor"
+    },
+    {
+      "kind": "skill",
+      "effect": "shadow",
+      "name": "sb-explain-error",
+      "project": ".github/skills/explain/SKILL.md",
+      "plugin": "plugins/sb-harness/skills/sb-explain-error/SKILL.md"
+    },
+    {
+      "kind": "skill",
+      "effect": "shadow",
+      "name": "sb-new-module",
+      "project": ".claude/skills/sb-new-module/SKILL.md",
+      "plugin": "plugins/sb-harness/skills/sb-new-module/SKILL.md"
+    },
+    {
+      "kind": "skill",
+      "effect": "shadow",
+      "name": "sb-study-plan",
+      "project": ".agents/skills/study/SKILL.md",
+      "plugin": "plugins/sb-harness/skills/sb-study-plan/SKILL.md"
+    }
+  ]
+}

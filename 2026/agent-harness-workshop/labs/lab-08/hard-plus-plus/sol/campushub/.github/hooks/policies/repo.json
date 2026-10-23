@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "default": "allow",
+  "rules": [
+    {
+      "id": "campushub-no-api-key-literal",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "This looks like a CampusHub API key (chk_live_ or chk_test_). Keys live only in .env.campushub on each server, never in files, commands or tickets. Tests use a made-up key.",
+      "match": {
+        "text": "\\bchk_(live|test)_[A-Za-z0-9]{24,}\\b"
+      }
+    },
+    {
+      "id": "campushub-no-api-key-in-shell",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "CAMPUSHUB_API_KEY never goes through the shell: don't print, set, pass or filter it. The server reads it from .env.campushub, and the tests inject their own key. Ask the human if you need the API running with the real key.",
+      "match": {
+        "tool": "shell",
+        "commandLine": "\\$\\{?CAMPUSHUB_API_KEY\\b|\\benv:[\\\\/]?CAMPUSHUB_API_KEY\\b|%CAMPUSHUB_API_KEY%|\\b(printenv|export|set|setx|unset)\\s+CAMPUSHUB_API_KEY\\b|\\bCAMPUSHUB_API_KEY\\s*=|process\\.env(\\.|\\[\\s*['\"`])CAMPUSHUB_API_KEY|GetEnvironmentVariable\\(\\s*['\"]CAMPUSHUB_API_KEY|\\b(env|printenv|set|gci|get-childitem|dir|ls)\\b[^|]*\\|\\s*(grep|egrep|findstr|sls|select-string|where-object|where)\\b[^|]*CAMPUSHUB"
+      }
+    },
+    {
+      "id": "campushub-no-env-dump",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "Listing every environment variable would print CAMPUSHUB_API_KEY on a machine that runs the API. Ask for the one variable you need by name (not the key), or ask the human.",
+      "match": {
+        "tool": "shell",
+        "command": "^(env|printenv|set|export -p|declare -x|compgen -e)$|^(gci|get-childitem|dir|ls|gi|get-item)( -\\S+)* env:[\\\\/]?\\*?$"
+      }
+    },
+    {
+      "id": "campushub-no-env-file",
+      "decision": "deny",
+      "severity": "high",
+      "reason": ".env.campushub holds the real API key: the agent never reads, writes or loads it. Use .env.campushub.example for the variable names, and ask the human for anything else.",
+      "match": {
+        "path": "(^|[\\\\/=])\\.env\\.campushub$"
+      }
+    },
+    {
+      "id": "campushub-no-env-file-from-shell",
+      "decision": "deny",
+      "severity": "high",
+      "reason": ".env.campushub holds the real API key: no command may read, copy, load or write it. Use .env.campushub.example for the variable names, and ask the human for anything else.",
+      "match": {
+        "tool": "shell",
+        "commandLine": "\\.env\\.campushub(?![\\w.-])"
+      }
+    },
+    {
+      "id": "campushub-no-deploy",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "Deploying CampusHub needs a release approver, never the agent. Prepare the release (version, CHANGELOG.md, green tests, ./deploy.sh --dry-run) and ask the human to deploy.",
+      "match": {
+        "tool": "shell",
+        "command": "^(npm|pnpm|yarn)\\b.*\\b(run|run-script)\\s+deploy\\b|^(pnpm|yarn)\\s+deploy\\b|^deploy\\.sh\\b|^(ba|z|da)?sh(\\s+-\\S+)*\\s+\\S*deploy\\.sh\\b|^(pwsh|powershell)(\\s+-\\S+)*\\s+\\S*deploy\\.sh\\b"
+      }
+    },
+    {
+      "id": "campushub-allow-deploy-dry-run",
+      "decision": "allow",
+      "override": true,
+      "reason": "A dry run only prints the deploy plan, so the release process may run it (an exception to campushub-no-deploy).",
+      "match": {
+        "tool": "shell",
+        "command": "^deploy\\.sh --dry-run$|^(ba|z|da)?sh \\S*deploy\\.sh --dry-run$"
+      }
+    },
+    {
+      "id": "campushub-no-ticket-file-edits",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "Tickets change only through the ticket tools, where a human approves every write. Don't edit tickets/tickets.json directly.",
+      "match": {
+        "tool": "write",
+        "path": "(^|[\\\\/])tickets([\\\\/]+\\.(?=[\\\\/]))*[\\\\/]+tickets\\.json$"
+      }
+    },
+    {
+      "id": "campushub-no-ticket-file-edits-from-shell",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "Tickets change only through the ticket tools, where a human approves every write. Don't change, move, restore or delete tickets/tickets.json from the shell.",
+      "match": {
+        "tool": "shell",
+        "command": "^(delete|tee|tee-object|sed|perl|awk|truncate|dd|install|ln|mv|cp|rsync|copy|xcopy|robocopy|cpi|cpp|move|mi|ren|rni|rename|set-content|sc|add-content|ac|out-file|clear-content|clc|new-item|ni|set-item|si|move-item|copy-item|rename-item|replace)\\b.*tickets([\\\\/]+\\.(?=[\\\\/]))*[\\\\/]+tickets\\.json|^git (checkout|restore|rm|mv|apply|stash|reset)\\b.*tickets([\\\\/]+\\.(?=[\\\\/]))*[\\\\/]+tickets\\.json|>>?\\s*\\S*tickets([\\\\/]+\\.(?=[\\\\/]))*[\\\\/]+tickets\\.json"
+      }
+    },
+    {
+      "id": "campushub-no-npm-start",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "npm start (and restart) loads .env.campushub (the real API key) into the server, out of the guard's sight. Run node api/server.mjs instead (read-only, no key), or ask the human to start the API with the key.",
+      "match": {
+        "tool": "shell",
+        "command": "^(npm|pnpm|yarn|bun)\\b.*\\s(run(-script)?\\s+)?(re)?start\\b"
+      }
+    },
+    {
+      "id": "campushub-no-inline-script-writes",
+      "decision": "deny",
+      "severity": "high",
+      "reason": "An inline script (node -e, node -pe, python -c …) must not touch tickets/tickets.json, .approvals/ or tickets/approve.mjs: tickets change only through the ticket tools, after a human approves.",
+      "match": {
+        "tool": "shell",
+        "commandLine": "\\b(node|bun|deno|python3?|perl|ruby)\\b[^|;&]*\\s(-\\w*[epc]\\b|--(eval|print)\\b).*(tickets([\\\\/]+\\.(?=[\\\\/]))*[\\\\/]+tickets\\.json|\\.approvals\\b|approve\\.mjs\\b)"
+      }
+    },
+    {
+      "id": "campushub-no-self-approval",
+      "decision": "deny",
+      "severity": "critical",
+      "reason": "Approvals are a human's: the agent never runs or changes tickets/approve.mjs and never writes .approvals/. Ask a release approver to approve, then call close_ticket again.",
+      "match": {
+        "tool": ["shell", "write"],
+        "path": "(^|[\\\\/])(\\.approvals([\\\\/]|$)|approve\\.mjs$)"
+      }
+    },
+    {
+      "id": "campushub-allow-force-push-preview",
+      "decision": "allow",
+      "override": true,
+      "reason": "The preview branch is rebuilt from main on every deploy, so the team force-pushes it. An organisation deny on force-pushes still wins: an override only beats this repository's own denies.",
+      "match": {
+        "tool": "shell",
+        "command": "^git push (-f|--force|--force-with-lease) origin preview$"
+      }
+    }
+  ]
+}

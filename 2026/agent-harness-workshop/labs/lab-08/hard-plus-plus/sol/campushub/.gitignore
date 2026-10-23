@@ -1,0 +1,15 @@
+# The real API key lives in .env.campushub on each machine, never in git.
+.env.campushub
+# Digests the nightly job writes.
+jobs/out/
+# Leftovers of an interrupted atomic write or test run.
+*.tmp
+.scratch-*/
+node_modules/
+# The agent's logs (guards, the ticket tools) and the approvals a human gives: never in git.
+.agent-logs/
+.approvals/
+
+
+# APM dependencies
+apm_modules/

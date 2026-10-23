@@ -1,0 +1,93 @@
+// 📜 The portal's contract, tested through a real MCP client: JSON-RPC over stdio, `initialize` first, like Copilot.
+// Run it: node --test mcp-contract.test.mjs    (npm test runs it too)
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { after, test } from 'node:test';
+
+const SERVER = path.join(import.meta.dirname, 'mcp', 'studybuddy-server.mjs');
+
+// ---------- plumbing: a tiny MCP client (you don't need to change it) ----------
+const temps = [];
+after(() => { for (const dir of temps) fs.rmSync(dir, { recursive: true, force: true }); });
+
+/** A path for a state file that doesn't exist yet, in a fresh temp folder. */
+function freshState() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'contract-'));
+  temps.push(dir);
+  return path.join(dir, 'state.json');
+}
+
+/** Start the server with STUDYBUDDY_STATE=stateFile, do the handshake, run fn(client), and always stop the server. */
+async function withServer(stateFile, fn) {
+  const child = spawn(process.execPath, [SERVER], { env: { ...process.env, STUDYBUDDY_STATE: stateFile }, stdio: ['pipe', 'pipe', 'pipe'] });
+  const pending = new Map();
+  let nextId = 1;
+  let buf = '';
+  child.stdout.on('data', (d) => {
+    buf += d;
+    for (let n = buf.indexOf('\n'); n >= 0; n = buf.indexOf('\n')) {
+      const line = buf.slice(0, n).trim();
+      buf = buf.slice(n + 1);
+      let msg = null;
+      try { msg = JSON.parse(line); } catch { continue; }
+      pending.get(msg.id)?.(msg);
+      pending.delete(msg.id);
+    }
+  });
+  const request = (method, params) => new Promise((resolve, reject) => {
+    const id = nextId++;
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`no answer to ${method} within 5 s`)); }, 5000);
+    pending.set(id, (msg) => { clearTimeout(timer); resolve(msg); });
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+  });
+  const client = {
+    /** The tools from tools/list. */
+    tools: async () => (await request('tools/list', {})).result.tools,
+    /** { isError, text, data (the parsed JSON, or null), rpcError (a JSON-RPC error object, or null) } */
+    async call(name, args = {}) {
+      const msg = await request('tools/call', { name, arguments: args });
+      if (msg.error) return { isError: true, text: msg.error.message, data: null, rpcError: msg.error };
+      const text = (msg.result.content ?? []).map((c) => c.text ?? '').join('\n');
+      let data = null;
+      try { data = JSON.parse(text); } catch { /* plain text */ }
+      return { isError: Boolean(msg.result.isError), text, data, rpcError: null };
+    },
+  };
+  try {
+    await request('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'contract-tests', version: '1.0.0' } });
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
+    return await fn(client);
+  } finally {
+    child.kill();
+  }
+}
+
+// ---------- your contract (M5) ----------
+// One test per promise the portal makes. The checks run this file against six broken servers, and it must fail on
+// each one. A server is broken when it:
+//   1. "marks" an id that doesn't exist, instead of an isError result that lists the valid ids
+//   2. answers a repeat with an error, instead of changed: false
+//   3. forgets what was done after a restart (the same STUDYBUDDY_STATE, a new server process)
+//   4. still lists a done assignment in get_deadlines
+//   5. says mark_done is read-only (annotations.readOnlyHint)
+//   6. reports bad input as a JSON-RPC error (rpcError), instead of a result with isError
+// Test what todo.md promises (ids, isError, changed), not the exact wording of your messages.
+
+test('mark_done is listed with a required id', async () => {
+  await withServer(freshState(), async (c) => {
+    const tool = (await c.tools()).find((t) => t.name === 'mark_done');
+    assert.ok(tool, 'tools/list has mark_done');
+    assert.deepEqual(tool.inputSchema.required, ['id']);
+  });
+});
+
+// TODO(M5): turn each of these into a real test (async () => { await withServer(…) }), then add your own.
+test.todo('mark_done says it writes: readOnlyHint false');
+test.todo('marking A2 works, and get_deadlines stops listing it');
+test.todo('an unknown id is an isError result that lists the valid ids');
+test.todo('bad input ({}, { id: 42 }, an unknown argument) is an isError result, not a JSON-RPC error');
+test.todo('marking twice is safe: changed true, then changed false');
+test.todo('done ids survive a restart with the same state file');

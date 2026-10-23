@@ -1,0 +1,120 @@
+# Harness CI: the gate every change to the agent's context goes through (HARNESS.md, "Changing the harness").
+# Free checks on every pull request. Real evals spend AI credits, so a person decides when: they run once when
+# someone adds the run-evals label (push again and re-label to re-run), and on every push to main.
+name: Harness CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - "AGENTS.md"
+      - "**/AGENTS.md"
+      - "**/*.instructions.md"
+      - "HARNESS.md"
+      - "harness.json"
+      - "CHANGELOG.md"
+      - ".github/**"
+      - ".mcp.json"
+      - "mcp/**"
+      - "apm.yml"
+      - "apm.lock.yaml"
+      - "scripts/**"
+      - "evals/**"
+      - "attacks/**"
+      - "attacks.local.json"
+      - "dist/**"
+  push:
+    branches: [main]
+    paths:
+      - "AGENTS.md"
+      - "**/AGENTS.md"
+      - "**/*.instructions.md"
+      - "HARNESS.md"
+      - "harness.json"
+      - "CHANGELOG.md"
+      - ".github/**"
+      - ".mcp.json"
+      - "mcp/**"
+      - "apm.yml"
+      - "apm.lock.yaml"
+      - "scripts/**"
+      - "evals/**"
+      - "attacks/**"
+      - "attacks.local.json"
+      - "dist/**"
+
+permissions:
+  contents: read
+
+# Concurrency lives on the jobs: a new push cancels the free gate, but never a paid eval run halfway through.
+
+jobs:
+  gate:
+    name: Scorecard, attacks and self-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: harness-gate-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    defaults:
+      run:
+        working-directory: harness
+    steps:
+      - name: Check out the harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: harness
+          persist-credentials: false
+      - name: Check out the scorecard (the workshop's, pinned to a commit)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: arolariu/workshops
+          ref: d0e58b9d0fd7029ddabe562ece22bece41dd1feb
+          path: tools
+          sparse-checkout: 2026/agent-harness-workshop/labs/_harness
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Scorecard (L4 Guarded or better)
+        run: node scripts/harness-check.mjs --min L4
+        env:
+          HARNESS_SCORECARD: ${{ github.workspace }}/tools/2026/agent-harness-workshop/labs/_harness/scorecard.mjs
+      - name: Attack pack (no miss, no false positive)
+        run: node scripts/attack.mjs
+      - name: Self-tests
+        run: node --test
+      - name: Eval self-test (recorded runs, no credits)
+        run: node scripts/eval.mjs --from evals/runs/full --baseline evals/baseline.json
+
+  evals:
+    name: Evals against the baseline (real runs, about 240 credits)
+    needs: gate
+    # Only on a push to main, or on the event of a person adding the run-evals label: not on every event of a
+    # pull request that has the label (a push, another label), which would spend the credits again unasked.
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      || (github.event.action == 'labeled' && github.event.label.name == 'run-evals')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Queued, never cancelled: a cancelled run has spent its credits and measured nothing.
+    concurrency:
+      group: harness-evals-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Install the Copilot CLI (a pinned version)
+        run: npm install --global @github/copilot@1.0.100
+      # eval.mjs passes --trust-folder to each run: a CI runner trusts no folder, so the harness wouldn't load.
+      - name: Evals (worst case about 240 credits = 8 cases x 1 run x 30, a soft cap)
+        run: node scripts/eval.mjs --runs 1 --budget 240 --baseline evals/baseline.json --threshold 75 --report evals/reports
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+      - name: Show the report
+        if: always()
+        run: cat evals/reports/report.md >> "$GITHUB_STEP_SUMMARY" || true

@@ -3,7 +3,7 @@ export default [
   {
     name: 'An autonomous run on a leash fixes a bug, with tests after every edit',
     command: ['node', 'scripts/leash.mjs', 'Make upcoming() in deadlines.js skip assignments that are already done, and add a test for it.'],
-    prompts: 3,
+    prompts: 1, // one copilot -p run (leash.mjs); its own --max-ai-credits caps it
     timeout: 600000,
     expect: (t) => {
       if (t.unchanged('deadlines.js')) return 'deadlines.js was not changed.';

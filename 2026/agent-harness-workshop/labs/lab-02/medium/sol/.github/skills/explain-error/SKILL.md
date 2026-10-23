@@ -1,20 +1,25 @@
 ---
 name: explain-error
-description: Explain an error message or stack trace in plain words, find the exact file and line in this project, and propose a minimal fix. Use when the user pastes an error, a crash or a stack trace, or points to a file that contains one.
-argument-hint: "<error message, or a file with the stack trace>"
+description: Explain a Node.js error or stack trace in plain words, point to the exact file and line in this project, and propose a minimal fix. Use when the user pastes an error message, a crash or a stack trace, or points to a file that contains one.
+argument-hint: "<error message, or a file with the stack trace, e.g. fixtures/crash.txt>"
+# The model may call it on its own: it only reads files and answers, and people paste a stack trace without remembering the command.
+disable-model-invocation: false
 ---
-1. Read the error. If the argument is a file path (for example `fixtures/crash.txt`), open that file first.
-2. Find the first stack frame that points to a file in **this** project (skip `node:internal` and `<anonymous>` frames).
-3. Open that file at that line and read the surrounding function.
-4. Answer in exactly this format, short and in plain words:
+Explain one error. Read files, but change nothing unless the user asks you to apply the fix.
+
+1. Get the error. If the argument is a file path (for example `fixtures/crash.txt`), open that file and read all of it.
+2. Find the line that matters:
+   - **A stack trace:** take the first frame in a file of this project. Skip `node:internal`, `node_modules` and `<anonymous>` frames.
+   - **Thrown on purpose:** if that line is our own `throw new …Error(…)` (input validation), the validation is right and the bug is in the **caller**: use the next project frame down the trace.
+   - **No project frame** (a `SyntaxError` before the program runs, such as "does not provide an export named"): use the `file:line` on the first line of the output.
+3. Open that file at that line and read the whole function around it.
+4. Answer with exactly these three sections, in this order:
 
 ### Cause
-One or two sentences: what went wrong and why, for a student who has never seen this error.
+One or two sentences in plain words: what went wrong and why, for a student who has never seen this error.
 
 ### Where
-`<file>:<line>`, then the offending line of code in a code block.
+`<file>:<line>`, with the path relative to the project root (never `file:///…` or an absolute path), then that line of code in a code block.
 
 ### Fix
-The smallest code change that fixes it (a code block), plus one regression test to add.
-
-Do not change any file unless the user asks you to apply the fix.
+The smallest change that fixes it, as a code block, plus one regression test to add.

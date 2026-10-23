@@ -1,0 +1,11 @@
+{"at":"2026-10-01T09:00:00.000Z","tool":"view","decision":"allow","args":"{\"path\":\"README.md\"}"}
+{"at":"2026-10-01T09:00:01.000Z","tool":"bash","decision":"allow","args":"{\"command\":\"npm test\"}"}
+{"at":"2026-10-01T09:00:02.000Z","tool":"bash","decision":"deny","reason":"No new dependencies: StudyBuddy is dependency-free on purpose (see AGENTS.md). Write a small helper instead, or ask the human.","args":"{\"command\":\"npm install lodash\"}"}
+{"at":"2026-10-01T09:00:03.000Z","tool":"bash","decis
+{"at":"2026-10-01T09:00:04.000Z","tool":"edit","decision":"allow","args":"{\"path\":\"grades.js\"}"}
+
+{"at":"2026-10-01T09:00:05.000Z","tool":"bash","decision":"deny","reason":".env files hold secrets and are off-limits for the agent. Use .env.example for the variable names instead, and ask the human for values.","args":"{\"command\":\"cat .env\"}"}
+{"at":"2026-10-01T09:00:06.000Z","tool":"powershell","decision":"allow","args":"{\"command\":\"Get-ChildItem\"}"}
+{"at":"2026-10-01T09:00:07.000Z","tool":"edit","decision":"deny","reason":"The guardrails in .github/hooks are protected. Read them if you need to, and ask the human to change them.","args":"{\"path\":\".github/hooks/guardrails.json\"}"}
+{"at":"2026-10-01T09:00:08.000Z","tool":"view","decision":"allow","args":"{\"path\":\"grades.js\"}"}
+{"at":"2026-10-01T09:00:09.000Z","tool":"bash","decision":"allow","args":"{\"command\":\"npm test\"}"}

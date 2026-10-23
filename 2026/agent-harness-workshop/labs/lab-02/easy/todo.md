@@ -1,6 +1,6 @@
 # 🟢 Easy · Teach a recipe once
 
-> 🕐 10 min · 🆓 free checks · 🤖 optional agent check (about 1 prompt)
+> 🕐 10 min · 👥 together · 🆓 free checks · 🤖 optional agent check (about 1 prompt) · 🧱 builds on: Lab 01 · easy
 
 ## 🎯 Mission
 Every new StudyBuddy module follows the same recipe, and the team keeps explaining it to the agent again
@@ -21,6 +21,22 @@ copilot
 - `copilot skill list` shows it
 - You asked for an attendance module: `attendanceRate(sessions)` returns the percentage of
   `{ attended: true }` sessions (1 decimal) and throws a `RangeError` for an empty list, built the recipe way
+
+## 🧠 Takeaway
+Only a skill's name and description are always in the context, so write the description as a routing rule: what the skill does and when to use it.
+
+## ❓ Check yourself
+Twenty skills are installed in a project. Before any of them is used, what is in the model's context?
+1. All twenty `SKILL.md` files in full, so the model can compare their steps before it picks one.
+2. Each skill's name and description; a skill's full instructions load when the model picks it.
+3. Nothing at all, until you call one of the skills yourself by name, with `/skill-name`.
+
+<details><summary>Answer</summary>
+
+**2.** That's progressive disclosure: the descriptions are cheap and always there, the bodies load on demand. It's
+also why a vague description means the skill never gets picked.
+
+</details>
 
 ## 💡 Hints
 <details><summary>The frontmatter</summary>

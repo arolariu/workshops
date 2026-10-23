@@ -1,0 +1,18 @@
+{
+  "$comment": "TODO(M1): at least 8 golden cases across the layers. The recordings in evals/runs/full/ are a head start: one file per case id, its prompt in the first line.",
+  "cases": [
+    {
+      "id": "rules-footer",
+      "layer": "instructions",
+      "prompt": "Which modules does StudyBuddy have? Answer in one or two sentences.",
+      "expect": [{ "answerMatches": "Harness check: AGENTS\\.md loaded" }]
+    },
+    {
+      "id": "mcp-deadlines",
+      "layer": "mcp",
+      "allow": ["studybuddy(get_deadlines)"],
+      "prompt": "What is due in the next 7 days? Check the student portal.",
+      "expect": [{ "tool": "studybuddy-get_deadlines" }]
+    }
+  ]
+}

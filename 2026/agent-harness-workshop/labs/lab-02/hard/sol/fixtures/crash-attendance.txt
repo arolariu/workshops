@@ -1,0 +1,18 @@
+$ node print-report.js
+SE201 Software Engineering: 8.5
+WEB230 Web Development: no grades yet
+file:///home/alex/studybuddy/attendance.js:10
+    throw new RangeError('sessions must be a non-empty array');
+          ^
+
+RangeError: sessions must be a non-empty array
+    at attendanceRate (file:///home/alex/studybuddy/attendance.js:10:11)
+    at file:///home/alex/studybuddy/report.js:23:68
+    at Array.map (<anonymous>)
+    at attendanceLines (file:///home/alex/studybuddy/report.js:23:18)
+    at file:///home/alex/studybuddy/print-report.js:20:20
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:643:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.19.0

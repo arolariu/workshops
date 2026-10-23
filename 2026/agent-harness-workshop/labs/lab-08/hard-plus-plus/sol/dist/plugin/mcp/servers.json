@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "studybuddy": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "mcp/studybuddy-server.mjs"
+      ]
+    }
+  }
+}

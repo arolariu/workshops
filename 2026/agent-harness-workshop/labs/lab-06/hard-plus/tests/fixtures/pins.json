@@ -1,0 +1,55 @@
+{
+  "_about": "M1: dependencies as people write them in apm.yml. \"loose\" ones can change under you: [dependency, why].",
+  "pinned": [
+    "microsoft/apm-sample-package#v1.0.0",
+    "studybuddy-org/campus-standards#v1.4.0",
+    "acme/skills#2.3.1",
+    "acme/skills#v2.0.0-beta.1",
+    "acme/prompts#a94a8fe5ccb19ba61c4c0873d391e987982fbbd3",
+    {
+      "git": "https://github.com/acme/tools.git",
+      "ref": "v3.1.4"
+    },
+    "./packages/local-rules"
+  ],
+  "loose": [
+    [
+      "acme/skills",
+      "no ref: it follows the default branch"
+    ],
+    [
+      "acme/skills#main",
+      "a branch moves with every push"
+    ],
+    [
+      "acme/skills#latest",
+      "a name that moves"
+    ],
+    [
+      "acme/skills#^1.2.0",
+      "a range picks a different release later"
+    ],
+    [
+      "acme/skills#~1.4",
+      "a range"
+    ],
+    [
+      "acme/skills#>=1.0.0",
+      "a range"
+    ],
+    [
+      "acme/skills#a94a8fe",
+      "a short SHA can become ambiguous: use all 40 characters"
+    ],
+    [
+      "acme/skills#v1",
+      "a major-only tag is re-pointed at every v1.x release"
+    ],
+    [
+      {
+        "git": "https://github.com/acme/tools.git"
+      },
+      "no ref"
+    ]
+  ]
+}

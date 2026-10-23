@@ -1,0 +1,49 @@
+{
+  "_about": "Maintainers: the rules of the seeded chain (node labs/start.mjs sync-seeds). harnessPaths: what `bring` carries forward from earlier levels (gitignore-style: a leading slash pins a name to the level's root). Per level: local = files that don't pass to the next level; keep = starter files `bring` never overwrites; overrides = inherited files this level's starter changes on purpose; drop = inherited files this level must not have; _why = a sentence explaining the level's rules.",
+  "capstone": "lab-08",
+  "harnessPaths": [
+    "AGENTS.md",
+    "*.instructions.md",
+    ".github/**",
+    "/.mcp.json",
+    "mcp/**",
+    "/apm.yml",
+    "/apm.lock.yaml",
+    "scripts/**",
+    "evals/**",
+    "attacks/**",
+    "/attacks.local.json",
+    "/harness.json",
+    "/CHANGELOG.md",
+    "HARNESS.md"
+  ],
+  "levels": {
+    "lab-00/medium": {
+      "overrides": ["grades.js"],
+      "_why": "Think first plans a new feature, so it starts with the red build already fixed (hasPassed checks the exam grade too)."
+    },
+    "lab-01/easy": { "local": ["FINDINGS.md", "team-notes.md"] },
+    "lab-02/hard-plus": {
+      "local": ["VERDICT.md", "vendor/**"],
+      "_why": "The verdict and the three vendor samples are this level's evidence: the routing level after it doesn't need them."
+    },
+    "lab-02/easy": {
+      "overrides": ["README.md"],
+      "_why": "The README gets a Modules list: the new-module recipe adds a line to it."
+    },
+    "lab-05/easy": {
+      "overrides": [".gitignore", "AGENTS.md"],
+      "_why": "From this lab on, the guard writes audit logs to .agent-logs/, which can hold secrets: .gitignore keeps them out of commits (and still ignores mcp/state.json), so the line belongs to the harness the learner owns. AGENTS.md gains the boundary \"Never change the guardrails in .github/hooks/\"."
+    },
+    "lab-06/easy": { "local": ["SOLUTION-NOTES.md"] },
+    "lab-07/medium": { "local": ["NOTES.md"] },
+    "lab-08/easy": {
+      "overrides": ["AGENTS.md", ".github/hooks/guardrails.json"],
+      "_why": "The capstone starts from a brought-in mess: AGENTS.md gains a merged Testing section with a rule twice and a rule that contradicts \"never change a test\" (M1), and the hook config is registered for bash only, so the harness drops below L4 (M3)."
+    },
+    "lab-08/hard-plus-plus": {
+      "overrides": ["REVIEW.md"],
+      "_why": "M6's harness review goes in REVIEW.md: the starter replaces the Lab 03 code review it held (no later level reads it) with the review skeleton."
+    }
+  }
+}

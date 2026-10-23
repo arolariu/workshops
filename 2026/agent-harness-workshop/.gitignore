@@ -1,7 +1,15 @@
-# lab companion state
+# lab companion state (stays on this computer)
 labs/.progress.json
+labs/.progress.json.*.tmp
+labs/.progress.json.lock
+labs/.progress.corrupt-*.json
 labs/.runs/
 labs/.backups/
+labs/.recovery/
+labs/.reports/
+
+# private tools prepared by start.cmd / start.sh / setup.mjs
+.workshop/
 
 # things the exercises create
 node_modules/
@@ -10,3 +18,4 @@ apm_modules/
 labs/**/src/runs/
 labs/**/src/ab-results.json
 labs/**/src/mcp/state.json
+labs/**/src/mcp/state.json.*.tmp

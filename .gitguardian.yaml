@@ -1,0 +1,10 @@
+# GitGuardian: what secret scanning skips. Keep this list short and specific.
+# The agent-harness workshop's test fixtures and attack packs hold made-up attack data on purpose (a guard's test
+# suite has to show it the shapes it must stop). They still hold no real-looking secret: a key in a pack is written
+# `{{FAKE_KEY}}` and built when the pack is replayed. Everything else in the repository is scanned.
+version: 2
+secret:
+  ignored_paths:
+    - '2026/agent-harness-workshop/labs/**/tests/fixtures/**'
+    - '2026/agent-harness-workshop/labs/**/attacks/pack.json'
+    - '2026/agent-harness-workshop/labs/**/attacks.local.json'

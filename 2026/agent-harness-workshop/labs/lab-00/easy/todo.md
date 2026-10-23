@@ -1,6 +1,6 @@
 # 🟢 Easy · First contact
 
-> 🕐 10 min · 🆓 free checks · 🤖 optional agent check (about 1 prompt)
+> 🕐 8 min · 👥 together · 🆓 free checks · 🤖 optional agent check (about 1 prompt) · 🧱 starts the chain
 
 ## 🎯 Mission
 StudyBuddy's build is red and nobody knows why. Don't read the code yourself: make **Copilot** investigate.
@@ -17,6 +17,22 @@ copilot
 - `FINDINGS.md` names the failing test, the guilty file and the rule the code forgets
 - `grades.js` and `grades.test.js` are unchanged
 - The checks are green: press **t** in the lab app, or run `node labs/start.mjs test lab-00 easy`
+
+## 🧠 Takeaway
+The model is stateless: every turn, the harness sends the whole context again and runs the tool calls the model writes.
+
+## ❓ Check yourself
+You ask Copilot a follow-up question in the same session. What does the model receive?
+1. Only your new prompt: the model still remembers the earlier turns from before.
+2. A short summary of the earlier turns that the model wrote for itself, plus your new prompt.
+3. The whole conversation so far (instructions, turns, tool results), plus your new prompt.
+
+<details><summary>Answer</summary>
+
+**3.** The model keeps no memory between calls, so the harness resends the context on every turn. That's why long
+sessions cost more tokens, and why `/context` and `/compact` exist.
+
+</details>
 
 ## 💡 Hints
 <details><summary>Getting in</summary>

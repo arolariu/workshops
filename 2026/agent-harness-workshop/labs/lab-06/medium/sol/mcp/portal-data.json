@@ -1,0 +1,18 @@
+{
+  "student": "Alex",
+  "today": "2026-10-15",
+  "courses": [
+    { "code": "SE201", "name": "Software Engineering", "examDate": "2026-11-20", "examWeight": 40, "grades": [ { "item": "Project", "grade": 8, "weight": 30 }, { "item": "Labs", "grade": 9, "weight": 30 } ] },
+    { "code": "AI210", "name": "Intro to AI", "examDate": "2026-11-12", "examWeight": 50, "grades": [ { "item": "Assignments", "grade": 9.2, "weight": 50 } ] },
+    { "code": "DB220", "name": "Databases", "examDate": "2026-11-02", "examWeight": 50, "grades": [ { "item": "Labs", "grade": 7.6, "weight": 50 } ] },
+    { "code": "MA110", "name": "Calculus", "examDate": "2026-11-26", "examWeight": 60, "grades": [ { "item": "Homework", "grade": 4, "weight": 40 } ] },
+    { "code": "WEB230", "name": "Web Development", "examDate": "2026-12-04", "examWeight": 60, "grades": [] }
+  ],
+  "assignments": [
+    { "id": "A1", "course": "SE201", "title": "Sprint 2 demo", "due": "2026-10-20", "done": false },
+    { "id": "A2", "course": "DB220", "title": "Normalize the schema to 3NF", "due": "2026-10-17", "done": false },
+    { "id": "A3", "course": "AI210", "title": "Search algorithms quiz", "due": "2026-10-16", "done": true },
+    { "id": "A4", "course": "WEB230", "title": "Portfolio page", "due": "2026-10-28", "done": false },
+    { "id": "A5", "course": "SE201", "title": "Code review exercise", "due": "2026-11-03", "done": false }
+  ]
+}

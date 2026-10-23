@@ -1,0 +1,196 @@
+{
+  "_about": "Artifacts that break their stage contract. \"cross\": true marks the ones a schema alone cannot catch: contractProblems() must.",
+  "artifacts": [
+    {
+      "kind": "plan",
+      "why": "a plan without steps",
+      "value": {
+        "goal": "Fix the three bugs in BUGS.md so that the red tests in deadlines.test.js pass",
+        "files": [
+          "deadlines.js"
+        ],
+        "steps": []
+      }
+    },
+    {
+      "kind": "plan",
+      "why": "a step without a file",
+      "value": {
+        "goal": "Fix the three bugs in BUGS.md so that the red tests in deadlines.test.js pass",
+        "files": [
+          "deadlines.js"
+        ],
+        "steps": [
+          {
+            "id": "S1",
+            "change": "upcoming() leaves out done items"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "plan",
+      "why": "a plan without files",
+      "value": {
+        "goal": "Fix the three bugs in BUGS.md so that the red tests in deadlines.test.js pass",
+        "steps": [
+          {
+            "id": "S1",
+            "file": "deadlines.js",
+            "change": "upcoming() leaves out assignments that are already done"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "plan",
+      "why": "a field the contract doesn't know",
+      "value": {
+        "goal": "Fix the three bugs in BUGS.md so that the red tests in deadlines.test.js pass",
+        "files": [
+          "deadlines.js"
+        ],
+        "steps": [
+          {
+            "id": "S1",
+            "file": "deadlines.js",
+            "change": "upcoming() leaves out assignments that are already done"
+          }
+        ],
+        "deploy": true
+      }
+    },
+    {
+      "kind": "plan",
+      "why": "prose instead of a plan",
+      "value": "Just fix deadlines.js."
+    },
+    {
+      "kind": "test-report",
+      "why": "\"failed\" as a string",
+      "value": {
+        "passed": 13,
+        "failed": "0",
+        "failing": []
+      }
+    },
+    {
+      "kind": "test-report",
+      "why": "no list of failing tests",
+      "value": {
+        "passed": 13,
+        "failed": 0
+      }
+    },
+    {
+      "kind": "test-report",
+      "why": "a negative count",
+      "value": {
+        "passed": -1,
+        "failed": 0,
+        "failing": []
+      }
+    },
+    {
+      "kind": "verdict",
+      "why": "an unknown decision",
+      "value": {
+        "decision": "lgtm",
+        "findings": []
+      }
+    },
+    {
+      "kind": "verdict",
+      "why": "a finding without a location",
+      "value": {
+        "decision": "request-changes",
+        "findings": [
+          {
+            "severity": "high",
+            "problem": "today() is still UTC."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "verdict",
+      "why": "an unknown severity",
+      "value": {
+        "decision": "request-changes",
+        "findings": [
+          {
+            "severity": "critical",
+            "location": "deadlines.js:7",
+            "problem": "today() is still UTC."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "plan",
+      "why": "a step's file that isn't in files",
+      "cross": true,
+      "value": {
+        "goal": "Fix the three bugs in BUGS.md so that the red tests in deadlines.test.js pass",
+        "files": [
+          "deadlines.js"
+        ],
+        "steps": [
+          {
+            "id": "S1",
+            "file": "grades.js",
+            "change": "upcoming() leaves out assignments that are already done"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "plan",
+      "why": "two steps with the same id",
+      "cross": true,
+      "value": {
+        "goal": "Fix the three bugs in BUGS.md so that the red tests in deadlines.test.js pass",
+        "files": [
+          "deadlines.js"
+        ],
+        "steps": [
+          {
+            "id": "S1",
+            "file": "deadlines.js",
+            "change": "upcoming() leaves out assignments that are already done"
+          },
+          {
+            "id": "S1",
+            "file": "deadlines.js",
+            "change": "upcoming() leaves out assignments that are already done"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "test-report",
+      "why": "\"failed\" that doesn't match \"failing\"",
+      "cross": true,
+      "value": {
+        "passed": 12,
+        "failed": 1,
+        "failing": []
+      }
+    },
+    {
+      "kind": "verdict",
+      "why": "an approval with a high finding",
+      "cross": true,
+      "value": {
+        "decision": "approve",
+        "findings": [
+          {
+            "severity": "high",
+            "location": "deadlines.js:7",
+            "problem": "today() is still UTC."
+          }
+        ]
+      }
+    }
+  ]
+}

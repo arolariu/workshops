@@ -1,0 +1,11 @@
+# A sample for the checks (never used by GitHub): the last matching line wins.
+*                         @studybuddy/everyone
+*.md                      @studybuddy/docs
+/AGENTS.md                @studybuddy/platform
+/.github/                 @studybuddy/platform
+/packages/cli/            @studybuddy/cli-team
+/packages/portal/         @studybuddy/portal-team
+packages/portal/*.md      @studybuddy/portal-team @studybuddy/docs
+/scripts/check-*.mjs      @studybuddy/platform   # the gate
+/packages/planner/vendor/
+docs/*                    @studybuddy/writers

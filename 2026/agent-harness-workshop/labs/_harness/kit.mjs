@@ -1,12 +1,20 @@
 // The check kit: small helpers every exercise's tests/checks.mjs uses.
 // A check returns true/undefined (pass), a string (fail, shown to the student) or throws CheckFail.
+// To show evidence, fail with details: t.fail('Wrong total.', { expected: 42, actual: 41, files: ['grades.js'] }).
+import { guardNodeOptions } from './no-copilot.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { spawnSpec, killTree } from './process.mjs';
 
-export class CheckFail extends Error {}
+export class CheckFail extends Error {
+  constructor(message, detail) {
+    super(message);
+    if (detail && typeof detail === 'object') this.detail = detail;
+  }
+}
 
 // ---------- YAML (the subset used by frontmatter, apm.yml and agentic workflows) ----------
 function stripComment(line) {
@@ -157,9 +165,12 @@ export function applyToMatches(applyTo, file) {
 // ---------- processes ----------
 const winQuote = (a) => (/^[\w\-./:=@,]+$/.test(a) ? a : `"${String(a).replace(/"/g, '""')}"`);
 export function spawnCompat(cmd, args, opts = {}) {
+  // A .cmd or .bat file only runs through the shell on Windows (Node refuses it otherwise); one command string, because
+  // passing args together with `shell` is deprecated.
+  if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(String(cmd))) return spawnSync([`"${cmd}"`, ...args.map(winQuote)].join(' '), { encoding: 'utf8', ...opts, shell: true });
   let r = spawnSync(cmd, args, { encoding: 'utf8', ...opts });
   if (r.error && r.error.code === 'ENOENT' && process.platform === 'win32') {
-    r = spawnSync(cmd, args.map(winQuote), { encoding: 'utf8', ...opts, shell: true });
+    r = spawnSync([cmd, ...args.map(winQuote)].join(' '), { encoding: 'utf8', ...opts, shell: true });
     if (r.status === 9009 || /is not recognized/.test(r.stderr ?? '')) r.error = Object.assign(new Error('not found'), { code: 'ENOENT' });
   }
   return r;
@@ -210,9 +221,16 @@ export function isTrusted(dir) {
 }
 
 // ---------- MCP client (JSON-RPC over stdio) ----------
-export async function mcpClient({ command, args = [], env = {}, cwd }) {
-  const bin = command === 'node' ? process.execPath : command;
-  const child = spawn(bin, args, { cwd, env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
+export async function mcpClient({ command, args = [], env = {}, cwd, timeout = 8000 }) {
+  const fullEnv = { ...process.env, ...env };
+  // Found like a shell would (PATH, PATHEXT; npx is a .cmd on Windows). A relative path is relative to the server's folder.
+  const local = cwd && /[\\/]/.test(command) && !path.isAbsolute(command) ? path.resolve(cwd, command) : command;
+  const spec = command === 'node' ? { file: process.execPath, args, windowsVerbatimArguments: false } : spawnSpec(local, args, { env: fullEnv });
+  if (spec.missing) throw new CheckFail(`The MCP server could not start: \`${command}\` was not found (is it installed and on PATH?).`);
+  const child = spawn(spec.file, spec.args, { cwd, env: fullEnv, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, windowsVerbatimArguments: spec.windowsVerbatimArguments });
+  // A .cmd runs inside cmd.exe: stop the whole tree, or the real server outlives the client.
+  const wrapped = Boolean(spec.resolved) && spec.file !== spec.resolved;
+  const kill = () => { try { if (wrapped) killTree(child.pid); else child.kill(); } catch { /* already gone */ } };
   let buf = '';
   let stderr = '';
   let exitInfo = null;
@@ -246,7 +264,9 @@ export async function mcpClient({ command, args = [], env = {}, cwd }) {
       try { child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`); } catch { /* reported by exit */ }
     });
   }
-  const init = await request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'harness-check', version: '1.0.0' } });
+  // A server that never initializes must not outlive the check (or the X-ray) that started it.
+  const init = await request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'harness-check', version: '1.0.0' } }, timeout)
+    .catch((e) => { kill(); throw e; });
   child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
   return {
     init: init.result,
@@ -264,7 +284,7 @@ export async function mcpClient({ command, args = [], env = {}, cwd }) {
       try { data = JSON.parse(text); } catch { /* plain text */ }
       return { ...res, isError: Boolean(res.isError), text, data };
     },
-    close() { try { child.kill(); } catch { /* already gone */ } },
+    close() { kill(); },
     get stderr() { return stderr; },
   };
 }
@@ -290,6 +310,7 @@ export function makeKit({ dir, exDir }) {
   const solDir = path.join(exDir, 'sol');
   const P = (rel) => path.join(dir, rel);
   const norm = (s) => (s == null ? s : s.replace(/\r\n/g, '\n'));
+  const temps = [];
   const t = {
     dir,
     exDir,
@@ -297,7 +318,7 @@ export function makeKit({ dir, exDir }) {
     CheckFail,
     path: P,
     check: (name, run, opts = {}) => ({ name, run, ...opts }),
-    fail: (msg) => { throw new CheckFail(msg); },
+    fail: (msg, detail) => { throw new CheckFail(msg, detail); },
     ok: (cond, msg) => { if (!cond) throw new CheckFail(msg); return true; },
     exists: (rel) => fs.existsSync(P(rel)),
     read: (rel) => { try { return norm(fs.readFileSync(P(rel), 'utf8')); } catch { return null; } },
@@ -343,7 +364,7 @@ export function makeKit({ dir, exDir }) {
       return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '', all: `${r.stdout ?? ''}\n${r.stderr ?? ''}` };
     },
     unitTests(opts = {}) {
-      const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', ...(opts.files ?? [])], { cwd: opts.cwd ?? dir, encoding: 'utf8', timeout: 90000, env: { ...process.env, NODE_OPTIONS: '' } });
+      const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', ...(opts.files ?? [])], { cwd: opts.cwd ?? dir, encoding: 'utf8', timeout: 90000, env: { ...process.env, NODE_OPTIONS: guardNodeOptions() } });
       const out = r.stdout ?? '';
       const num = (k) => Number((out.match(new RegExp(`^# ${k} (\\d+)`, 'm')) ?? [])[1] ?? 0);
       const failing = [...out.matchAll(/^\s*not ok \d+ - (.*)$/gm)].map((m) => m[1].trim()).filter((n) => !/\.(m?js|cjs)$/.test(n));
@@ -408,7 +429,20 @@ export function makeKit({ dir, exDir }) {
       };
     },
     tmp() {
-      return fs.mkdtempSync(path.join(os.tmpdir(), 'harness-'));
+      // The real path: through a symlink (macOS /var → /private/var), a junction or an 8.3 name, a script's
+      // "am I the main module?" test compares a different spelling of the same folder and silently does nothing.
+      let dir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-'));
+      try { dir = fs.realpathSync.native(dir); } catch { /* keep the path we have */ }
+      temps.push(dir);
+      return dir;
+    },
+    /** How many temp folders exist now: pass it to cleanup() to remove only the ones made after it. */
+    mark: () => temps.length,
+    /** Remove the temp folders made since `from` (run-checks: each check's own after it, the rest at the end). */
+    cleanup(from = 0) {
+      for (const dir of temps.splice(from)) {
+        try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 }); } catch { /* a locked file on Windows: left in temp */ }
+      }
     },
     copy(dest) {
       fs.cpSync(dir, dest, { recursive: true, filter: (src) => !/[\\/](node_modules|\.git|\.agent-logs)([\\/]|$)/.test(path.relative(dir, src) ? `/${path.relative(dir, src)}` : '') });

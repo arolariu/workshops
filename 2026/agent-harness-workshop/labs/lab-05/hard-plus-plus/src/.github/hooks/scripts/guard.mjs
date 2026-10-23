@@ -1,0 +1,105 @@
+#!/usr/bin/env node
+// 🔒 preToolUse guard, policy edition. Copilot runs this before EVERY tool call and sends the call as JSON on stdin:
+//   { "toolName": "bash", "toolArgs": { "command": "npm test" }, "sessionId": "...", "cwd": "...", ... }
+// The rules live in .github/hooks/policies/repo.json; engine.mjs decides. To block the call, print
+// { "permissionDecision": "deny", "permissionDecisionReason": "..." }. To allow it, print nothing.
+// It fails closed: a missing or broken policy, a crash, or no decision within DEADLINE_MS all deny.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
+import { normalize, evaluate, validatePolicy } from './engine.mjs';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+export const POLICY = path.join(HERE, '..', 'policies', 'repo.json');
+// Copilot's own hook timeout (timeoutSec in guardrails.json) fails OPEN: a hook that runs out of time lets the call
+// through. So the guard keeps its own, much shorter deadline, and denies when it passes.
+export const DEADLINE_MS = 1500;
+
+// Mask secrets before anything is written to a log: the audit trail must not become the leak. A private key is masked
+// from its BEGIN line to its END line: the body is the secret.
+const SECRETS = [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g, /\bghp_[A-Za-z0-9]{36}\b/g, /\bgithub_pat_[A-Za-z0-9_]{22,}/g, /\bAKIA[0-9A-Z]{16}\b/g, /\bsk-[A-Za-z0-9]{32,}\b/g];
+export const redact = (text) => SECRETS.reduce((acc, re) => acc.replace(re, '[REDACTED]'), String(text));
+
+/** The policy, or a reason why there is none that can be used. */
+export function loadPolicy(file = POLICY) {
+  let policy;
+  try {
+    policy = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {
+    return { error: e.code === 'ENOENT' ? `There is no policy at .github/hooks/policies/${path.basename(file)}` : `The policy is not valid JSON (${e.message})` };
+  }
+  const problems = validatePolicy(policy);
+  return problems.length ? { error: `The policy is broken: ${problems[0]}` } : { policy };
+}
+
+/** The full decision for one call: { decision, rule, severity, reason }. */
+export function decision(toolName, args, { policyFile = POLICY } = {}) {
+  const { policy, error } = loadPolicy(policyFile);
+  if (error) return { decision: 'deny', rule: 'policy-unusable', severity: 'critical', reason: `${error}, so every call is blocked until a human fixes it.` };
+  return evaluate(policy, normalize(toolName, args));
+}
+
+/** The question the hard level's suite asks: a reason to block the call, or null to allow it. */
+export function decide(toolName, args) {
+  const d = decision(toolName, args);
+  return d.decision === 'deny' ? d.reason : null;
+}
+
+// ---------- plumbing ----------
+/** The call Copilot sent: an object, or null when stdin is empty, or undefined when it can't be read (deny that). */
+function readInput() {
+  let raw = '';
+  try { raw = fs.readFileSync(0, 'utf8'); } catch { return undefined; }
+  if (!raw.trim()) return null;
+  try { return JSON.parse(raw); } catch { return undefined; }
+}
+function log(entry) {
+  try {
+    fs.mkdirSync('.agent-logs', { recursive: true });
+    fs.appendFileSync(path.join('.agent-logs', 'guard.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`);
+  } catch { /* logging must never break the agent */ }
+}
+/** Decide in a worker, so a policy that hangs (a catastrophic regex) can be stopped: no answer in time means deny. */
+function decideInTime(tool, args) {
+  return new Promise((resolve) => {
+    const failClosed = (reason) => ({ decision: 'deny', rule: 'guard-failed', severity: 'critical', reason });
+    const worker = new Worker(fileURLToPath(import.meta.url), { workerData: { guardWorker: true, tool, args } });
+    const timer = setTimeout(() => {
+      worker.terminate();
+      resolve(failClosed(`The guard could not decide within ${DEADLINE_MS} ms (time limit), so the call is blocked to be safe.`));
+    }, DEADLINE_MS);
+    worker.once('message', (d) => { clearTimeout(timer); worker.terminate(); resolve(d); });
+    worker.once('error', (e) => { clearTimeout(timer); resolve(failClosed(`The guard crashed (${e.message}), so the call is blocked to be safe.`)); });
+  });
+}
+
+if (!isMainThread && workerData?.guardWorker) {
+  let d;
+  try { d = decision(workerData.tool, workerData.args); } catch (e) { d = { decision: 'deny', rule: 'guard-failed', severity: 'critical', reason: `The guard crashed (${e.message}), so the call is blocked to be safe.` }; }
+  parentPort.postMessage(d);
+}
+
+// Real paths on both sides: through a symlink (macOS /var), a junction or an 8.3 name the spellings differ.
+const sameFile = (a, b) => { try { return fs.realpathSync.native(a) === fs.realpathSync.native(b); } catch { return false; } };
+const isMain = isMainThread && process.argv[1] && sameFile(process.argv[1], fileURLToPath(import.meta.url));
+const input = isMain ? readInput() : null;
+// A call the guard can't read (broken JSON, nothing, or no toolName) can't be vouched for: deny it.
+if (isMain && (!input || typeof input !== 'object' || Array.isArray(input) || !input.toolName)) {
+  const reason = 'The guard could not read this tool call, so it is blocked to be safe.';
+  log({ tool: 'unknown', decision: 'deny', rule: 'unreadable-call', severity: 'critical', reason });
+  process.stdout.write(JSON.stringify({ permissionDecision: 'deny', permissionDecisionReason: reason }));
+  process.exit(0);
+}
+if (input && typeof input === 'object') {
+  let args = input.toolArgs ?? {};
+  if (typeof args === 'string') {
+    try { args = JSON.parse(args); } catch { args = { raw: args }; }
+  }
+  if (!args || typeof args !== 'object') args = {};
+  const tool = String(input.toolName ?? '');
+  const d = await decideInTime(tool, args);
+  log({ tool, decision: d.decision, rule: d.rule ?? undefined, severity: d.severity ?? undefined, reason: d.reason || undefined, args: redact(JSON.stringify(args)).slice(0, 300) });
+  if (d.decision === 'deny') process.stdout.write(JSON.stringify({ permissionDecision: 'deny', permissionDecisionReason: d.reason }));
+  process.exit(0);
+}

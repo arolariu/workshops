@@ -1,0 +1,10 @@
+{
+  "name": "answer",
+  "about": "A plain answer: one model call, no tools.",
+  "prompt": "Say hello to the StudyBuddy team in one sentence.",
+  "steps": [
+    {
+      "say": "Hello, StudyBuddy team: your grades are in good hands!"
+    }
+  ]
+}

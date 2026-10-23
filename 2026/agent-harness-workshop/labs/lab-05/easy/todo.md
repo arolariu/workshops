@@ -1,12 +1,12 @@
 # 🟢 Easy · A hook that says no
 
-> 🕐 10 min · 🆓 free checks · 🤖 optional agent check (about 1 prompt)
+> 🕐 10 min · 👥 together · 🆓 free checks · 🤖 optional agent check (about 1 prompt) · 🧱 builds on: Lab 04 · easy
 
 ## 🎯 Mission
 One day an agent *will* try `rm -rf` on the wrong folder. Make sure that in this project it physically can't.
 The hook is already wired up in `.github/hooks/guardrails.json`; it runs
-`.github/hooks/scripts/guard.mjs` before every tool call. Teach `decide()` to block recursive force-deletes,
-**every spelling of them**, while letting normal work through.
+`.github/hooks/scripts/guard.mjs` before every tool call. Fill in `isRecursiveForceDelete()` and `decide()` so it
+blocks recursive force-deletes, **every spelling of them**, while letting normal work through.
 
 ## 📂 Work here
 ```bash
@@ -20,6 +20,23 @@ code .github/hooks/scripts/guard.mjs
 - Normal work is allowed: `rm notes.txt`, `rm -f notes.txt`, `rm -r empty-folder`, `npm test`, `ls`, reading files
 - Denials come with a reason the model can understand
 
+## 🧠 Takeaway
+Instructions are wishes; hooks are guarantees: they run outside the model, and when in doubt they fail closed.
+
+## ❓ Check yourself
+`AGENTS.md` says "never run rm -rf", and your `preToolUse` hook denies it. The model insists it has a good reason
+to delete the folder. What holds?
+1. Whichever the model finds more convincing: it weighs the rule, the hook and its own reason.
+2. `AGENTS.md`, because it's in the context on every turn and the model reads it first.
+3. The hook: it runs outside the model, so no argument the model makes can reach it.
+
+<details><summary>Answer</summary>
+
+**3.** The model only ever sees the hook's decision, never its code. Instructions shape what the model *tries*;
+the hook decides what actually *runs*.
+
+</details>
+
 ## 💡 Hints
 <details><summary>What arrives</summary>
 
@@ -28,10 +45,11 @@ is `"powershell"`. Return a string to block, `null` to allow.
 
 </details>
 
-<details><summary>Regex or words?</summary>
+<details><summary>The helpers do the splitting</summary>
 
-A single regex gets messy fast. Try: split the command on `&&`, `||`, `;`, `|`; split each part into words;
-skip `sudo`; if the first word is `rm`, collect its flags and check for "recursive" **and** "force".
+`segments("cd build && rm -rf x")` gives `["cd build", "rm -rf x"]`, and `words("sudo rm -r -f x")` gives
+`["rm", "-r", "-f", "x"]` (it drops `sudo`). So `isRecursiveForceDelete` only looks at one command's flags:
+are "recursive" **and** "force" both there, in short (`-rf`, `-r -f`) or long (`--recursive --force`) form?
 
 </details>
 

@@ -33,12 +33,21 @@ function isRecursiveForceDelete(segment) {
 const WRITE_TOOLS = /^(edit|create|write|apply_patch|str_replace_editor|multi_edit)$/;
 
 // "npm install lodash", "npm i -D jest", "yarn add x", "pnpm add x" add a dependency; "npm install" and "npm ci" don't.
-const addsDependency = (segment) => /\b(npm|pnpm|yarn)\s+(install|i|add)\b(\s+-\S+)*\s+[^-\s]/.test(segment);
+// "npm pkg set dependencies.x=1" edits package.json without an editor.
+const addsDependency = (segment) => /\b(npm|pnpm|yarn)\s+(install|i|add)\b(\s+-\S+)*\s+[^-\s]/.test(segment) || /\bnpm\s+pkg\s+set\b/.test(segment);
 
-// ".env" or ".env.local" as a file name, but not ".env.example", and not "process.env".
+// The shell can write package.json too: a redirect, tee, sed -i, or PowerShell's Set-Content / Out-File / Add-Content.
+const WRITES_FILE = /^(tee|sed|truncate|mv|cp|set-content|add-content|out-file|clear-content|new-item|move-item|copy-item)$/i;
+function writesPackageJson(segment) {
+  if (!/package\.json/i.test(segment)) return false;
+  const [cmd] = words(segment);
+  return WRITES_FILE.test(cmd ?? '') || />>?\s*\S*package\.json/i.test(segment);
+}
+
+// ".env", ".env.local" or ".env.production.local" as a file name, but not ".env.example", and not "process.env".
 function mentionsEnvFile(text) {
-  for (const m of String(text).matchAll(/(^|[\s"'`/\\=:])\.env(\.[\w-]+)?(?=$|[\s"'`/\\,;)}])/g)) {
-    if (!/^\.(example|sample|template)$/i.test(m[2] ?? '')) return true;
+  for (const m of String(text).matchAll(/(^|[\s"'`/\\=:])\.env((?:\.[\w-]+)*)(?=$|[\s"'`/\\,;)}])/g)) {
+    if (!/^\.(example|sample|template)(\.|$)/i.test(m[2] ?? '')) return true;
   }
   return false;
 }
@@ -60,8 +69,18 @@ const SECRETS = [
   ['API key', /\bsk-[A-Za-z0-9]{32,}\b/],
 ];
 const findSecret = (text) => SECRETS.find(([, re]) => re.test(text))?.[0] ?? null;
-// Mask secrets before anything is written to a log: the audit trail must not become the leak.
-export const redact = (text) => SECRETS.reduce((acc, [, re]) => acc.replace(new RegExp(re.source, 'g'), '[REDACTED]'), String(text));
+// Mask secrets before anything is written to a log: the audit trail must not become the leak. A private key is masked
+// from its BEGIN line to its END line (or to the end of the text): the body is the secret, not the header.
+const REDACT = [
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g,
+  ...SECRETS.filter(([name]) => name !== 'private key').map(([, re]) => new RegExp(re.source, 'g')),
+];
+export const redact = (text) => REDACT.reduce((acc, re) => acc.replace(re, '[REDACTED]'), String(text));
+
+// Every reason says what to do instead: the model reads it and picks its next move from it.
+const NO_DEPS = 'No new dependencies: StudyBuddy is dependency-free on purpose (see AGENTS.md). Write a small helper instead, or ask the human.';
+const NO_ENV = '.env files hold secrets and are off-limits for the agent. Use .env.example for the variable names instead, and ask the human for values.';
+const HOOKS = 'The guardrails in .github/hooks are protected. Read them if you need to, and ask the human to change them.';
 
 /**
  * Decide about one tool call.
@@ -73,18 +92,18 @@ export function decide(toolName, args) {
   const text = JSON.stringify(args ?? {});
   if (SHELL_TOOLS.has(toolName)) {
     const parts = segments(args.command);
-    if (parts.some(isRecursiveForceDelete)) return 'Recursive force-deletes (rm -rf, Remove-Item -Recurse) are blocked in this project.';
-    if (parts.some(addsDependency)) return 'No new dependencies: StudyBuddy is dependency-free on purpose (see AGENTS.md). Write a small helper instead.';
-    if (parts.some(changesHooks)) return 'The guardrails in .github/hooks are protected. Ask the human to change them.';
+    if (parts.some(isRecursiveForceDelete)) return 'Recursive force-deletes (rm -rf, Remove-Item -Recurse) are blocked in this project. Delete specific files instead, or ask the human.';
+    if (parts.some(addsDependency) || parts.some(writesPackageJson)) return NO_DEPS;
+    if (parts.some(changesHooks)) return HOOKS;
   }
-  if (mentionsEnvFile(text)) return '.env files hold secrets and are off-limits for the agent.';
+  if (mentionsEnvFile(text)) return NO_ENV;
   if (WRITE_TOOLS.test(toolName) || SHELL_TOOLS.has(toolName)) {
     const secret = findSecret(text);
-    if (secret) return `This looks like a ${secret}. Secrets never go into files or commands: read them from an environment variable instead.`;
+    if (secret) return `This looks like a ${secret}. Secrets never go into files or commands: read it from an environment variable instead.`;
   }
   if (WRITE_TOOLS.test(toolName)) {
-    if (HOOKS_PATH.test(text)) return 'The guardrails in .github/hooks are protected. Ask the human to change them.';
-    if (/package\.json/.test(text)) return 'package.json is locked: no new dependencies or scripts without a human.';
+    if (HOOKS_PATH.test(text)) return HOOKS;
+    if (/package\.json/.test(text)) return NO_DEPS;
   }
   return null;
 }
@@ -99,7 +118,9 @@ function log(entry) {
     fs.appendFileSync(path.join('.agent-logs', 'guard.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`);
   } catch { /* logging must never break the agent */ }
 }
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Real paths on both sides: through a symlink (macOS /var), a junction or an 8.3 name the spellings differ.
+const sameFile = (a, b) => { try { return fs.realpathSync.native(a) === fs.realpathSync.native(b); } catch { return false; } };
+const isMain = process.argv[1] && sameFile(process.argv[1], fileURLToPath(import.meta.url));
 const input = isMain ? readInput() : null;
 if (input && typeof input === 'object') {
   let args = input.toolArgs ?? {};

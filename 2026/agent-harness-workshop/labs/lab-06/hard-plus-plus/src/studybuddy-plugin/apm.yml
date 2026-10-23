@@ -1,0 +1,10 @@
+# The plugin is an APM package too: `apm install <owner>/<repo>/studybuddy-plugin#v1.0.0`
+# deploys the same agents and skills that `copilot plugin install` loads.
+name: studybuddy-harness
+version: 1.0.0
+description: StudyBuddy's agent harness (reviewer, skills, guard, portal) as one package
+author: StudyBuddy team
+license: MIT
+dependencies:
+  apm:
+    - microsoft/apm-sample-package#v1.0.0

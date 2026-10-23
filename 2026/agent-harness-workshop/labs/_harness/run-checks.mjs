@@ -1,65 +1,150 @@
 // Child process: runs one exercise's free checks (tests/checks.mjs) against a folder and streams
-// results as "@@harness {json}" lines. Running in a child keeps a broken solution from freezing the app.
+// results as "@@harness <token> {json}" lines. Running in a child keeps a broken solution from freezing the app.
+// The token arrives on stdin before any learner code loads, so learner output cannot pass for a grader event.
+// Statuses: pass | fail | blocked (a required tool is missing) | skip (optional or machine-dependent).
 import { register } from 'node:module';
+import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { makeKit, CheckFail, commandExists, spawnCompat, copilotBin } from './kit.mjs';
+import os from 'node:os';
+import { makeKit, CheckFail, commandExists, spawnCompat } from './kit.mjs';
+import { resolveCommand } from './process.mjs';
+import { guardEnvironment, installGuard, attemptsSince, NO_COPILOT } from './no-copilot.mjs';
+import { recoveryFor } from './doctor.mjs';
 
 register('./fake-sdk/loader.mjs', import.meta.url);
 
 const [exDirArg, targetArg] = process.argv.slice(2);
 const exDir = path.resolve(exDirArg);
 const target = path.resolve(targetArg);
-const emit = (o) => process.stdout.write(`@@harness ${JSON.stringify(o)}\n`);
+// Captured before learner code runs: patching process.stdout, fs or JSON later cannot read or rewrite events.
+const { writeSync } = fs;
+const stringify = JSON.stringify;
+// Blocking stdout keeps learner output and grader events in order, and nothing queued is lost at exit.
+process.stdout._handle?.setBlocking?.(true);
+const token = await new Promise((resolve) => {
+  let text = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (d) => { text += d; });
+  process.stdin.on('end', () => resolve(text.trim()));
+  process.stdin.on('error', () => resolve(''));
+});
+process.stdin.destroy();
 
-const INSTALL = {
-  copilot: 'Install GitHub Copilot CLI: npm install -g @github/copilot',
-  apm: 'Install APM (Agent Package Manager): https://github.com/microsoft/apm#install',
-  'gh-aw': 'Install the GitHub CLI (https://cli.github.com) and run: gh extension install github/gh-aw',
+// Free checks never start Copilot with a prompt: the guard (no-copilot.mjs) goes in before any checks or learner code
+// load, in this process, in every Node child (NODE_OPTIONS) and for shells (a stub `copilot` first on PATH).
+const realCopilot = process.env.HARNESS_COPILOT ? resolveCommand(process.env.HARNESS_COPILOT) : resolveCommand('copilot');
+const guardDir = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-nocopilot-'));
+Object.assign(process.env, guardEnvironment({ dir: guardDir, real: realCopilot }));
+installGuard();
+process.on('exit', () => { try { fs.rmSync(guardDir, { recursive: true, force: true }); } catch { /* temp */ } });
+let guardOffset = 0;
+// Each event starts on its own line even when learner output did not end with a newline; the parent drops that separator.
+const emit = (o) => {
+  const bytes = Buffer.from(`\n@@harness ${token} ${stringify(o)}\n`);
+  for (let off = 0; off < bytes.length;) {
+    try { off += writeSync(1, bytes, off); } catch (e) { if (e.code !== 'EAGAIN') throw e; }
+  }
 };
+
 const available = (tool) => {
-  if (tool === 'copilot') return commandExists(copilotBin());
+  if (tool === 'copilot') return Boolean(realCopilot);
   if (tool === 'gh-aw') return commandExists('gh') && spawnCompat('gh', ['aw', 'version'], { timeout: 20000 }).status === 0;
   return commandExists(tool);
 };
+
+const jsonSafe = (v) => {
+  try { return JSON.parse(JSON.stringify(v)); } catch { return String(v); }
+};
+/** Only the evidence a check actually supplied: never invent expected/actual values. */
+function evidence(src) {
+  const detail = {};
+  if (src && typeof src === 'object') {
+    if (Object.hasOwn(src, 'expected')) detail.expected = jsonSafe(src.expected);
+    if (Object.hasOwn(src, 'actual')) detail.actual = jsonSafe(src.actual);
+  }
+  return detail;
+}
+/** Files a check names: declared ones, plus `backticked` paths in its message that exist in the folder. */
+function filesFor(c, message, supplied) {
+  const named = [...String(message).matchAll(/`([^`\s]+\.[A-Za-z0-9]+)`/g)].map((m) => m[1]);
+  const declared = [...(Array.isArray(supplied) ? supplied : []), ...(Array.isArray(c.files) ? c.files : [])];
+  const inside = (f) => {
+    const abs = path.resolve(target, f);
+    const rel = path.relative(target, abs);
+    return rel && !rel.startsWith('..') && !path.isAbsolute(rel) && fs.existsSync(abs);
+  };
+  return [...new Set([...declared.map(String), ...named.filter(inside)])];
+}
 
 const kit = makeKit({ dir: target, exDir });
 let checks;
 try {
   const mod = await import(pathToFileURL(path.join(exDir, 'tests', 'checks.mjs')).href);
   checks = typeof mod.default === 'function' ? await mod.default(kit) : mod.default;
+  if (!Array.isArray(checks)) throw new Error('tests/checks.mjs must export a list of checks.');
 } catch (e) {
   emit({ type: 'fatal', message: `Could not load the checks: ${e.message}` });
   process.exit(0);
 }
 
-emit({ type: 'plan', total: checks.length, names: checks.map((c) => c.name) });
+// A check's milestone: "M2" (case and spaces don't matter), or null for anything else.
+const milestoneOf = (c) => (typeof c.milestone === 'string' && /^m\d+$/i.test(c.milestone.trim()) ? c.milestone.trim().toUpperCase() : null);
+emit({ type: 'plan', total: checks.length, names: checks.map((c) => String(c.name)), milestones: checks.map(milestoneOf) });
 for (const [idx, c] of checks.entries()) {
-  emit({ type: 'start', idx, name: c.name });
+  const limit = c.timeout ?? 60000;
+  emit({ type: 'start', idx, name: String(c.name), timeout: limit });
   let status = 'pass';
   let message = '';
+  let detail = {};
+  let supplied = [];
+  let needs = null;
   const missing = (c.needs ?? []).find((n) => !available(n));
   if (missing) {
-    status = c.optional ? 'skip' : 'fail';
-    message = `${c.optional ? 'Skipped: this optional check needs' : 'This check needs'} \`${missing}\`. ${INSTALL[missing] ?? ''}`;
+    needs = missing;
+    // Verify (facilitators, CI) checks the course, not this machine: a missing tool skips. Learners see "blocked".
+    const verifying = process.env.HARNESS_VERIFY === '1';
+    status = c.optional || verifying ? 'skip' : 'blocked';
+    message = verifying && !c.optional
+      ? `\`${missing}\` is not on this machine (skipped in verify mode).`
+      : `${c.optional ? 'Skipped: this optional check needs' : 'Blocked: this check needs'} \`${missing}\`, which is not available. ${recoveryFor(missing)}`;
   } else if (process.env.HARNESS_VERIFY === '1' && c.env) {
     status = 'skip';
     message = 'Depends on your machine (skipped in verify mode).';
   } else {
-    const limit = c.timeout ?? 60000;
+    let timer;
+    const mark = kit.mark();
     try {
       const res = await Promise.race([
         Promise.resolve().then(() => c.run()),
-        new Promise((_, reject) => setTimeout(() => reject(new CheckFail(`This check took longer than ${limit / 1000}s.`)), limit)),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new CheckFail(`This check took longer than ${limit / 1000}s.`)), limit); }),
       ]);
       if (typeof res === 'string') { status = 'fail'; message = res; }
       else if (res === false) { status = 'fail'; message = c.hint ?? 'Not there yet.'; }
+      else if (res && typeof res === 'object' && res.ok === false) {
+        status = 'fail';
+        message = String(res.message ?? c.hint ?? 'Not there yet.');
+        detail = evidence(res);
+        supplied = res.files;
+      }
     } catch (e) {
       status = 'fail';
-      message = e instanceof CheckFail || e?.constructor?.name === 'CheckFail' ? e.message : `The check crashed: ${e?.message ?? e}`;
+      const known = e instanceof CheckFail || e?.constructor?.name === 'CheckFail';
+      message = known ? e.message : `The check crashed: ${e?.message ?? e}`;
+      if (known) { detail = evidence(e.detail); supplied = e.detail?.files; }
+    } finally {
+      clearTimeout(timer);
+      kit.cleanup(mark);
+    }
+    const tried = attemptsSince(process.env.HARNESS_COPILOT_LOG, guardOffset);
+    guardOffset = tried.offset;
+    if (tried.attempts.length) {
+      status = 'fail';
+      message = `${NO_COPILOT} This check's code tried: \`${tried.attempts[0].command}\``;
     }
   }
-  emit({ type: 'result', idx, name: c.name, status, message, optional: Boolean(c.optional) });
+  emit({ type: 'result', idx, name: String(c.name), status, message, optional: Boolean(c.optional), milestone: milestoneOf(c), ...(needs ? { needs } : {}), detail, files: status === 'pass' ? [] : filesFor(c, message, supplied) });
 }
+kit.cleanup();
 emit({ type: 'done' });
 process.exit(0);

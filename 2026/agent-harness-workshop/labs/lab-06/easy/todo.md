@@ -1,6 +1,6 @@
 # 🟢 Easy · Install, don't copy
 
-> 🕐 10 min · 🆓 free checks (need APM and a network connection) · 🤖 optional agent check (about 1 prompt)
+> 🕐 10 min · 👥 together · 🆓 free checks (need APM and a network connection) · 🤖 optional agent check (about 1 prompt) · 🧱 builds on: Lab 05 · easy
 
 ## 🎯 Mission
 Your team publishes its agent harness as a package. Instead of copy-pasting files between projects (and
@@ -17,6 +17,22 @@ apm --help          # not installed? see github.com/microsoft/apm
 - `apm.yml` exists and depends on `microsoft/apm-sample-package`, **pinned** to a version tag
 - `apm.lock.yaml` exists, and the package's files were deployed into the folders Copilot reads
 - You installed at least one plugin from the `awesome-copilot` marketplace (`copilot plugin list` shows it)
+
+## 🧠 Takeaway
+A shared harness is a dependency made of prompts and code: install it pinned and locked, don't copy it.
+
+## ❓ Check yourself
+Why pin the APM package to a tag (`owner/repo#v1.0.0`) instead of following its main branch?
+1. Everyone gets the same prompts and scripts; an upstream change can't silently change your agent.
+2. Pinned packages install faster, because APM can skip asking GitHub whether a newer version exists.
+3. APM refuses to install a package without a tag, so the install would fail otherwise.
+
+<details><summary>Answer</summary>
+
+**1.** What a package deploys lands in the agent's context. Pinning (plus the lockfile) keeps that context the same
+for every teammate until you choose to upgrade, and review the change.
+
+</details>
 
 ## 💡 Hints
 <details><summary>Start a manifest</summary>

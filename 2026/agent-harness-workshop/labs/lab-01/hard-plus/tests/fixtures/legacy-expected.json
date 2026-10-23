@@ -1,0 +1,163 @@
+{
+  "rules": 56,
+  "vague": [
+    ".github/copilot-instructions.md:97",
+    ".github/copilot-instructions.md:98",
+    ".github/copilot-instructions.md:101",
+    ".github/copilot-instructions.md:103",
+    ".github/copilot-instructions.md:132",
+    ".github/copilot-instructions.md:147",
+    ".github/copilot-instructions.md:165",
+    ".github/copilot-instructions.md:174"
+  ],
+  "duplicates": [
+    [
+      "AGENTS.md:8",
+      ".github/copilot-instructions.md:111"
+    ],
+    [
+      "AGENTS.md:12",
+      ".github/copilot-instructions.md:127"
+    ],
+    [
+      "AGENTS.md:16",
+      ".github/copilot-instructions.md:142"
+    ],
+    [
+      "AGENTS.md:17",
+      ".github/copilot-instructions.md:144"
+    ],
+    [
+      "AGENTS.md:20",
+      ".github/copilot-instructions.md:181"
+    ],
+    [
+      "AGENTS.md:21",
+      ".github/copilot-instructions.md:169"
+    ],
+    [
+      "AGENTS.md:22",
+      ".github/copilot-instructions.md:182"
+    ],
+    [
+      "AGENTS.md:22",
+      ".github/copilot-instructions.md:184"
+    ],
+    [
+      ".github/copilot-instructions.md:182",
+      ".github/copilot-instructions.md:184"
+    ]
+  ],
+  "contradictions": {
+    "indent": {
+      "values": [
+        "2",
+        "4"
+      ],
+      "rules": [
+        ".github/copilot-instructions.md:125",
+        ".github/copilot-instructions.md:130"
+      ]
+    },
+    "quotes": {
+      "values": [
+        "double",
+        "single"
+      ],
+      "rules": [
+        ".github/copilot-instructions.md:126",
+        ".github/copilot-instructions.md:131"
+      ]
+    },
+    "decimals": {
+      "values": [
+        "1",
+        "2"
+      ],
+      "rules": [
+        "AGENTS.md:16",
+        ".github/copilot-instructions.md:142",
+        ".github/copilot-instructions.md:143",
+        ".github/copilot-instructions.md:196"
+      ]
+    },
+    "runner": {
+      "values": [
+        "jest",
+        "node:test"
+      ],
+      "rules": [
+        "AGENTS.md:7",
+        "AGENTS.md:13",
+        ".github/copilot-instructions.md:164",
+        ".github/copilot-instructions.md:167",
+        ".github/instructions/tests.instructions.md:5"
+      ]
+    }
+  },
+  "commands": [
+    ".github/copilot-instructions.md:112 npm run lint",
+    ".github/copilot-instructions.md:113 npm run build",
+    ".github/copilot-instructions.md:114 npm run test:watch",
+    ".github/copilot-instructions.md:115 npm run coverage",
+    ".github/copilot-instructions.md:116 yarn test"
+  ],
+  "keys": {
+    "L01": null,
+    "L02": null,
+    "L03": "30 lines",
+    "L04": "no file or network access",
+    "L05": null,
+    "L06": "computeaverage",
+    "L07": null,
+    "L08": "delete",
+    "L09": "npm test",
+    "L10": "node --test grades\\.test\\.js",
+    "L11": null,
+    "L12": "no build step",
+    "L13": null,
+    "L14": null,
+    "L15": "npm test",
+    "L16": "never require\\(\\)",
+    "L17": "2-space|2 spaces",
+    "L18": "single quotes",
+    "L19": "jsdoc",
+    "L20": "typeerror",
+    "L21": "reduce",
+    "L22": null,
+    "L23": null,
+    "L24": null,
+    "L25": "1-10 scale",
+    "L26": "2 decimals",
+    "L27": "exam grade",
+    "L28": "percentages or relative weights",
+    "L29": "below 1 or above 10",
+    "L30": null,
+    "L31": "yyyy-mm-dd",
+    "L32": "new date\\(\\) without an argument",
+    "L33": "overdue",
+    "L34": "node:assert/strict",
+    "L35": null,
+    "L36": "random",
+    "L37": null,
+    "L38": "error case",
+    "L39": "change a test",
+    "L40": "readme\\.md",
+    "L41": null,
+    "L42": "code examples",
+    "L43": "never add dependencies",
+    "L44": "\\.env",
+    "L45": "push to main",
+    "L46": "not even to debug",
+    "L47": "student's id",
+    "L48": "with their weights",
+    "L49": "weightedaverage\\(\\)",
+    "L50": "below 5 means the course is failed",
+    "L51": "to 2 decimals",
+    "L52": "explains the difference",
+    "L53": "only the course's professor",
+    "L54": "step by step",
+    "L55": "not to the student",
+    "L56": "appeals spreadsheet"
+  }
+}

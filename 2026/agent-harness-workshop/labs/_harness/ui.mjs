@@ -4,6 +4,8 @@
 export const ESC = '\x1b[';
 export const isTTY = Boolean(process.stdout.isTTY);
 export const noColor = 'NO_COLOR' in process.env || process.env.TERM === 'dumb' || (!process.stdout.isTTY && !process.env.FORCE_COLOR);
+/** The CLI's width: the terminal's, else COLUMNS, else null (piped with no width: lines are left as they are). */
+export const termColumns = () => process.stdout.columns || Number(process.env.COLUMNS) || null;
 
 const fg = (n) => `${ESC}38;5;${n}m`;
 const bgc = (n) => `${ESC}48;5;${n}m`;
@@ -44,9 +46,62 @@ export const bold = (s) => style.bold(s);
 const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
 export const stripAnsi = (s) => String(s).replace(ANSI, '');
 
+// ---------- ASCII mode ----------
+// With --ascii every symbol is replaced by plain text. Widths are measured on the folded text, so layout stays aligned.
+let ASCII = false;
+export const setAscii = (on) => { ASCII = Boolean(on); };
+export const isAscii = () => ASCII;
+const FOLD = new Map(Object.entries({
+  '✅': '[ok]', '❌': '[x]', '⬜': '[ ]', '🕓': '[~]', '🚧': '[!]', '⏩': '[-]', '⛔': '[stop]', '⚠': '[?]', '🟠': '[o]',
+  '🟢': 'E', '🟡': 'M', '🔴': 'H', '🟣': 'H+', '⚫': 'H++', '💎': 'H++', '▰': '#', '▱': '.',
+  '🤖': '[ai]', '💡': '*', '🏅': '[medal]', '🏆': '[trophy]', '👉': '->', '🔖': '[bookmark]', '⭐': '*', '🎉': '!', '💪': '', '👀': '', '🧭': '',
+  '╭': '+', '╮': '+', '╰': '+', '╯': '+', '─': '-', '│': '|', '┼': '+', '┃': '|', '█': '#', '░': '.', '▄': '#', '▀': '#',
+  '❯': '>', '•': '*', '●': '*', '○': 'o', '◻': '.', '↳': '->', '↓': 'v', '↑': '^', '→': '->', '←': '<-', '⏎': 'Enter',
+  '·': '-', '—': '-', '–': '-', '…': '...', '✔': 'ok', '▸': '>', '◂': '<', '“': '"', '”': '"', '‘': "'", '’': "'", '✗': 'x', '↪': '>',
+  // Glyphs that carry meaning on their own get a marker (--plain, Phase 6): modes, the X-ray's and the chain's file
+  // marks, the change view, trace and replay rows, the doctor, the layer map.
+  '👥': '[live]', '🏠': '[hw]', '🆕': '[new]', '✏': '[chg]', '🧳': '[brought]', '🌱': '[start]', '➖': '[n/a]',
+  '📝': '[edit]', '🗑': '[del]', '➕': '[+]', '−': '-', '🔧': '[tool]', '⏳': '[...]', '✓': 'ok', '≈': '~', 'Σ': 'total', '💬': '[answer]',
+  '🙋': '[manual]', '├': '|-', '└': '`-', '┌': '+', '┐': '+', '┘': '+', '┤': '|', '┬': '+', '┴': '+', '◀': '<-', '▶': '->',
+  '≤': '<=', '≥': '>=', '↔': '<->', '▏': '|', '☰': '=', '×': 'x', '÷': '/', '§': 'S', '½': '.5', '¼': '.25', '¾': '.75',
+}));
+/** Plain-ASCII version of a (possibly styled) string. ANSI codes are kept. */
+export function asciiFold(s) {
+  let out = '';
+  for (const ch of String(s)) {
+    const cp = ch.codePointAt(0);
+    if (cp < 0x80) { out += ch; continue; }
+    const hit = FOLD.get(ch);
+    if (hit !== undefined) { out += hit; continue; }
+    if (cp === 0xfe0f || cp === 0xfe0e || cp === 0x200d) continue;
+    if (cp >= 0x2800 && cp <= 0x28ff) { out += '*'; continue; }
+    if (cp >= 0x2500 && cp <= 0x257f) { out += '+'; continue; } // any other box-drawing corner or joint
+    if (cp >= 0x1f000 || (cp >= 0x2190 && cp <= 0x2bff)) continue;
+    const plain = ch.normalize('NFKD').replace(/[^\x00-\x7f]/g, '');
+    out += plain || '?';
+  }
+  return out;
+}
+
+/** How each assessment state is shown. One table for the app, the CLI and the linear mode. */
+export const STATUS = {
+  pass: { icon: '✅', word: 'passed' },
+  fail: { icon: '❌', word: 'not passing yet' },
+  stale: { icon: '🕓', word: 'changed since it was checked' },
+  blocked: { icon: '🚧', word: 'blocked: a tool is missing' },
+  skipped: { icon: '⏩', word: 'incomplete: some checks were skipped' },
+  cancelled: { icon: '⛔', word: 'cancelled' },
+  interrupted: { icon: '⚠️', word: 'stopped early' },
+  'not-run': { icon: '⬜', word: 'not run yet' },
+  none: { icon: '', word: 'no agent check' },
+};
+export const statusIcon = (s) => STATUS[s]?.icon ?? '⬜';
+export const statusWord = (s) => STATUS[s]?.word ?? String(s);
+
 // Display width: emoji count as 2 columns, variation selectors and joiners as 0.
 const WIDE_BMP = new Set([0x231a, 0x231b, 0x23e9, 0x23ea, 0x23eb, 0x23ec, 0x23f0, 0x23f3, 0x25fd, 0x25fe, 0x2614, 0x2615, 0x26a1, 0x26aa, 0x26ab, 0x26bd, 0x26be, 0x26c4, 0x26c5, 0x26ce, 0x26d4, 0x26ea, 0x26f2, 0x26f3, 0x26f5, 0x26fa, 0x26fd, 0x2705, 0x270a, 0x270b, 0x2728, 0x274c, 0x274e, 0x2753, 0x2754, 0x2755, 0x2757, 0x2795, 0x2796, 0x2797, 0x27b0, 0x27bf, 0x2b1b, 0x2b1c, 0x2b50, 0x2b55]);
 export function width(s) {
+  if (ASCII) return asciiFold(stripAnsi(s)).length;
   let w = 0;
   let last = 0;
   for (const ch of stripAnsi(s)) {
@@ -117,7 +172,7 @@ export function wrap(text, cols, indent = '') {
 
 export function bar(done, total, cols = 24) {
   const filled = total ? Math.round((done / total) * cols) : 0;
-  return bright('█'.repeat(filled)) + dim('░'.repeat(cols - filled));
+  return bright('█'.repeat(filled)) + dim('░'.repeat(Math.max(0, cols - filled)));
 }
 
 export function box(lines, cols, color = C.green) {
@@ -130,6 +185,7 @@ export function box(lines, cols, color = C.green) {
 }
 
 // Inline Markdown: `code`, **bold**, *italic*, [text](link) → styled text. Code spans are left untouched.
+// Links keep their destination: "text (url)".
 export function inline(s) {
   return String(s)
     .split(/(`[^`]+`)/)
@@ -138,16 +194,32 @@ export function inline(s) {
       return part
         .replace(/\*\*([^*]+)\*\*/g, (_, t) => bold(white(t)))
         .replace(/(^|[\s("'])\*([^*\s][^*]*?)\*(?=[\s).,:;!?"']|$)/g, (_, pre, t) => `${pre}${noColor ? t : `${ESC}3m${t}${ESC}23m`}`)
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, t) => white(t))
+        .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, t, url) => (t === url ? cyan(url) : `${white(t)} ${dim(`(${url})`)}`))
         .replace(/\*(?=")|(?<=")\*/g, '');
     })
     .join('');
 }
 
+/** Break a line at exactly `cols` display columns, keeping its spaces (for code). */
+export function hardWrap(text, cols) {
+  const out = [];
+  let line = '';
+  let used = 0;
+  for (const m of String(text).matchAll(/\x1b\[[0-9;?]*[ -/]*[@-~]|./gsu)) {
+    const tok = m[0];
+    const tw = tok.startsWith('\x1b') ? 0 : width(tok);
+    if (used + tw > cols && used > 0) { out.push(line); line = ''; used = 0; }
+    line += tok;
+    used += tw;
+  }
+  out.push(line);
+  return out;
+}
+
 function renderTable(rows, cols) {
   const cells = rows
     .filter((r) => !/^\s*\|?\s*:?-{3,}/.test(r))
-    .map((r) => r.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((c) => inline(c.trim().replace(/<br>/g, ' '))));
+    .map((r) => r.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split(/(?<!\\)\|/).map((c) => inline(c.trim().replace(/<br>/g, ' ').replace(/\\\|/g, '|'))));
   if (!cells.length) return [];
   const n = Math.max(...cells.map((r) => r.length));
   const widths = Array.from({ length: n }, (_, i) => Math.max(...cells.map((r) => width(r[i] ?? ''))));
@@ -158,6 +230,19 @@ function renderTable(rows, cols) {
     widths[i]--;
   }
   const out = [];
+  if (widths.reduce((a, b) => a + b, 0) > budget) {
+    // Too narrow for columns: one block per row, "Header: value".
+    const [head, ...body] = cells;
+    for (const r of body) {
+      r.forEach((c, i) => {
+        if (!stripAnsi(c).trim()) return;
+        wrap(`${bold(stripAnsi(head[i] ?? ''))}: ${c}`, cols - 6).forEach((l, j) => out.push(`  ${j ? '  ' : ''}${l}`));
+      });
+      out.push('');
+    }
+    if (out[out.length - 1] === '') out.pop();
+    return out;
+  }
   cells.forEach((r, ri) => {
     const wrapped = widths.map((wd, i) => wrap(r[i] ?? '', wd));
     const height = Math.max(...wrapped.map((c) => c.length));
@@ -196,7 +281,7 @@ export function renderMarkdown(md, cols) {
     const b = blocks[i];
     if (b.type === 'blank') { blank(); continue; }
     if (b.type === 'h') { blank(); lines.push(`  ${bold(bright(stripAnsi(inline(b.text)).toUpperCase()))}`); continue; }
-    if (b.type === 'code') { lines.push(`   ${cyan(clip(b.text, cols - 5))}`); continue; }
+    if (b.type === 'code') { hardWrap(b.text.replace(/\t/g, '  '), Math.max(10, cols - 5)).forEach((l, j) => lines.push(`${j ? `  ${dim('↪')}` : '   '}${cyan(l)}`)); continue; }
     if (b.type === 'table') {
       const rows = [b.text];
       while (blocks[i + 1]?.type === 'table') rows.push(blocks[++i].text);

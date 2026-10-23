@@ -1,0 +1,142 @@
+lockfile_version: '1'
+apm_version: 0.33.0
+dependencies:
+- repo_url: _local/apm
+  name: studybuddy-harness
+  version: 1.0.1
+  package_type: apm_package
+  deployed_files:
+  - .agents/skills/ects-grades
+  - .agents/skills/ects-grades/SKILL.md
+  - .agents/skills/new-module
+  - .agents/skills/new-module/SKILL.md
+  - .agents/skills/new-module/templates/module.template.js
+  - .agents/skills/new-module/templates/module.test.template.js
+  - .agents/skills/release-checklist
+  - .agents/skills/release-checklist/SKILL.md
+  - .github/agents/reviewer.agent.md
+  - .github/hooks/apm-guardrails.json
+  - .github/hooks/scripts/apm/scripts/guard.mjs
+  - .github/instructions/testing.instructions.md
+  deployed_file_hashes:
+    .agents/skills/ects-grades/SKILL.md: sha256:24ff1d43acd777b51078c33c06261b46b2fc279bc0b8608cda5bcfd59affe1f7
+    .agents/skills/new-module/SKILL.md: sha256:78c08d09a408a7f9794b53467f4f9b0e45f8f22ae58b81b7d18b551f38dcb3e5
+    .agents/skills/new-module/templates/module.template.js: sha256:df5ad340802973940660d0ca359075021d94e4a67d84af24b85eb93ac1aa17f3
+    .agents/skills/new-module/templates/module.test.template.js: sha256:075a6334265890efd748c14197c7054e7a45f9af29058e4651b6b9de2fd1e6f7
+    .agents/skills/release-checklist/SKILL.md: sha256:d013c7a04ec453560ea3540b1b0661d2ba095b4dbfc924a181ab1bd64fbc1796
+    .github/agents/reviewer.agent.md: sha256:1bf8a79dc3acbc11864c641e8e9b42321b84fadf7659afd02dd1a8fa8acbafce
+    .github/hooks/apm-guardrails.json: sha256:b457d3451d1aefaccafecb669cf9cdcc5bb915e87dd641e98d3f5ac59e4fb71d
+    .github/hooks/scripts/apm/scripts/guard.mjs: sha256:d70bea0d5cc0995ed973f9ad707c683f088586d276b9aaa5cabfbae71848faf8
+    .github/instructions/testing.instructions.md: sha256:bd0b0eb7582e7777e7a4cf0444de1d3c5f0c0ca46b357799f84882230a678efe
+  source: local
+  local_path: ../dist/apm
+  declared_license: MIT
+deployments:
+- kind: project-relative
+  target: copilot
+  value: .agents/skills/ects-grades
+  runtime: null
+  scope: project
+  owners:
+  - ../dist/apm
+  active_owner: ../dist/apm
+  content_hash: null
+- kind: project-relative
+  target: copilot
+  value: .agents/skills/ects-grades/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - ../dist/apm
+  active_owner: ../dist/apm
+  content_hash: sha256:24ff1d43acd777b51078c33c06261b46b2fc279bc0b8608cda5bcfd59affe1f7
+- kind: project-relative
+  target: copilot
+  value: .agents/skills/new-module
+  runtime: null
+  scope: project
+  owners:
+  - ../dist/apm
+  active_owner: ../dist/apm
+  content_hash: null
+- kind: project-relative
+  target: copilot
+  value: .agents/skills/new-module/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - ../dist/apm
+  active_owner: ../dist/apm
+  content_hash: sha256:78c08d09a408a7f9794b53467f4f9b0e45f8f22ae58b81b7d18b551f38dcb3e5
+- kind: project-relative
+  target: copilot
+  value: .agents/skills/new-module/templates/module.template.js
+  runtime: null
+  scope: project
+  owners:
+  - ../dist/apm
+  active_owner: ../dist/apm
+  content_hash: sha256:df5ad340802973940660d0ca359075021d94e4a67d84af24b85eb93ac1aa17f3
+- kind: project-relative
+  target: copilot
+  value: .agents/skills/new-module/templates/module.test.template.js
+  runtime: null
+  scope: project
+  owners:
+  - ../dist/apm
+  active_owner: ../dist/apm
+  content_hash: sha256:075a6334265890efd748c14197c7054e7a45f9af29058e4651b6b9de2fd1e6f7
+- kind: project-relative
+  target: copilot
+  value: .agents/skills/release-checklist
+  runtime: null
+  scope: project
+  owners:
+  - ../dist/apm
+  active_owner: ../dist/apm
+  content_hash: null
+- kind: project-relative
+  target: copilot
+  value: .agents/skills/release-checklist/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - ../dist/apm
+  active_owner: ../dist/apm
+  content_hash: sha256:d013c7a04ec453560ea3540b1b0661d2ba095b4dbfc924a181ab1bd64fbc1796
+- kind: project-relative
+  target: copilot
+  value: .github/agents/reviewer.agent.md
+  runtime: null
+  scope: project
+  owners:
+  - ../dist/apm
+  active_owner: ../dist/apm
+  content_hash: sha256:1bf8a79dc3acbc11864c641e8e9b42321b84fadf7659afd02dd1a8fa8acbafce
+- kind: project-relative
+  target: copilot
+  value: .github/hooks/apm-guardrails.json
+  runtime: null
+  scope: project
+  owners:
+  - ../dist/apm
+  active_owner: ../dist/apm
+  content_hash: sha256:b457d3451d1aefaccafecb669cf9cdcc5bb915e87dd641e98d3f5ac59e4fb71d
+- kind: project-relative
+  target: copilot
+  value: .github/hooks/scripts/apm/scripts/guard.mjs
+  runtime: null
+  scope: project
+  owners:
+  - ../dist/apm
+  active_owner: ../dist/apm
+  content_hash: sha256:d70bea0d5cc0995ed973f9ad707c683f088586d276b9aaa5cabfbae71848faf8
+- kind: project-relative
+  target: copilot
+  value: .github/instructions/testing.instructions.md
+  runtime: null
+  scope: project
+  owners:
+  - ../dist/apm
+  active_owner: ../dist/apm
+  content_hash: sha256:bd0b0eb7582e7777e7a4cf0444de1d3c5f0c0ca46b357799f84882230a678efe

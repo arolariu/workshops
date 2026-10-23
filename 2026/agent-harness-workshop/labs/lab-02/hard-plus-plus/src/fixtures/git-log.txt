@@ -1,0 +1,8 @@
+a1b2c3d	feat(grades): add gpa() with credit weighting
+b2c3d4e	fix(deadlines): skip assignments that are already done
+c3d4e5f	docs: explain the exam rule in README
+d4e5f6a	test(grades): cover exam grades below 5
+e5f6a7b	feat!: drop support for Node 18
+f6a7b8c	fix: use local dates instead of UTC
+0a1b2c3	Update stuff
+1b2c3d4	chore(deps): nothing to see here

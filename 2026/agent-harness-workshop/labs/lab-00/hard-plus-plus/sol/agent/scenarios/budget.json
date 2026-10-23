@@ -1,0 +1,29 @@
+{
+  "name": "budget",
+  "about": "Every turn re-sends a growing history, so the tokens add up until the budget stops the run.",
+  "prompt": "Read grades.js and grades.test.js until you are completely sure they agree.",
+  "files": {
+    "grades.js": "// StudyBuddy grades: weighted averages and pass rules (grades use the 1-10 scale).\n\n/**\n * Weighted average of graded items, rounded to 2 decimals.\n * @param {{ grade: number, weight: number }[]} items - weights are percentages or relative weights\n * @returns {number}\n */\nexport function weightedAverage(items) {\n  if (!Array.isArray(items) || items.length === 0) {\n    throw new RangeError('items must be a non-empty array');\n  }\n  const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);\n  if (totalWeight <= 0) {\n    throw new RangeError('the total weight must be positive');\n  }\n  const total = items.reduce((sum, item) => sum + item.grade * item.weight, 0);\n  return Math.round((total / totalWeight) * 100) / 100;\n}\n\n/**\n * Did the student pass the course? Both the final grade and the exam grade must be at least 5.\n * @param {{ finalGrade: number, examGrade: number }} result\n * @returns {boolean}\n */\nexport function hasPassed({ finalGrade, examGrade }) {\n  return finalGrade >= 5 && examGrade >= 5;\n}\n\n/**\n * Grade point average weighted by credits, rounded to 2 decimals.\n * @param {{ credits: number, finalGrade: number }[]} courses\n * @returns {number}\n */\nexport function gpa(courses) {\n  if (!Array.isArray(courses)) throw new TypeError('courses must be an array');\n  if (courses.length === 0) throw new RangeError('courses must not be empty');\n  for (const { credits, finalGrade } of courses) {\n    if (!Number.isInteger(credits) || credits <= 0) {\n      throw new RangeError(`credits must be a positive whole number, got ${credits}`);\n    }\n    if (typeof finalGrade !== 'number' || finalGrade < 1 || finalGrade > 10) {\n      throw new RangeError(`finalGrade must be between 1 and 10, got ${finalGrade}`);\n    }\n  }\n  const credits = courses.reduce((sum, c) => sum + c.credits, 0);\n  const points = courses.reduce((sum, c) => sum + c.finalGrade * c.credits, 0);\n  return Math.round((points / credits) * 100) / 100;\n}\n",
+    "grades.test.js": "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { weightedAverage, hasPassed, gpa } from './grades.js';\n\ntest('weightedAverage combines grades by weight', () => {\n  assert.equal(weightedAverage([{ grade: 8, weight: 60 }, { grade: 6, weight: 40 }]), 7.2);\n});\n\ntest('weightedAverage rounds to two decimals', () => {\n  assert.equal(weightedAverage([{ grade: 7, weight: 1 }, { grade: 8, weight: 1 }, { grade: 8, weight: 1 }]), 7.67);\n});\n\ntest('weightedAverage rejects an empty list', () => {\n  assert.throws(() => weightedAverage([]), RangeError);\n});\n\ntest('hasPassed is true when the final grade is 5 or more', () => {\n  assert.equal(hasPassed({ finalGrade: 7, examGrade: 6 }), true);\n});\n\ntest('hasPassed is false when the exam grade is below 5, even with a good final grade', () => {\n  assert.equal(hasPassed({ finalGrade: 7.5, examGrade: 4 }), false);\n});\n\ntest('gpa weights final grades by credits', () => {\n  assert.equal(gpa([{ credits: 6, finalGrade: 9 }, { credits: 4, finalGrade: 7 }]), 8.2);\n});\n\ntest('gpa rounds to two decimals', () => {\n  assert.equal(gpa([{ credits: 5, finalGrade: 8 }, { credits: 5, finalGrade: 7 }, { credits: 5, finalGrade: 7 }]), 7.33);\n});\n\ntest('gpa rejects input that is not a list of valid courses', () => {\n  assert.throws(() => gpa('nope'), TypeError);\n  assert.throws(() => gpa([]), RangeError);\n  assert.throws(() => gpa([{ credits: 5, finalGrade: 11 }]), RangeError);\n  assert.throws(() => gpa([{ credits: 0, finalGrade: 8 }]), RangeError);\n});\n"
+  },
+  "run": {
+    "budget": 6000,
+    "maxTurns": 20
+  },
+  "steps": [
+    {
+      "say": "Reading both files again.",
+      "calls": [
+        {
+          "name": "view",
+          "arguments": "{\"path\":\"grades.js\"}"
+        },
+        {
+          "name": "view",
+          "arguments": "{\"path\":\"grades.test.js\"}"
+        }
+      ],
+      "repeat": true
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+# Who must review a change to these paths: GitHub asks a code owner to review every pull request that touches them.
+# The last matching line wins.
+# TODO(M4): owners for the shared baseline (AGENTS.md, .github/, .agents/, scripts/, evals/: @studybuddy/platform), for each
+# package (@studybuddy/cli-team, @studybuddy/portal-team, @studybuddy/planner-team), and for each package's
+# AGENTS.md: its team and platform together.

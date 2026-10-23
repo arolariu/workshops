@@ -1,0 +1,15 @@
+{
+  "name": "studybuddy-grades",
+  "description": "Exam maths for StudyBuddy: a deterministic tool the model calls instead of doing arithmetic itself.",
+  "version": "1.0.0",
+  "author": {
+    "name": "StudyBuddy platform team"
+  },
+  "license": "MIT",
+  "keywords": [
+    "education",
+    "grades",
+    "extension"
+  ],
+  "extensions": "extensions"
+}

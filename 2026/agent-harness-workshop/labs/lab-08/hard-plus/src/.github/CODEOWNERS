@@ -1,0 +1,4 @@
+# TODO(M2): who must review a change to the harness. HARNESS.md names the owner.
+# One line per pattern: the pattern, then one or more owners (@user, @org/team or an e-mail address).
+# Lines work like .gitignore, and the LAST matching line wins: broad lines first, the strict ones after them.
+# Every harness file of this folder needs an owner, and so does this file.
